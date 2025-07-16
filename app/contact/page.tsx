@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Map from "@/components/Map";
+import Map from "@/components/Contact";
 import Footer from "@/components/Footer";
 import FAQSection from "@/components/FAQSection";
 import Navbar from "@/components/Navbar";
@@ -29,9 +29,9 @@ export default function Contact() {
         </section>
 
         {/* FAQ Section */}
-        <section className="py-10">
+        {/* <section className="py-10">
           <FAQSection />
-        </section>
+        </section> */}
       </main>
 
       {/* Footer */}

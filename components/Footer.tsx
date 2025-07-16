@@ -21,39 +21,40 @@ export default function Footer() {
           </div>
 
           {/* Mobile Layout - Two columns */}
-          <div className="w-full flex  gap-8 md:hidden items-center justify-center">
-            {/* Left Column - Contact + Products */}
-            <div className="space-y-6 ">
+          <div className="w-full flex gap-8  md:hidden items-center justify-center">
+            {/* Left Column - Contact + Legal & Compliance */}
+            <div className="space-y-6">
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
                 <p className="hover:text-lime-400 transition-colors cursor-pointer">sweetdeli@gmail.com</p>
                 <p className="hover:text-lime-400 transition-colors cursor-pointer">+1-2345-6789</p>
                 <p className="hover:text-lime-400 transition-colors cursor-pointer">123 Ave, New York, USA</p>
               </div>
-
-              
-              
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Products</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Legal & Compliance</h3>
                 <ul className="space-y-3 text-gray-300 text-sm">
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Auctor volutpat</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Fermentum turpis</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Mi consequat</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
+                  <li><Link href="/policy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
+                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
                 </ul>
               </div>
             </div>
 
-            {/* Right Column - About + Social */}
-            <div className="space-y-6">
-              <div className='mt-[-11px]'>
-                <h3 className="text-lg font-semibold text-white mb-4">About</h3>
+            {/* Right Column - Support & Help + Get the App */}
+            <div className="space-y-6  flex flex-col justify-between h-[54vh]">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-4">Support & Help</h3>
                 <ul className="space-y-3 text-gray-300 text-sm">
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">Egestas vitae</Link></li>
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">Viverra lorem ac</Link></li>
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">Eget ac tellus</Link></li>
+                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">About Us</Link></li>
+                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">Contact Us</Link></li>
+                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">FAQ</Link></li>
+                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">How It Works</Link></li>
                 </ul>
               </div>
-
               <div>
                 <h3 className="text-lg font-semibold text-lime-400 mb-4">Get the App</h3>
                 <div className="flex flex-col gap-3">
@@ -106,27 +107,28 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Products */}
+            {/* Legal & Compliance */}
             <div className="flex flex-col items-center md:items-start">
-              <h3 className="text-lg font-semibold text-white mb-4">Products</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Legal & Compliance</h3>
               <ul className="space-y-3 text-gray-300 text-sm">
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Auctor volutpat</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Fermentum turpis</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Mi consequat</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Amet venenatis</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Convallis porttitor</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
+                <li><Link href="/policy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
+                <li><Link href="#" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
               </ul>
             </div>
 
-            {/* About */}
+            {/* Support & Help */}
             <div className="flex flex-col items-center md:items-start">
-              <h3 className="text-lg font-semibold text-white mb-4">About</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Support & Help</h3>
               <ul className="space-y-3 text-gray-300 text-sm">
-                <li><Link href="/about" className="hover:text-lime-400 transition-colors">Egestas vitae</Link></li>
-                <li><Link href="/about" className="hover:text-lime-400 transition-colors">Viverra lorem ac</Link></li>
-                <li><Link href="/about" className="hover:text-lime-400 transition-colors">Eget ac tellus</Link></li>
-                <li><Link href="/about" className="hover:text-lime-400 transition-colors">Erat nulla</Link></li>
-                <li><Link href="/about" className="hover:text-lime-400 transition-colors">Vulputate proin</Link></li>
+                <li><Link href="/about" className="hover:text-lime-400 transition-colors">About Us</Link></li>
+                <li><Link href="/contact" className="hover:text-lime-400 transition-colors">Contact Us</Link></li>
+                <li><Link href="/faq" className="hover:text-lime-400 transition-colors">FAQ</Link></li>
+                <li><Link href="/howitworks" className="hover:text-lime-400 transition-colors">How It Works</Link></li>
               </ul>
             </div>
 
