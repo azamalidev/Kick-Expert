@@ -1,44 +1,13 @@
 'use client'
 
 import { motion } from "framer-motion"
-import { Lock } from "lucide-react"
+import { FileText } from "lucide-react"
 import Image from "next/image"
 
-const Policy = () => {
+const TermsOfService = () => {
   return (
     <>
-      {/* Hero Section */}
-      <section className=" hidden md:block relative w-full mt-16 h-64 sm:h-80 lg:h-96 overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src="/images/image10.png"
-            alt="Privacy Policy Background"
-            fill
-            className="object-cover opacity-90"
-            priority
-          />
-          {/* <div className="absolute inset-0 bg-gradient-to-b from-lime-600/30 to-teal-500/30"></div> */}
-        </div>
-        <div className="relative z-10 flex flex-col justify-center h-full px-6 sm:px-12 lg:px-16">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl"
-          >
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold mb-3 sm:mb-5">
-              <span className="text-lime-400">Kick</span>
-              <span className="text-white">Expert</span>
-            </h1>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-5">
-              Privacy Policy
-            </h2>
-            <p className="text-base sm:text-lg lg:text-xl text-white/90 font-medium">
-              We value your privacy
-            </p>
-          </motion.div>
-        </div>
-      </section>
+     
 
       {/* Content Section */}
       <section className="bg-gradient-to-b from-gray-50 to-white py-20 sm:py-32">
@@ -51,20 +20,20 @@ const Policy = () => {
             className="text-center mb-20"
           >
             <div className="inline-flex items-center justify-center bg-lime-100 px-6 py-3 rounded-full mb-2 shadow-sm">
-              <Lock className="w-6 h-6 text-lime-600 mr-3" />
+              <FileText className="w-6 h-6 text-lime-600 mr-3" />
               <span className="text-base font-semibold text-lime-700 uppercase tracking-wide">
-                Privacy Policy
+                Terms of Service
               </span>
             </div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold  mb-3 p-2 bg-clip-text text-transparent bg-gradient-to-r from-lime-600 to-teal-500">
-              Protecting Your Data
+            <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 p-2 bg-clip-text text-transparent bg-gradient-to-r from-lime-600 to-teal-500">
+              Governing Your Experience
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium">
-              Last updated: July 14, 2025 - How we collect, use, and safeguard your personal information
+              Last updated: July 14, 2025 - Rules and guidelines for using KickExpert
             </p>
           </motion.div>
 
-          {/* What We Collect */}
+          {/* Introductory Text */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -72,57 +41,20 @@ const Policy = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
-              </div>
-              What We Collect
-            </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
               <p className="text-gray-700 text-base mb-4">
-                When you use KickExpert, we collect the following types of data:
+                Welcome to KickExpert. These Terms of Service ("Terms") govern your use of our platform, including our website, quizzes, AI features, competitions, and wallet system.
               </p>
-              <ul className="space-y-4 text-gray-700">
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Account information: name, email, date of birth
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Usage data: your quiz scores, competition activity, AI queries
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Device info: browser type, device model, IP address, general location
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Payment details: securely processed through Stripe and PayPal (we do not store your card info)
-                  </span>
-                </li>
-              </ul>
+              <p className="text-gray-700 text-base">
+                By using KickExpert, you agree to these terms. Please read them carefully.
+              </p>
             </motion.div>
           </motion.div>
 
-          {/* How We Use Your Data */}
+          {/* Eligibility */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -132,74 +64,21 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              How We Use Your Data
+              Eligibility
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
-              <p className="text-gray-700 text-base mb-4">
-                We use your data to:
-              </p>
-              <ul className="space-y-4 text-gray-700">
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Create and manage your account
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Operate quizzes, competitions, and wallet functionality
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Analyze platform performance and user trends
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Prevent fraud and enforce fair play
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Process deposits and payouts securely
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <div className="flex-shrink-0 mt-1 mr-3">
-                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                  </div>
-                  <span className="text-base font-medium">
-                    Comply with legal and tax obligations
-                  </span>
-                </li>
-              </ul>
-              <p className="text-gray-700 text-base mt-4">
-                We do not sell your personal data under any circumstances.
+              <p className="text-gray-700 text-base">
+                You must be at least 18 years old and legally allowed to participate in skill-based competitions in your country of residence. By signing up, you confirm that you meet these requirements.
               </p>
             </motion.div>
           </motion.div>
 
-          {/* AI Content & User Queries */}
+          {/* What We Offer */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -209,24 +88,58 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              AI Content & User Queries
+              What We Offer
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
               <p className="text-gray-700 text-base mb-4">
-                When you ask questions via the Ask AI feature, your input is processed through third-party AI providers (e.g., OpenAI) to generate responses. These queries may be logged for performance monitoring, abuse detection, and content improvements.
+                KickExpert provides:
               </p>
-              <p className="text-gray-700 text-base">
-                AI responses are educational and informational only.
+              <ul className="space-y-4 text-gray-700">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    AI-powered football Q&A (Ask AI)
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Football knowledge quizzes
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Timed, skill-based competitions with real-money prizes
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    A wallet system for deposits, entry fees, and payouts
+                  </span>
+                </li>
+              </ul>
+              <p className="text-gray-700 text-base mt-4">
+                All competitions are skill-based — outcomes are determined by the accuracy of your answers, the speed of your submissions, and your overall performance, not chance.
               </p>
             </motion.div>
           </motion.div>
 
-          {/* Data Sharing */}
+          {/* Your Account */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -236,24 +149,24 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Data Sharing
+              Your Account
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
               <p className="text-gray-700 text-base mb-4">
-                We only share your data with trusted third parties essential to operating KickExpert:
+                You agree to:
               </p>
-              <ul className="space-y-4 text-gray-700 mb-4">
+              <ul className="space-y-4 text-gray-700">
                 <li className="flex items-start">
                   <div className="flex-shrink-0 mt-1 mr-3">
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Stripe and PayPal (for payment processing)
+                    Provide accurate information
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -261,7 +174,7 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Analytics providers (e.g., Google Analytics, Meta Pixel)
+                    Keep your login credentials secure
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -269,7 +182,7 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Identity verification partners (for secure withdrawals)
+                    Use only one account
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -277,17 +190,17 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Regulatory and tax authorities (where required by law)
+                    Be responsible for any activity that happens under your account
                   </span>
                 </li>
               </ul>
-              <p className="text-gray-700 text-base">
-                All partners are required to handle your data securely and in accordance with applicable laws.
+              <p className="text-gray-700 text-base mt-4">
+                We reserve the right to suspend or close accounts in cases of suspected fraud, abuse, or violation of our rules.
               </p>
             </motion.div>
           </motion.div>
 
-          {/* Data Security */}
+          {/* Deposits & Wallet */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -297,24 +210,21 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Data Security
+              Deposits & Wallet
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
-              <p className="text-gray-700 text-base mb-4">
-                We implement:
-              </p>
-              <ul className="space-y-4 text-gray-700 mb-4">
+              <ul className="space-y-4 text-gray-700">
                 <li className="flex items-start">
                   <div className="flex-shrink-0 mt-1 mr-3">
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    SSL encryption on all data transmissions
+                    Deposits are made via Stripe or PayPal and stored in your KickExpert wallet
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -322,7 +232,7 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Secure authentication protocols
+                    Deposits are non-refundable unless there is a confirmed technical error
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -330,17 +240,14 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Continuous monitoring and access control
+                    Wallet balances are not interest-bearing and cannot be transferred between users
                   </span>
                 </li>
               </ul>
-              <p className="text-gray-700 text-base">
-                You are responsible for keeping your login credentials secure. We are not liable for unauthorized access due to compromised user devices or weak passwords.
-              </p>
             </motion.div>
           </motion.div>
 
-          {/* Your Rights */}
+          {/* Competitions */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -350,24 +257,21 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Your Rights
+              Competitions
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
-              <p className="text-gray-700 text-base mb-4">
-                You have the right to:
-              </p>
-              <ul className="space-y-4 text-gray-700 mb-4">
+              <ul className="space-y-4 text-gray-700">
                 <li className="flex items-start">
                   <div className="flex-shrink-0 mt-1 mr-3">
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Access the data we store about you
+                    Entry fees vary per competition and are deducted from your wallet
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -375,7 +279,7 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Correct or update your personal information
+                    Each competition includes a timed quiz; scoring is based on both accuracy and speed
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -383,17 +287,14 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Request deletion of your account and data (unless we are required to retain it for legal reasons)
+                    If a competition is canceled (e.g., due to system issues), entry fees will be refunded to your wallet
                   </span>
                 </li>
               </ul>
-              <p className="text-gray-700 text-base">
-                To exercise your rights, please reach out through our Contact Us page.
-              </p>
             </motion.div>
           </motion.div>
 
-          {/* Cookies */}
+          {/* Payouts */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -403,24 +304,21 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Cookies
+              Payouts
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
-              <p className="text-gray-700 text-base mb-4">
-                We use cookies to:
-              </p>
-              <ul className="space-y-4 text-gray-700 mb-4">
+              <ul className="space-y-4 text-gray-700">
                 <li className="flex items-start">
                   <div className="flex-shrink-0 mt-1 mr-3">
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Save your login preferences
+                    Minimum payout is $10
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -428,7 +326,7 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Measure usage and improve functionality
+                    Identity verification may be required before withdrawal
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -436,17 +334,22 @@ const Policy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Track anonymized analytics and advertising data
+                    Payouts are processed securely via Stripe or PayPal within 2–7 business days
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    U.S.-based users earning $600 or more in a calendar year will receive a Form 1099-MISC for tax reporting
                   </span>
                 </li>
               </ul>
-              <p className="text-gray-700 text-base">
-                You can manage or disable cookies through your browser settings. More details are provided in our Cookie Policy.
-              </p>
             </motion.div>
           </motion.div>
 
-          {/* Minors */}
+          {/* Fair Use & Conduct */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -456,42 +359,125 @@ const Policy = () => {
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Minors
+              Fair Use & Conduct
+            </h2>
+            <motion.div
+              whileHover={{ y: -5 }}
+              className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+            >
+              <p className="text-gray-700 text-base mb-4">
+                You agree not to:
+              </p>
+              <ul className="space-y-4 text-gray-700">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Cheat, use bots, or submit automated answers
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Open multiple accounts or impersonate other users
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Interfere with the platform’s performance or abuse its features
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 mt-1 mr-3">
+                    <div className="w-3 h-3 rounded-full bg-lime-500"></div>
+                  </div>
+                  <span className="text-base font-medium">
+                    Misuse AI-generated content (e.g., copying it directly into competitions)
+                  </span>
+                </li>
+              </ul>
+              <p className="text-gray-700 text-base mt-4">
+                Violations may lead to suspension or permanent ban without refund.
+              </p>
+            </motion.div>
+          </motion.div>
+
+          {/* Content Accuracy & AI Disclaimer */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            viewport={{ once: true, margin: "-50px" }}
+            className="mb-16"
+          >
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
+                <FileText className="w-6 h-6 text-lime-600" />
+              </div>
+              Content Accuracy & AI Disclaimer
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
             >
               <p className="text-gray-700 text-base">
-                KickExpert is intended for users 18 years and older. We do not knowingly collect or process data from individuals under 18 years of age.
+                KickExpert uses advanced AI to deliver football knowledge. While we strive for accuracy, responses may occasionally contain outdated or incorrect information. All content is for educational and entertainment purposes only.
               </p>
             </motion.div>
           </motion.div>
 
-          {/* Policy Updates */}
+          {/* Termination */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
+            transition={{ duration: 0.5, delay: 0.9 }}
             viewport={{ once: true, margin: "-50px" }}
+            className="mb-16"
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
               <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Lock className="w-6 h-6 text-lime-600" />
+                <FileText className="w-6 h-6 text-lime-600" />
               </div>
-              Policy Updates
+              Termination
+            </h2>
+            <motion.div
+              whileHover={{ y: -5 }}
+              className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+            >
+              <p className="text-gray-700 text-base">
+                We reserve the right to suspend or terminate your account if you breach these Terms, misuse the platform, or violate applicable laws.
+              </p>
+            </motion.div>
+          </motion.div>
+
+          {/* Governing Law */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 1.0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            className="mb-16"
+          >
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
+              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
+                <FileText className="w-6 h-6 text-lime-600" />
+              </div>
+              Governing Law
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
               className="bg-gradient-to-r from-lime-600 to-teal-500 rounded-2xl p-8 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <p className="text-gray-100 text-base mb-4">
-                If we make changes to this policy, the updated version will be posted here with the revised date. Continued use of the platform implies acceptance of the changes.
-              </p>
-              <p className="text-sm text-gray-200">
-                Last updated: July 14, 2025
+              <p className="text-gray-100 text-base">
+                These Terms are governed by the laws of the State of New Mexico, United States.
               </p>
             </motion.div>
           </motion.div>
@@ -501,4 +487,4 @@ const Policy = () => {
   )
 }
 
-export default Policy
+export default TermsOfService

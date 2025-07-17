@@ -1,13 +1,12 @@
 
-import PrivacyPolicy from "@/components/Policy";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
-
-export default function Policy() {
+import TermsOfService from "@/components/TermsOfService";
+export default function TermsOfServicePage() {
   return (
     <div>
       <Navbar />
-      <PrivacyPolicy />
+        <TermsOfService />
       <Footer />
     </div>
   );

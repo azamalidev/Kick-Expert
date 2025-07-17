@@ -111,13 +111,13 @@ export default function Footer() {
             <div className="flex flex-col items-center md:items-start">
               <h3 className="text-lg font-semibold text-white mb-4">Legal & Compliance</h3>
               <ul className="space-y-3 text-gray-300 text-sm">
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
+                <li><Link href="/termsofservice" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
                 <li><Link href="/policy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
-                <li><Link href="#" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
+                <li><Link href="/cookiepolicy" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
+                <li><Link href="/refundpayoutpolicy" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
+                <li><Link href="/disclaimer" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
+                <li><Link href="trustandsafety" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
+                <li><Link href="/fairplaypolicy" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
               </ul>
             </div>
 
