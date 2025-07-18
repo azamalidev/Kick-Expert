@@ -12,6 +12,7 @@ import FootballAssistant from "@/components/FootballAssistant";
 import SportsArticle from "@/components/SportsArticle";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import { Suspense } from "react";
 
 export default function Home() {
   const pathname = usePathname();
@@ -32,8 +33,14 @@ export default function Home() {
       <Navbar />
       <div className="relative w-full md:h-full bg-zinc-50">
         <div className="relative z-10 flex items-center justify-center h-full flex-col text-center px-4">
-          <FootballExample />
+         
         </div>
+        <div className="relative z-10 flex items-center justify-center h-full flex-col text-center px-4">
+          <Suspense fallback={<div>Loading...</div>}>
+              <FootballExample />
+          </Suspense>
+        </div>
+
         {/* <div className="absolute inset-0 flex items-center md:flex">
           <Image
             src="/footbal.png"
@@ -58,7 +65,7 @@ export default function Home() {
       {/* <div className="w-full" id="live-competition">
         <LiveCompetition />
       </div> */}
-  
+
       <div className="w-full ">
 
         <FootballAssistant />
@@ -67,7 +74,7 @@ export default function Home() {
       </div>
 
       <div className="w-full mt-10 md:mt-20"></div>
-      {/* <SportsArticle /> */}
+      <SportsArticle />
 
       <Footer />
     </section>
