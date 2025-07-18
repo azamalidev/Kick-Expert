@@ -1,3 +1,4 @@
+"use client";
 import Image from "next/image";
 import Link from "next/link";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
@@ -76,7 +77,7 @@ export const articles = [
     paragraphs: [
       "Lionel Messi's 2023 season cemented his status as one of football's all-time greats. After leading Argentina to World Cup glory in Qatar (2022), Messi continued breaking records with Paris Saint-Germain before moving to Inter Miami. His World Cup victory filled the last major gap in his trophy cabinet, completing a career that had already included numerous Ballon d'Or awards and Champions League titles with Barcelona.",
       "Statistically, Messi's 2022-23 season was remarkable. He became the first player to score in every stage of the World Cup (group stage through final) since the knockout format began in 1986. At club level, he surpassed 800 career goals and became the most decorated footballer in history with 43 trophies. Even at 35, Messi demonstrated the dribbling, vision, and finishing that have defined his career.",
-      "Beyond statistics, Messi's impact on football culture is immeasurable. His move to MLS brought unprecedented attention to North American soccer, with ticket prices soaring and jersey sales breaking records. Young players worldwide continue to model their game after Messi, proving that technical ability and intelligence can triumph over physicality. As Messi's career enters its twilight, his influence on the sport will be felt for generations."
+      "Beyond statistics, Messi's impact on football culture is immeasurable. His move to MLS brought unprecedented attention to North American soccer, with ticket prices soaring and jersey sales breaking records. Young players worldwide continue to model their game after Messi, proving that technical ability and intelligence can triumph over physicality. As Messi's career enters its twilight, his influence on the sport will be felt for generations"
     ]
   },
   {
@@ -91,7 +92,52 @@ export const articles = [
     paragraphs: [
       "The debate over football's Greatest of All Time (GOAT) is one that sparks passionate arguments among fans worldwide. Traditional contenders include Pelé, who won three World Cups with Brazil; Diego Maradona, whose 1986 World Cup performance is legendary; and modern stars Lionel Messi and Cristiano Ronaldo, who have dominated the Ballon d'Or awards for over a decade. Each brings unique qualities to the debate - Pelé's trophy haul, Maradona's single-handed dominance, and the sustained excellence of Messi and Ronaldo.",
       "Comparing across eras presents challenges. Older players competed in different conditions - heavier balls, worse pitches, more physical defending. Modern players benefit from sports science, nutrition, and rule changes that protect attackers. Some argue that Alfredo Di Stéfano (Real Madrid's 1950s star) or Johan Cruyff (architect of Total Football) deserve consideration. The debate often reflects what we value most in football - pure skill, trophies, longevity, or transformative impact on the game.",
-      "Perhaps the GOAT debate is ultimately unanswerable, but that's what makes it compelling. Football has seen so many extraordinary talents across different positions and eras that comparing them directly may be impossible. Instead of seeking one definitive answer, we can appreciate how each great player has contributed to football's rich history and inspired generations of fans and players worldwide."
+      "Perhaps the GOAT debate is ultimately unanswerable, but that's what makes it compelling. Football has seen so many extraordinary talents across different positions and eras that comparing them directly may be impossible. Instead of seeking one definitive answer, we can appreciate how each great player has contributed to football's rich history and inspired generations of fans and players worldwide"
+    ]
+  },
+  {
+    id: 7,
+    category: "Football Tactics",
+    image: "/images/football_tactics1.jpg",
+    authorImage: "/images/testimonial2.png",
+    author: "Sophie Clark",
+    date: "10 September 2023",
+    title: "The Rise of Tiki-Taka: Barcelona's Revolutionary Style",
+    desc: "How Barcelona's tiki-taka philosophy redefined modern football with possession and precision.",
+    paragraphs: [
+      "Tiki-taka, the possession-based style of play, became synonymous with Barcelona's dominance in the late 2000s and early 2010s. Pioneered by manager Pep Guardiola and inspired by Johan Cruyff's Total Football, tiki-taka emphasized short passes, constant movement, and maintaining control of the ball to exhaust opponents.",
+      "The style reached its peak during Barcelona's 2008-2012 era, with players like Xavi, Iniesta, and Messi orchestrating play with unparalleled precision. The 2011 Champions League final against Manchester United showcased tiki-taka at its best, as Barcelona dominated possession and won 3-1. This approach not only won titles but also influenced global football tactics.",
+      "While critics argue tiki-taka can be predictable or overly reliant on exceptional players, its legacy is undeniable. It inspired national teams like Spain, who won the 2010 World Cup using similar principles. Today, variations of tiki-taka continue to influence clubs worldwide, proving that possession can be a powerful weapon in football."
+    ]
+  },
+  {
+    id: 8,
+    category: "Football",
+    image: "/images/womens_football.jpg",
+     authorImage: "/images/testimonial1.png",
+    author: "Emma Davis",
+    date: "15 October 2023",
+    title: "The Growth of Women's Football: A Global Revolution",
+    desc: "Exploring the rapid rise of women's football and its impact on the sport's global landscape.",
+    paragraphs: [
+      "Women's football has seen exponential growth in recent years, with record-breaking viewership and investment. The 2023 FIFA Women's World Cup, co-hosted by Australia and New Zealand, drew over 2 billion viewers, showcasing the sport's growing popularity. Teams like the United States, England, and Spain have led the charge with professional leagues and grassroots development.",
+      "The rise of stars like Alexia Putellas, Sam Kerr, and Ada Hegerberg has brought mainstream attention to the women's game. These players combine technical skill with athleticism, challenging stereotypes and inspiring a new generation. Off the pitch, campaigns for equal pay and better facilities have gained traction, with federations slowly addressing longstanding disparities.",
+      "Clubs like Barcelona and Lyon have set the standard in women's football, dominating the UEFA Women's Champions League. As investment continues to grow, the gap between men's and women's football is narrowing, promising a future where the sport is truly inclusive and celebrated worldwide."
+    ]
+  },
+  {
+    id: 9,
+    category: "Football History",
+    image: "/images/football_rivalries.jpg",
+    authorImage: "/images/testimonial1.png",
+    author: "James Wilson",
+    date: "20 November 2023",
+    title: "Iconic Football Rivalries: Passion and Drama on the Pitch",
+    desc: "A look at the fiercest rivalries in football history, from El Clásico to the Manchester Derby.",
+    paragraphs: [
+      "Football rivalries are the heartbeat of the sport, fueling passion and drama. El Clásico, between Real Madrid and Barcelona, is perhaps the most famous, with political, cultural, and sporting tensions dating back decades. Matches between these giants often decide La Liga titles and showcase stars like Ronaldo and Messi at their peak.",
+      "In England, the Manchester Derby between United and City has grown fiercer with City's rise under Pep Guardiola. The North West Derby, pitting Liverpool against Manchester United, carries a historic weight, with both clubs vying for supremacy in English football. These matches are about more than points—they're about pride and identity.",
+      "Globally, rivalries like Boca Juniors vs. River Plate in Argentina or Celtic vs. Rangers in Scotland bring cities to a standstill. These contests transcend sport, reflecting deep cultural divides. Whether it's local bragging rights or global attention, football rivalries continue to captivate fans with their intensity and history."
     ]
   }
 ];
@@ -127,9 +173,9 @@ export default function SportsArticleSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const cardsPerPage = 3;
+  const cardsPerPage = 6; // Show 6 articles (2 rows of 3)
   const totalCards = articles.length;
-  const maxIndex = totalCards - cardsPerPage;
+  const maxIndex = Math.max(0, totalCards - cardsPerPage); // Ensure maxIndex doesn't go negative
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -143,28 +189,28 @@ export default function SportsArticleSection() {
   const handlePrev = () => {
     if (isTransitioning || currentIndex === 0) return;
     setIsTransitioning(true);
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    setCurrentIndex((prev) => Math.max(prev - cardsPerPage, 0)); // Move back by 6
     setTimeout(() => setIsTransitioning(false), 300);
   };
 
   const handleNext = () => {
-    if (isTransitioning || currentIndex === maxIndex) return;
+    if (isTransitioning || currentIndex >= maxIndex) return;
     setIsTransitioning(true);
-    setCurrentIndex((prev) => (prev < maxIndex ? prev + 1 : prev));
+    setCurrentIndex((prev) => Math.min(prev + cardsPerPage, maxIndex)); // Move forward by 6
     setTimeout(() => setIsTransitioning(false), 300);
   };
 
   const visibleArticles = articles.slice(currentIndex, currentIndex + cardsPerPage);
 
   const isLeftDisabled = currentIndex === 0;
-  const isRightDisabled = currentIndex === maxIndex;
+  const isRightDisabled = currentIndex >= maxIndex;
 
   return (
     <section className="px-4 sm:px-10 py-10">
       <h2 className="text-2xl font-semibold mb-8 text-gray-900">Football Articles</h2>
 
       <div className="relative overflow-hidden">
-        <div className={`grid gap-8 grid-cols-1 md:grid-cols-3 transition-transform duration-300 ease-in-out`}>
+        <div className={`grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 transition-transform duration-300 ease-in-out`}>
           {visibleArticles.map((item) => (
             <div key={item.id} className="space-y-4 group flex flex-col h-full">
               <div className="relative h-[270px] overflow-hidden rounded-lg flex-shrink-0">
@@ -210,7 +256,7 @@ export default function SportsArticleSection() {
         </div>
       </div>
 
-      <div className="mt-4 flex gap-4">
+      <div className="mt-4 flex gap-4 justify-start">
         <button
           onClick={handlePrev}
           className={`bg-gray-200 hover:bg-gray-300 p-3 px-4 rounded transition-all duration-200 ${isLeftDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}

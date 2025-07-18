@@ -55,9 +55,9 @@ export default function Home() {
       </div>
 
       <FootballHistory />
-      <div className="w-full" id="live-competition">
+      {/* <div className="w-full" id="live-competition">
         <LiveCompetition />
-      </div>
+      </div> */}
   
       <div className="w-full ">
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from "next/image";
+import { useSearchParams } from 'next/navigation';
 import { useState, useRef, useEffect } from "react";
 import { FaArrowRight, FaSearch, FaPaperPlane } from "react-icons/fa";
 
@@ -21,21 +22,21 @@ export default function FootballAssistant() {
   // AI model configurations
   const aiModels = {
     easy: {
-      name: "Football Beginner Bot",
+      name: "", // Changed from "Football Beginner Bot"
       avatar: "👶",
       systemPrompt: `You are a friendly football assistant for beginners. Respond concisely in 1-2 sentences. 
         Provide only the essential fact or result. Avoid extra details, context, stats, or explanations. 
         Assume the user wants a fast, simple answer to a football-related question.`
     },
     medium: {
-      name: "Football Analyst",
+      name: "", // Changed from "Football Analyst"
       avatar: "🧠",
       systemPrompt: `You are a knowledgeable football analyst. Respond in 2-4 informative sentences. 
         Include the key fact and one additional insight such as a relevant stat, comparison, or brief historical background. 
         Keep the tone engaging and helpful without going into deep analysis.`
     },
     hard: {
-      name: "Football Professor",
+      name: "",
       avatar: "🏆",
       systemPrompt: `You are a football expert with deep knowledge of the game. Respond in 4-6 sentences with expert-level insight. 
         Include the core fact, at least one advanced stat or tactical reference, and meaningful historical or contextual depth. 
@@ -73,6 +74,29 @@ export default function FootballAssistant() {
   //   const examples = exampleQuestions[activeLevel];
   //   return examples[Math.floor(Math.random() * examples.length)];
   // };
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check for a preset question in URL first
+    const urlQuestion = searchParams?.get('question');
+    const storageQuestion = sessionStorage.getItem('presetQuestion');
+    
+    const presetQuestion = urlQuestion || storageQuestion;
+    
+    if (presetQuestion) {
+      setSearchQuery(presetQuestion);
+      sessionStorage.removeItem('presetQuestion');
+      
+      // Focus the input field if it exists
+      const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        // Optional: Auto-submit the question
+        // handleSearch();
+      }
+    }
+  }, [searchParams]);
 
   const generateAIResponse = async (query: string, level: "easy" | "medium" | "hard") => {
     try {
@@ -189,7 +213,7 @@ export default function FootballAssistant() {
   const currentModel = aiModels[activeLevel];
 
   return (
-    <div className="flex flex-col items-center justify-center px-4 pt-20 pb-8 md:pt-28 min-h-screen">
+    <div id="football-example" className="flex flex-col items-center justify-center px-4 pt-20 pb-8 md:pt-28 min-h-screen">
       {/* Header section */}
       <div className="relative text-center mb-10 w-full max-w-4xl">
         <div className="flex items-center justify-center">
