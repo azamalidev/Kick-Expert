@@ -67,7 +67,7 @@ export default function Home() {
       </div>
 
       <div className="w-full mt-10 md:mt-20"></div>
-      <SportsArticle />
+      {/* <SportsArticle /> */}
 
       <Footer />
     </section>
