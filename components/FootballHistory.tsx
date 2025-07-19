@@ -7,68 +7,50 @@ export default function FootballHistory2() {
   const router = useRouter();
 
   const handleQuestionClick = (question: string) => {
-    // Store the question in sessionStorage to be used by FootballExample
     sessionStorage.setItem('presetQuestion', question);
-    // Add a query parameter to trigger refresh
     router.push('?question=' + encodeURIComponent(question));
-    // Scroll to the FootballExample component
     const element = document.getElementById('football-example');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const questions = [
-    "Which country won the 2018 World Cup?",
-    "Who scored the most goals in World Cup history?",
-    "When was the first FIFA World Cup held?"
-  ];
+ const questions = [
+  "Which country won the 2018 World Cup?",
+  "Who has the most World Cup goals?",
+  "When was the first FIFA World Cup held?"
+];
+
 
   return (
-    <div className="bg-stone-50 flex mb-10 justify-center m-0 p-0 pt-8 px-4">
+    <div className="bg-stone-50 flex justify-center px-4 pt-12 ">
       <div className="flex flex-col items-center w-full max-w-5xl">
-        <h2 className="text-2xl md:text-2xl font-semibold text-[#0f172a] text-center w-full mb-8">
-          Try these examples:
+        <h2 className="text-3xl md:text-4xl font-extrabold text-[#0f172a] text-center mb-10">
+          Try These Examples
         </h2>
 
-        <div className="flex flex-col md:flex-row items-center md:items-center justify-center gap-12 w-full text-center">
-          <div className="flex items-center justify-center">
-            <div className="flex flex-col space-y-4 items-center justify-center w-full max-w-xs p-4 rounded-lg">
-              <div className="flex flex-col gap-4 w-full">
-                {questions.map((text, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleQuestionClick(text)}
-                    className="border border-lime-500 px-2 py-2 rounded-full text-[#0f172a] text-sm md:text-base font-medium text-center hover:bg-lime-50 transition-colors cursor-pointer"
-                  >
-                    {text}
-                  </button>
-                ))}
-              </div>
-
+        <div className="flex flex-col md:flex-row items-center justify-center gap-14 w-full">
+          {/* Suggestion Buttons */}
+          <div className="flex flex-col items-center space-y-5 w-full max-w-sm">
+            {questions.map((text, i) => (
               <button
-                className="bg-lime-400 hover:bg-lime-500 text-black font-semibold px-4 py-2.5 rounded-md shadow-md uppercase text-sm tracking-wider transition w-full"
-                onClick={() => {
-                  sessionStorage.removeItem('presetQuestion');
-                  const element = document.getElementById('football-example');
-                  if (element) {
-                    element.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
+                key={i}
+                onClick={() => handleQuestionClick(text)}
+                className="w-full border border-lime-500 bg-white hover:bg-lime-50 text-[#0f172a] font-medium px-4 py-3 rounded-full text-sm md:text-base transition-all shadow-sm hover:shadow-md"
               >
-                Start Asking Questions
+                {text}
               </button>
-            </div>
+            ))}
           </div>
 
-          {/* Right Side */}
-          <div className="hidden  md:flex justify-center items-center">
-            <div className="relative w-60 h-60 sm:w-80 sm:h-80 md:w-60 md:h-60 flex items-center justify-center">
+          {/* Image */}
+          <div className="hidden md:flex justify-center items-center">
+            <div className="relative w-60 h-60 md:w-64 md:h-64 rounded-full overflow-hidden ">
               <Image
                 src="/images/image1.png"
                 alt="Brain Icon"
                 fill
-                className="rounded-full object-cover"
+                className="object-cover"
               />
             </div>
           </div>

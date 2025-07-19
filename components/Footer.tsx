@@ -1,7 +1,6 @@
 'use client';
 
-import { FaFacebookF, FaLinkedinIn, FaTwitter, FaInstagram } from 'react-icons/fa';
-import { IoGlobeOutline } from 'react-icons/io5';
+import { FaFacebookF, FaInstagram } from 'react-icons/fa';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -14,69 +13,64 @@ export default function Footer() {
           {/* Brand - Centered on mobile */}
           <div className="w-full flex justify-center md:justify-start mb-8">
             <Link href="/" className="flex items-center">
-              <h2 className="text-2xl mr-8 font-bold text-white flex items-center gap-2">
-                <span className="text-lime-400">●</span> Kick<span className="text-white">Expert</span>
+              <div className="relative w-8 h-8 mr-2">
+                <Image 
+                  src="/logo.png" 
+                  alt="KickExpert Logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <h2 className="text-2xl font-bold flex items-center">
+                <span className="text-lime-400">Kick</span><span className="text-white">Expert</span>
               </h2>
             </Link>
           </div>
 
           {/* Mobile Layout - Two columns */}
-          <div className="w-full flex gap-8  md:hidden items-center justify-center">
+          <div className="w-full flex gap-8 md:hidden items-center justify-center">
             {/* Left Column - Contact + Legal & Compliance */}
             <div className="space-y-6">
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">sweetdeli@gmail.com</p>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">+1-2345-6789</p>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">123 Ave, New York, USA</p>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">+1-555-123-4567</p>
+                <div className="flex gap-4 text-gray-300 text-lg pt-2">
+                  <a href="https://facebook.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                    <FaFacebookF />
+                  </a>
+                  <a href="https://instagram.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                    <FaInstagram />
+                  </a>
+                </div>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Legal & Compliance</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Legal</h3>
                 <ul className="space-y-3 text-gray-300 text-sm">
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
+                  <li><Link href="/termsofservice" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
                   <li><Link href="/policy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
-                  <li><Link href="#" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
+                  <li><Link href="/cookiepolicy" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
                 </ul>
               </div>
             </div>
 
-            {/* Right Column - Support & Help + Get the App */}
-            <div className="space-y-6  flex flex-col justify-between h-[54vh]">
+            {/* Right Column - Support & Help + Additional Links */}
+            <div className="space-y-6 flex flex-col justify-between ">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Support & Help</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Support</h3>
                 <ul className="space-y-3 text-gray-300 text-sm">
                   <li><Link href="/about" className="hover:text-lime-400 transition-colors">About Us</Link></li>
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">Contact Us</Link></li>
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">FAQ</Link></li>
-                  <li><Link href="/about" className="hover:text-lime-400 transition-colors">How It Works</Link></li>
+                  <li><Link href="/contact" className="hover:text-lime-400 transition-colors">Contact Us</Link></li>
+                  <li><Link href="/faq" className="hover:text-lime-400 transition-colors">FAQ</Link></li>
                 </ul>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-lime-400 mb-4">Get the App</h3>
-                <div className="flex flex-col gap-3">
-                  <a href="https://www.apple.com/app-store/" target="_blank" rel="noopener noreferrer">
-                    <Image 
-                      src="/images/image7.png"
-                      alt="App Store"
-                      width={120}
-                      height={40}
-                      className="rounded-lg hover:opacity-80 transition-opacity"
-                    />
-                  </a>
-                  <a href="https://play.google.com/store" target="_blank" rel="noopener noreferrer">
-                    <Image 
-                      src="/images/image8.png"
-                      alt="Google Play"
-                      width={120}
-                      height={40}
-                      className="rounded-lg hover:opacity-80 transition-opacity"
-                    />
-                  </a>
-                </div>
+                <h3 className="text-lg font-semibold text-white mb-4">Policies</h3>
+                <ul className="space-y-3 text-gray-300 text-sm">
+                  <li><Link href="/refundpayoutpolicy" className="hover:text-lime-400 transition-colors">Refund Policy</Link></li>
+                  <li><Link href="/disclaimer" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
+                  <li><Link href="/fairplaypolicy" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
+                </ul>
               </div>
             </div>
           </div>
@@ -87,85 +81,54 @@ export default function Footer() {
             <div className="space-y-6 flex flex-col items-center md:items-start">
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">sweetdeli@gmail.com</p>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">+1-2345-6789</p>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">123 Ave, New York, USA</p>
-              </div>
-              <div className="flex gap-4 text-gray-300 text-lg">
-                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
-                  <FaFacebookF />
-                </a>
-                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
-                  <FaLinkedinIn />
-                </a>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
-                  <FaTwitter />
-                </a>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
-                  <FaInstagram />
-                </a>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">+1-555-123-4567</p>
+                <div className="flex gap-4 text-gray-300 text-lg pt-2">
+                  <a href="https://facebook.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                    <FaFacebookF />
+                  </a>
+                  <a href="https://instagram.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                    <FaInstagram />
+                  </a>
+                </div>
               </div>
             </div>
 
-            {/* Legal & Compliance */}
+            {/* Legal */}
             <div className="flex flex-col items-center md:items-start">
-              <h3 className="text-lg font-semibold text-white mb-4">Legal & Compliance</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Legal</h3>
               <ul className="space-y-3 text-gray-300 text-sm">
                 <li><Link href="/termsofservice" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
                 <li><Link href="/policy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
                 <li><Link href="/cookiepolicy" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
-                <li><Link href="/refundpayoutpolicy" className="hover:text-lime-400 transition-colors">Refund & Payout Policy</Link></li>
-                <li><Link href="/disclaimer" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
-                <li><Link href="trustandsafety" className="hover:text-lime-400 transition-colors">Trust & Safety</Link></li>
-                <li><Link href="/fairplaypolicy" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
               </ul>
             </div>
 
-            {/* Support & Help */}
+            {/* Support */}
             <div className="flex flex-col items-center md:items-start">
-              <h3 className="text-lg font-semibold text-white mb-4">Support & Help</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">Support</h3>
               <ul className="space-y-3 text-gray-300 text-sm">
                 <li><Link href="/about" className="hover:text-lime-400 transition-colors">About Us</Link></li>
                 <li><Link href="/contact" className="hover:text-lime-400 transition-colors">Contact Us</Link></li>
                 <li><Link href="/faq" className="hover:text-lime-400 transition-colors">FAQ</Link></li>
-                <li><Link href="/howitworks" className="hover:text-lime-400 transition-colors">How It Works</Link></li>
               </ul>
             </div>
 
-            {/* Get the App */}
+            {/* Policies */}
             <div className="flex flex-col items-center md:items-start">
-              <h3 className="text-lg font-semibold text-lime-400 mb-4">Get the App</h3>
-              <div className="flex flex-col sm:flex-row gap-4 items-center">
-                <a href="https://www.apple.com/app-store/" target="_blank" rel="noopener noreferrer">
-                  <Image 
-                    src="/images/image7.png"
-                    alt="App Store"
-                    width={140}
-                    height={48}
-                    className="rounded-lg hover:opacity-80 transition-opacity"
-                  />
-                </a>
-                <a href="https://play.google.com/store" target="_blank" rel="noopener noreferrer">
-                  <Image 
-                    src="/images/image8.png"
-                    alt="Google Play"
-                    width={140}
-                    height={48}
-                    className="rounded-lg hover:opacity-80 transition-opacity"
-                  />
-                </a>
-              </div>
+              <h3 className="text-lg font-semibold text-white mb-4">Policies</h3>
+              <ul className="space-y-3 text-gray-300 text-sm">
+                <li><Link href="/refundpayoutpolicy" className="hover:text-lime-400 transition-colors">Refund Policy</Link></li>
+                <li><Link href="/disclaimer" className="hover:text-lime-400 transition-colors">Disclaimer</Link></li>
+                <li><Link href="/fairplaypolicy" className="hover:text-lime-400 transition-colors">Fair Play Policy</Link></li>
+              </ul>
             </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 text-sm text-gray-400">
-          <div className="flex items-center gap-3 mb-4 md:mb-0">
-            <IoGlobeOutline className="text-lg" />
-            <span>English</span>
-          </div>
-          <div>Copyright © {new Date().getFullYear()}. All rights reserved.</div>
+        <div className="flex flex-col md:flex-row justify-center  md:justify-between items-center pt-8 text-sm text-gray-400">
+          <div className=' w-full flex justify-center'>Copyright © {new Date().getFullYear()} KickExpert. All rights reserved.</div>
         </div>
       </div>
     </footer>

@@ -22,63 +22,31 @@ export default function FootballAssistant() {
   // AI model configurations
   const aiModels = {
     easy: {
-      name: "", // Changed from "Football Beginner Bot"
-      avatar: "👶",
+      name: "",
+      avatar: "⭐", // Changed from 👶
       systemPrompt: `You are a friendly football assistant for beginners. Respond concisely in 1-2 sentences. 
         Provide only the essential fact or result. Avoid extra details, context, stats, or explanations. 
         Assume the user wants a fast, simple answer to a football-related question.`
     },
     medium: {
-      name: "", // Changed from "Football Analyst"
-      avatar: "🧠",
+      name: "",
+      avatar: "🔥", // Changed from 🧠
       systemPrompt: `You are a knowledgeable football analyst. Respond in 2-4 informative sentences. 
         Include the key fact and one additional insight such as a relevant stat, comparison, or brief historical background. 
         Keep the tone engaging and helpful without going into deep analysis.`
     },
     hard: {
       name: "",
-      avatar: "🏆",
+      avatar: "💎", // Changed from 🏆
       systemPrompt: `You are a football expert with deep knowledge of the game. Respond in 4-6 sentences with expert-level insight. 
         Include the core fact, at least one advanced stat or tactical reference, and meaningful historical or contextual depth. 
         Optionally mention rare trivia, controversies, or player/coach quotes. Assume the user is a highly knowledgeable football fan.`
     }
   };
 
-  // Example questions for each level (moved outside component to prevent hydration issues)
-  // const exampleQuestions = {
-  //   easy: [
-  //     "What is offside in football?",
-  //     "How long is a football match?",
-  //     "What does a yellow card mean?",
-  //     "How many players are on a football team?",
-  //     "What is a penalty kick?"
-  //   ],
-  //   medium: [
-  //     "Explain the 4-4-2 formation",
-  //     "What makes Lionel Messi special?",
-  //     "Compare Cristiano Ronaldo and Messi's playing styles",
-  //     "What was significant about the 2005 Champions League final?",
-  //     "How has football tactics evolved in the last decade?"
-  //   ],
-  //   hard: [
-  //     "Compare Cruyff's total football with Guardiola's tiki-taka",
-  //     "Analyze the impact of xG statistics on modern football",
-  //     "What tactical innovations did Arrigo Sacchi bring to AC Milan?",
-  //     "How did the Bosman ruling change European football?",
-  //     "Explain the false nine role with examples from football history"
-  //   ]
-  // };
-
-  // Get a random example question for the current level
-  // const getRandomExample = () => {
-  //   const examples = exampleQuestions[activeLevel];
-  //   return examples[Math.floor(Math.random() * examples.length)];
-  // };
-
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Check for a preset question in URL first
     const urlQuestion = searchParams?.get('question');
     const storageQuestion = sessionStorage.getItem('presetQuestion');
     
@@ -88,12 +56,9 @@ export default function FootballAssistant() {
       setSearchQuery(presetQuestion);
       sessionStorage.removeItem('presetQuestion');
       
-      // Focus the input field if it exists
       const input = document.querySelector('input[type="text"]') as HTMLInputElement;
       if (input) {
         input.focus();
-        // Optional: Auto-submit the question
-        // handleSearch();
       }
     }
   }, [searchParams]);
@@ -131,7 +96,6 @@ export default function FootballAssistant() {
     }
   };
 
-  // Typewriter effect for AI messages
   useEffect(() => {
     if (messages.length === 0 || messages.length === displayedMessages.length) return;
 
@@ -143,7 +107,7 @@ export default function FootballAssistant() {
 
     let currentText = "";
     let i = 0;
-    const typingSpeed = 20; // milliseconds per character
+    const typingSpeed = 20;
 
     const typeWriter = () => {
       if (i < lastMessage.text.length) {
@@ -165,7 +129,6 @@ export default function FootballAssistant() {
   const handleSearch = async () => {
     if (searchQuery.trim() === "" || isLoading) return;
 
-    // Add user message
     const userMessage: Message = {
       text: searchQuery,
       sender: "user",
@@ -202,14 +165,12 @@ export default function FootballAssistant() {
     }
   };
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [displayedMessages]);
 
-  // Get current AI model info
   const currentModel = aiModels[activeLevel];
 
   return (
@@ -224,41 +185,42 @@ export default function FootballAssistant() {
             height={50}
             className="w-8 h-8 md:w-15 md:h-15"
           />
-          <span className="ml-2 text-lime-400 font-bold text-xl md:text-2xl">
+          <span className="ml-2 mb-2 text-lime-400 font-bold text-xl md:text-2xl">
             Kick<span className="text-black ml-1">Expert</span>
           </span>
         </div>
-        <h1 className="text-3xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-b from-green-900 to-lime-400 text-transparent bg-clip-text mb-4">
-          Ask Anything About Football History
+        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold bg-gradient-to-b from-green-900 to-lime-400 text-transparent bg-clip-text mb-2">
+          ASK ANYTHING ABOUT
         </h1>
-        <p className="text-lime-600 max-w-xl mx-auto text-sm sm:text-base">
+        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold bg-gradient-to-b from-green-900 to-lime-400 text-transparent bg-clip-text mb-4">
+          FOOTBALL HISTORY
+        </h1>
+        <p className="text-lime-700 max-w-xl mx-auto text-sm sm:text-base font-medium">
           Get instant AI-powered answers about players, matches, goals and tournaments from international Football history 
         </p>
       </div>
 
       {/* Knowledge level cards */}
       <div className="flex flex-col w-full gap-2">
-        <p className="text-lime-600 max-w-xl mx-auto text-sm sm:text-base">
+        <p className="text-lime-700 max-w-xl mx-auto text-sm sm:text-base font-medium">
           Choose Your Knowledge Level
         </p>
         <div className="flex flex-row justify-center gap-4 mb-8 w-full max-w-4xl">
           {(["easy", "medium", "hard"] as const).map((level) => (
             <div
               key={level}
-              className={`flex-1 border-2 rounded-xl p-2 md:p-4 text-center transition-all cursor-pointer
+              className={`flex-1 rounded-xl p-2 md:p-4 text-center transition-all cursor-pointer
+                bg-gradient-to-br from-white to-gray-50
                 ${activeLevel === level
-                  ? "border-lime-500 bg-lime-100 shadow-md"
-                  : "border-gray-400 hover:border-lime-300"}`}
+                  ? "border-2 border-lime-500 shadow-lg"
+                  : "border-2 border-gray-300 hover:border-lime-300"}`}
               onClick={() => setActiveLevel(level)}
             >
               <div className="flex flex-col items-center">
-                <span className="text-xl md:text-2xl mb-2">
+                <span className="text-3xl md:text-4xl mb-2">
                   {aiModels[level].avatar}
                 </span>
                 <h2 className="text-lg font-bold text-gray-800 capitalize">{level}</h2>
-                <p className="text-gray-500 text-[10px] md:text-[14px] mt-1">
-                  {aiModels[level].name}
-                </p>
               </div>
             </div>
           ))}
@@ -286,7 +248,6 @@ export default function FootballAssistant() {
               <FaArrowRight />
             </button>
           </div>
-          
         </div>
       )}
 
