@@ -14,9 +14,9 @@ export default function AboutSection() {
         {/* Hero Section */}
         <div className="text-center mb-20">
           <div className="inline-block relative">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-gray-900 mb-6">
-              About <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400">KickExpert</span>
-            </h1>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
+              About KickExpert
+            </h2>
             <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
           </div>
           

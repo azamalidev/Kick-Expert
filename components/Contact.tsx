@@ -15,14 +15,16 @@ export default function ContactSection() {
     <section className="py-10  bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
-        <div className="text-center mb-16">
+       <div className="text-center mb-20">
           <div className="inline-block relative">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-              Contact <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400">KickExpert</span>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
+              Contact KickExpert
             </h2>
+            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
           </div>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            We're here to help. Whether you have a question, need assistance with your account, or want to report an issue.
+          
+          <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
+             We're here to help. Whether you have a question, need assistance with your account, or want to report an issue.
           </p>
         </div>
 

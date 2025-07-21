@@ -74,12 +74,18 @@ const HowItWorks = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-20"
         >
-          <h2 className="text-4xl sm:text-5xl font-extrabold  mb-6 bg-clip-text text-transparent bg-gradient-to-r from-lime-600 to-teal-500">
-            How <span>KickExpert</span> Works
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium">
-            Transform your football knowledge into victories with our skill-based platform
+          <div className="text-center mb-20">
+          <div className="inline-block relative">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-2 p-2">
+              How KickExpert Works
+            </h2>
+            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
+          </div>
+          
+          <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
+             Transform your football knowledge into victories with our skill-based platform
           </p>
+        </div>
         </motion.div>
 
         {/* Steps */}

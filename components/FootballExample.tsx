@@ -23,24 +23,31 @@ export default function FootballAssistant() {
   const aiModels = {
     easy: {
       name: "",
-      avatar: "⭐", // Changed from 👶
-      systemPrompt: `You are a friendly football assistant for beginners. Respond concisely in 1-2 sentences. 
-        Provide only the essential fact or result. Avoid extra details, context, stats, or explanations. 
-        Assume the user wants a fast, simple answer to a football-related question.`
+      avatar: "⭐",
+      systemPrompt: `You are a friendly football assistant for beginners. Respond in 1-2 short sentences with clear and accurate answers. 
+Include both recent and historical information as needed. If the question is about an event like the 2022 FIFA World Cup, 
+you know that Argentina won the tournament. Avoid saying anything hasn’t happened if it's already in the past. 
+Focus on the main fact only and keep the language very simple.
+`
     },
     medium: {
       name: "",
-      avatar: "🔥", // Changed from 🧠
-      systemPrompt: `You are a knowledgeable football analyst. Respond in 2-4 informative sentences. 
-        Include the key fact and one additional insight such as a relevant stat, comparison, or brief historical background. 
-        Keep the tone engaging and helpful without going into deep analysis.`
+      avatar: "🔥",
+      systemPrompt: `You are a helpful football analyst who provides accurate and up-to-date answers in 2–4 sentences. 
+You include both recent events (like player transfers, match results, and tournaments) and relevant historical context. 
+If asked about the 2022 World Cup, you confidently say Argentina won it. 
+Do not respond as if you're in the past — always assume the present is 2023 or later. 
+Keep your tone informative and accessible.`
     },
     hard: {
       name: "",
-      avatar: "💎", // Changed from 🏆
-      systemPrompt: `You are a football expert with deep knowledge of the game. Respond in 4-6 sentences with expert-level insight. 
-        Include the core fact, at least one advanced stat or tactical reference, and meaningful historical or contextual depth. 
-        Optionally mention rare trivia, controversies, or player/coach quotes. Assume the user is a highly knowledgeable football fan.`
+      avatar: "💎",
+      systemPrompt: `You are a football expert with deep and current knowledge of the sport. 
+You respond in 4–6 insightful sentences with expert-level detail, including stats, tactical insights, and historical relevance. 
+You are aware that Argentina won the 2022 World Cup, and you incorporate such recent facts naturally. 
+Avoid outdated statements like "this event has not happened yet" unless the event is truly in the future. 
+Tailor your response as if you're speaking to an advanced football fan who values accuracy, depth, and nuance.
+`
     }
   };
 
@@ -49,13 +56,13 @@ export default function FootballAssistant() {
   useEffect(() => {
     const urlQuestion = searchParams?.get('question');
     const storageQuestion = sessionStorage.getItem('presetQuestion');
-    
+
     const presetQuestion = urlQuestion || storageQuestion;
-    
+
     if (presetQuestion) {
       setSearchQuery(presetQuestion);
       sessionStorage.removeItem('presetQuestion');
-      
+
       const input = document.querySelector('input[type="text"]') as HTMLInputElement;
       if (input) {
         input.focus();
@@ -140,13 +147,13 @@ export default function FootballAssistant() {
 
     try {
       const aiResponseText = await generateAIResponse(searchQuery, activeLevel);
-      
+
       const aiResponse: Message = {
         text: aiResponseText,
         sender: "ai",
         level: activeLevel
       };
-      
+
       setMessages((prev) => [...prev, aiResponse]);
     } catch (error) {
       console.error("Error generating response:", error);
@@ -177,26 +184,27 @@ export default function FootballAssistant() {
     <div id="football-example" className="flex flex-col items-center justify-center px-4 pt-20 pb-8 md:pt-28 min-h-screen">
       {/* Header section */}
       <div className="relative text-center mb-10 w-full max-w-4xl">
-        <div className="flex items-center justify-center">
+        <div className="flex items-center mb-4 justify-center">
           <Image
             src="/logo.png"
             alt="Logo"
             width={50}
             height={50}
-            className="w-8 h-8 md:w-15 md:h-15"
+            className="w-8 h-8 md:w-12 md:h-12"
           />
-          <span className="ml-2 mb-2 text-lime-400 font-bold text-xl md:text-2xl">
+          <span className="ml-2 text-lime-400  font-bold text-xl md:text-2xl">
             Kick<span className="text-black ml-1">Expert</span>
           </span>
         </div>
-        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold bg-gradient-to-b from-green-900 to-lime-400 text-transparent bg-clip-text mb-2">
+        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold text-black mb-2">
           ASK ANYTHING ABOUT
         </h1>
-        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold bg-gradient-to-b from-green-900 to-lime-400 text-transparent bg-clip-text mb-4">
+        <h1 className="text-3xl sm:text-3xl md:text-5xl font-bold bg-gradient-to-b from-green-800 to-lime-500 text-transparent bg-clip-text mb-4">
           FOOTBALL HISTORY
         </h1>
-        <p className="text-lime-700 max-w-xl mx-auto text-sm sm:text-base font-medium">
-          Get instant AI-powered answers about players, matches, goals and tournaments from international Football history 
+
+        <p className="text-black max-w-xl mx-auto text-sm sm:text-base font-medium">
+          Get instant AI-powered answers about players, matches, goals and tournaments from international Football history
         </p>
       </div>
 
@@ -277,14 +285,14 @@ export default function FootballAssistant() {
               >
                 <div
                   className={`max-w-[85%] rounded-lg px-4 py-2 ${message.sender === "user"
-                      ? "bg-lime-500 text-white text-left"
-                      : "bg-gray-100 borde text-left text-gray-800"
+                    ? "bg-lime-500 text-white text-left"
+                    : "bg-gray-100 borde text-left text-gray-800"
                     }`}
                 >
                   <div className="flex items-center mb-1">
                     <span className={`text-xs font-medium ${message.sender === "user" ? "text-lime-100" : "text-gray-500"}`}>
-                      {message.sender === "user" 
-                        ? "You" 
+                      {message.sender === "user"
+                        ? "You"
                         : `${aiModels[message.level].name} (${message.level})`}
                     </span>
                   </div>

@@ -18,12 +18,18 @@ const Disclaimer = () => {
             <Shield className="w-5 h-5 text-lime-600 mr-2" />
             <span className="text-sm font-semibold text-lime-700 uppercase tracking-wide">Disclaimer</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 p-2 bg-clip-text text-transparent bg-gradient-to-r from-lime-600 to-teal-500">
-            KickExpert Disclaimer
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto font-medium">
-            Last updated: July 14, 2025 - Important information about your use of our platform
+         <div className="text-center mb-20">
+          <div className="inline-block relative">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
+              KickExpert Disclaimer
+            </h2>
+            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
+          </div>
+          
+          <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
+             Last updated: July 14, 2025 - Important information about your use of our platform.
           </p>
+        </div>
         </motion.div>
 
         {/* AI Content Disclaimer */}
