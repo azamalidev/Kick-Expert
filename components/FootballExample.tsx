@@ -79,7 +79,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
           "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
+          model: "gpt-4o",
           messages: [
             {
               role: "system",
