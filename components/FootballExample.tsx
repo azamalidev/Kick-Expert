@@ -72,6 +72,13 @@ Tailor your response as if you're speaking to an advanced football fan who value
 
   const generateAIResponse = async (query: string, level: "easy" | "medium" | "hard") => {
     try {
+      // Dynamic system prompt to handle historical questions
+      const isHistorical = /\b(18|19|early 20|FIFA|FA Cup|history|origin|found|first|oldest)\b/i.test(query);
+
+      const systemPrompt = isHistorical
+        ? `You are a football historian AI. Provide accurate, detailed, and well-researched answers about football history. Include relevant dates, names, matches, tournaments, and events. Focus on clarity and factual accuracy, even for events from the 1800s and early 1900s.`
+        : aiModels[level]?.systemPrompt || "You are a helpful AI assistant answering football-related questions.";
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -83,7 +90,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
           messages: [
             {
               role: "system",
-              content: aiModels[level].systemPrompt
+              content: systemPrompt
             },
             {
               role: "user",
@@ -91,17 +98,19 @@ Tailor your response as if you're speaking to an advanced football fan who value
             }
           ],
           temperature: 0.7,
-          max_tokens: level === "easy" ? 100 : level === "medium" ? 200 : 300
+          max_tokens: level === "easy" ? 300 : level === "medium" ? 600 : 1000
         })
       });
 
       const data = await response.json();
-      return data.choices[0]?.message?.content || "I couldn't generate a response. Please try again.";
+
+      return data.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
     } catch (error) {
       console.error("Error calling OpenAI API:", error);
       return "Sorry, I'm having trouble answering right now. Please try again later.";
     }
   };
+
 
   useEffect(() => {
     if (messages.length === 0 || messages.length === displayedMessages.length) return;
