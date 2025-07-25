@@ -1,11 +1,11 @@
 "use client";
 
 import { JSX } from "react";
-import { FaBolt, FaUser, FaTrophy } from "react-icons/fa";
+import { FaBolt, FaBrain, FaTrophy } from "react-icons/fa";
 
 export default function FootballHistory() {
   return (
-    <div className="relative w-full h-fit mb-20  bg-zinc-50 flex flex-col items-center justify-center px-4">
+    <div className="relative w-full h-fit mb-20 bg-zinc-50 flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-2xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
           Everything You Need To Explore <br className="hidden md:block" />
@@ -17,17 +17,17 @@ export default function FootballHistory() {
         <Card
           icon={<FaBolt className="text-white text-2xl" />}
           title="Instant AI Answers"
-          description="Get immediate, AI-generated responses to any football-related query."
+          description="Get fast, AI-powered responses to any football question about players, matches, goals, and more."
         />
         <Card
-          icon={<FaUser className="text-white text-2xl" />}
-          title="Personalized Insights"
-          description="Tailored content based on your interests in teams, players, and eras."
+          icon={<FaBrain className="text-white text-2xl" />}
+          title="Smart Quizzes"
+          description="Sharpen your football knowledge with interactive quizzes across eras, clubs, and legends."
         />
         <Card
           icon={<FaTrophy className="text-white text-2xl" />}
-          title="Explore Iconic Moments"
-          description="Relive historic matches, legendary goals, and unforgettable tournaments."
+          title="Weekend Competitions"
+          description="Join live contests, win real prizes, earn trophies, and share your results with friends."
         />
       </div>
     </div>

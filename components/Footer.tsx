@@ -15,13 +15,13 @@ export default function Footer() {
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const supabase = createClientComponentClient();
-      
+
       // Check if email already exists
       const { data: existing } = await supabase
         .from('newsletter_subscribers')
@@ -61,8 +61,8 @@ export default function Footer() {
           <div className="w-full flex justify-center md:justify-start mb-8">
             <Link href="/" className="flex items-center">
               <div className="relative w-8 h-8 mr-2">
-                <Image 
-                  src="/logo.png" 
+                <Image
+                  src="/logo.png"
                   alt="KickExpert Logo"
                   fill
                   className="object-contain"
@@ -81,7 +81,7 @@ export default function Footer() {
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
                 <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
-                
+
                 {/* Newsletter for mobile */}
                 <div className="pt-2">
                   <h4 className="text-white text-sm font-medium mb-2">Subscribe to our newsletter</h4>
@@ -108,9 +108,9 @@ export default function Footer() {
                     </form>
                   )}
                 </div>
-                
+
                 <div className="flex gap-4 text-gray-300 text-lg pt-2">
-                  <a href="https://facebook.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                  <a href="https://web.facebook.com/kick.expert.net/" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
                     <FaFacebookF />
                   </a>
                   <a href="https://www.instagram.com/kick.expert/" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
@@ -158,7 +158,7 @@ export default function Footer() {
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
                 <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
-                
+
                 {/* Newsletter for desktop */}
                 <div className="pt-2 w-full">
                   <h4 className="text-white text-sm font-medium mb-2">Get the latest updates</h4>
@@ -185,9 +185,9 @@ export default function Footer() {
                     </form>
                   )}
                 </div>
-                
+
                 <div className="flex gap-4 text-gray-300 text-lg pt-2">
-                  <a href="https://facebook.com/kickexpert" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
+                  <a href="https://web.facebook.com/kick.expert.net/" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
                     <FaFacebookF />
                   </a>
                   <a href="https://www.instagram.com/kick.expert/" target="_blank" rel="noopener noreferrer" className="hover:text-lime-400 transition-colors">
