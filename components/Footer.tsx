@@ -80,7 +80,7 @@ export default function Footer() {
             <div className="space-y-6 flex flex-col justify-between pb-1">
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">contact@kickexpert.com</p>
 
                 {/* Newsletter for mobile */}
                 <div className="pt-2">
@@ -157,7 +157,7 @@ export default function Footer() {
             <div className="space-y-6 flex flex-col items-center md:items-start">
               <div className="space-y-3 text-gray-300 text-sm">
                 <h3 className="text-lime-400 font-semibold text-lg">Contact Us</h3>
-                <p className="hover:text-lime-400 transition-colors cursor-pointer">support@kickexpert.com</p>
+                <p className="hover:text-lime-400 transition-colors cursor-pointer">contact@kickexpert.com</p>
 
                 {/* Newsletter for desktop */}
                 <div className="pt-2 w-full">

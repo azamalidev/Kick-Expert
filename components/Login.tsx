@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from "react";
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,6 +13,44 @@ export default function Login() {
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Handle email confirmation from URL parameters
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      const confirmed = searchParams.get('confirmed');
+      if (confirmed === 'true') {
+        toast.success('Email confirmed successfully! Please login.');
+        return;
+      }
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        if (session?.user) {
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ email_confirmed: true })
+            .eq('id', session.user.id);
+
+          if (updateError) {
+            console.error('Update error:', updateError);
+            toast.error('Failed to update email confirmation status.');
+            return;
+          }
+
+          await supabase.auth.signOut();
+          toast.success('Email confirmed successfully! Please login.');
+        }
+      } catch (error: any) {
+        console.error('Auth callback error:', error);
+        toast.error('Email confirmation failed. Please try again.');
+      }
+    };
+
+    handleAuthCallback();
+  }, [searchParams]);
 
   const validateForm = useCallback(() => {
     if (!email.trim()) {
@@ -45,8 +83,7 @@ export default function Login() {
     const toastId = toast.loading('Logging in...');
 
     try {
-      // Sign in with Supabase Auth
-      const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
+      const { data: { user, session }, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -59,9 +96,13 @@ export default function Login() {
         throw new Error('User authentication failed');
       }
 
+      if (!user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        throw { code: 'email_not_confirmed' };
+      }
+
       console.log("Authenticated user:", { id: user.id, email: user.email });
 
-      // Fetch user data from users table
       const { data: userData, error: dbError } = await supabase
         .from('users')
         .select('*')
@@ -71,6 +112,13 @@ export default function Login() {
       if (dbError || !userData) {
         console.error("User document not found in Supabase for ID:", user.id);
         throw new Error("User profile not found. Please contact support.");
+      }
+
+      if (!userData.email_confirmed) {
+        await supabase
+          .from('users')
+          .update({ email_confirmed: true })
+          .eq('id', user.id);
       }
 
       const role = userData.role || 'user';
@@ -84,8 +132,8 @@ export default function Login() {
       }, 1500);
     } catch (error: any) {
       console.error("Login Error:", error.code, error.message);
-      let errorMessage = 'Login failed. Please try again.';
-      switch (error.code) {
+      let errorMessage: any = 'Login failed. Please try again.';
+      switch (error.code || error.message) {
         case 'invalid_credentials':
           errorMessage = 'Incorrect email or password.';
           break;
@@ -94,6 +142,32 @@ export default function Login() {
           break;
         case 'too_many_requests':
           errorMessage = 'Too many attempts. Please try again later.';
+          break;
+        case 'email_not_confirmed':
+          errorMessage = (
+            <div className="text-center">
+              <p>Email not confirmed. Please check your inbox.</p>
+              <button
+                onClick={async () => {
+                  const { error } = await supabase.auth.resend({
+                    type: 'signup',
+                    email: email,
+                    options: {
+                      emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    }
+                  });
+                  if (error) {
+                    toast.error('Failed to resend confirmation email');
+                  } else {
+                    toast.success('Confirmation email resent!');
+                  }
+                }}
+                className="mt-2 px-3 py-1 bg-lime-500 text-white rounded hover:bg-lime-600 text-sm"
+              >
+                Resend confirmation
+              </button>
+            </div>
+          );
           break;
         default:
           errorMessage = error.message || errorMessage;
@@ -121,7 +195,7 @@ export default function Login() {
             },
           },
           error: {
-            duration: 4000,
+            duration: 8000,
           },
           loading: {
             duration: Infinity,
@@ -129,7 +203,6 @@ export default function Login() {
         }}
       />
 
-      {/* Image Section */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden h-[80vh] self-center">
         <div className="relative rounded-2xl w-full h-full">
           <Image
@@ -148,7 +221,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Form Section */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
@@ -214,9 +286,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 ${
-                  loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`w-full py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Log In
                 {loading ? (

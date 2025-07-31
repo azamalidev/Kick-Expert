@@ -50,64 +50,77 @@ export default function Signup() {
     const toastId = toast.loading('Creating your account...');
 
     try {
-      // Sign up with Supabase Auth
-      const { data: { user, session }, error: authError } = await supabase.auth.signUp({
+      // First check if user exists in public.users table
+      const { data: existingUser, error: lookupError } = await supabase
+        .from('users')
+        .select('id, email_confirmed')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (lookupError) throw lookupError;
+
+      // If user exists but email isn't confirmed, resend confirmation
+      if (existingUser) {
+        if (existingUser.email_confirmed) {
+          throw { code: 'user_already_exists' };
+        } else {
+          // Resend confirmation email without creating new user
+          const { error: resendError } = await supabase.auth.resend({
+            type: 'signup',
+            email: email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            }
+          });
+
+          if (resendError) throw resendError;
+
+          toast.success('Confirmation email resent! Please check your inbox.', { id: toastId });
+          return;
+        }
+      }
+
+      // Proceed with new signup if user doesn't exist
+      const { data: { user }, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name: name,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
       });
 
-      if (authError) {
-        throw authError;
-      }
+      if (authError) throw authError;
+      if (!user) throw new Error('User creation failed');
 
-      if (!user) {
-        throw new Error('User creation failed');
-      }
-
-      console.log("Authenticated user:", { id: user.id, email: user.email });
-
-      // Save user data to users table with default user role
+      // Save user data to users table
       const userData: SupabaseUser = {
         id: user.id,
         email: user.email || email,
         name,
         role: 'user',
         created_at: new Date().toISOString(),
+        email_confirmed: false
       };
 
       const { error: dbError } = await supabase
         .from('users')
         .insert([userData]);
 
-      if (dbError) {
-        console.error("Database Error:", dbError);
-        throw new Error(dbError.message || 'Failed to save user data');
-      }
+      if (dbError) throw dbError;
 
-      console.log("User data saved to Supabase:", userData);
+      toast.success('Check your email for the confirmation link!', { id: toastId });
 
-      // Ensure session is set (auto-login)
-      if (!session) {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (loginError) {
-          throw loginError;
-        }
-      }
 
-      toast.success('Account created and logged in successfully!', { id: toastId });
-      setTimeout(() => {
-        console.log(`Navigating to: /`);
-        router.replace('/');
-      }, 1500);
+
     } catch (error: any) {
       console.error("Signup Error:", error.code, error.message);
       let errorMessage = 'Signup failed. Please try again.';
       switch (error.code) {
         case 'user_already_exists':
-          errorMessage = 'This email is already registered.';
+          errorMessage = 'This email is already registered. Please log in.';
           break;
         case 'invalid_email':
           errorMessage = 'Invalid email address.';
@@ -117,9 +130,6 @@ export default function Signup() {
           break;
         case 'too_many_requests':
           errorMessage = 'Too many attempts. Please try again later.';
-          break;
-        case 'email_not_confirmed':
-          errorMessage = 'Email confirmation required. Please contact support.';
           break;
         default:
           errorMessage = error.message || errorMessage;

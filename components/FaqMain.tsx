@@ -60,7 +60,7 @@ const FAQMain = () => {
     },
     {
       question: "How do I contact support?",
-      answer: "You can reach us anytime at support@kickexpert.com.\nFor questions about payouts or account verification, write to payouts@kickexpert.com.",
+      answer: "You can reach us anytime at contact@kickexpert.com.\nFor questions about payouts or account verification, write to payouts@kickexpert.com.",
       icon: <Mail className="w-5 h-5 text-lime-400" />
     }
   ]
@@ -83,22 +83,22 @@ const FAQMain = () => {
             <HelpCircle className="w-5 h-5 text-lime-600 mr-2" />
             <span className="text-sm font-medium text-lime-700">FAQ</span>
           </div> */}
-           <div className="text-center mb-20">
-          <div className="inline-block relative">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
-              Frequently Asked Questions
-            </h2>
-            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
+          <div className="text-center mb-20">
+            <div className="inline-block relative">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
+                Frequently Asked Questions
+              </h2>
+              <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
+            </div>
+
+            <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
+              Find answers to common questions about KickExpert and how our platform works.
+            </p>
           </div>
-          
-          <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
-             Find answers to common questions about KickExpert and how our platform works.
-          </p>
-        </div>
         </motion.div>
 
         {/* FAQ Items */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ staggerChildren: 0.1 }}

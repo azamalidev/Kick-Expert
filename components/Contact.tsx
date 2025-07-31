@@ -15,16 +15,16 @@ export default function ContactSection() {
     <section className="py-10  bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
-       <div className="text-center mb-20">
+        <div className="text-center mb-20">
           <div className="inline-block relative">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-lime-400 mb-4">
               Contact KickExpert
             </h2>
             <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-green-400 to-lime-300 rounded-full" />
           </div>
-          
+
           <p className="mt-8 text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium">
-             We're here to help. Whether you have a question, need assistance with your account, or want to report an issue.
+            We're here to help. Whether you have a question, need assistance with your account, or want to report an issue.
           </p>
         </div>
 
@@ -41,8 +41,8 @@ export default function ContactSection() {
                   <p className="text-gray-600">
                     For help with your account, quizzes, competitions, or feedback
                   </p>
-                  <a href="mailto:support@kickexpert.com" className="text-green-600 hover:text-green-700 font-medium">
-                    support@kickexpert.com
+                  <a href="mailto:contact@kickexpert.com" className="text-green-600 hover:text-green-700 font-medium">
+                    contact@kickexpert.com
                   </a>
                 </div>
               </div>
@@ -92,13 +92,13 @@ export default function ContactSection() {
           {/* Right side - Contact Form */}
           <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10">
             <h3 className="text-2xl font-bold text-gray-900 mb-6">Send us a message</h3>
-            
+
             <form className="space-y-5">
               {/* Topic Dropdown */}
               <div className="relative">
-                <select 
+                <select
                   value={formData.topic}
-                  onChange={(e) => setFormData({...formData, topic: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
                   className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none"
                 >
                   <option value="">Select a topic</option>
@@ -117,7 +117,7 @@ export default function ContactSection() {
                     type="text"
                     placeholder="Your name"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
@@ -126,7 +126,7 @@ export default function ContactSection() {
                     type="email"
                     placeholder="Email address"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
                 </div>
@@ -138,7 +138,7 @@ export default function ContactSection() {
                   placeholder="Your message"
                   rows={4}
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                 />
               </div>
