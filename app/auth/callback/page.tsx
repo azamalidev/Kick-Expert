@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 export default function AuthCallback() {
     const router = useRouter();
-    const searchParams = useSearchParams();
+
 
     useEffect(() => {
         const handleAuth = async () => {
