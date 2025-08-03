@@ -26,8 +26,20 @@ export default function AuthCallback() {
 
                     if (updateError) console.error(updateError);
 
-                    toast.success('Email confirmed successfully! Please Login.');
-                    router.push('/login?confirmed=true');
+                    // Check if user already has a profile
+                    const { data: existingProfile } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('user_id', session.user.id)
+                        .single();
+
+                    if (existingProfile) {
+                        toast.success('Welcome back!');
+                        router.push('/');
+                    } else {
+                        toast.success('Email confirmed! Please complete your profile.');
+                        router.push('/complete-profile');
+                    }
                 } else {
                     throw new Error('No user session found');
                 }

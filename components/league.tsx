@@ -112,13 +112,23 @@ export default function League() {
     const initializeQuiz = async () => {
       try {
         setLoading(true);
+        
         const { data: { user } } = await supabase.auth.getUser();
         
         const { data: questionsData, error: questionsError } = await supabase
           .from('competition_questions')
           .select('*');
 
-        if (questionsError) throw questionsError;
+        if (questionsError) {
+          if (questionsError.message.includes('relation "competition_questions" does not exist')) {
+            throw new Error('Database not set up. Please run the setup scripts in database/ folder first.');
+          }
+          throw questionsError;
+        }
+
+        if (!questionsData || questionsData.length === 0) {
+          throw new Error('No questions found in database. Please run setup-quiz-tables.sql to add sample questions.');
+        }
 
         const shuffledQuestions = questionsData
           .sort(() => Math.random() - 0.5)
@@ -143,7 +153,10 @@ export default function League() {
           .select()
           .single();
 
-        if (sessionError) throw sessionError;
+        if (sessionError) {
+          throw sessionError;
+        }
+        
         setSessionId(session.id);
         setLoading(false);
       } catch (err) {
@@ -235,12 +248,14 @@ export default function League() {
 
   const handleNextQuestion = async () => {
     // Prevent multiple calls
-    if (nextCalled.current) return;
+    if (nextCalled.current) {
+      return;
+    }
     nextCalled.current = true;
 
-    console.log("➡️ handleNextQuestion called at index:", currentQuestionIndex);
-
-    if (questions.length === 0) return;
+    if (questions.length === 0) {
+      return;
+    }
 
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
@@ -252,14 +267,13 @@ export default function League() {
 
     // Save answer record
     if (currentQuestion) {
-      setAnswers((prev) => [
-        ...prev,
-        {
-          question_id: currentQuestion.id,
-          is_correct: isCorrect,
-          difficulty: currentQuestion.difficulty
-        }
-      ]);
+      const answerRecord = {
+        question_id: currentQuestion.id,
+        is_correct: isCorrect,
+        difficulty: currentQuestion.difficulty
+      };
+      
+      setAnswers((prev) => [...prev, answerRecord]);
     }
 
     // Move to next question or complete the quiz
@@ -270,9 +284,12 @@ export default function League() {
       setTimer(10);
       setTimerKey((prev) => prev + 1);
     } else {
-      await completeQuiz();
-      setQuizCompleted(true);
-      setPhase('results');
+      // Wait for score and answers to update before completing
+      setTimeout(async () => {
+        await completeQuiz();
+        setQuizCompleted(true);
+        setPhase('results');
+      }, 100);
     }
 
     // Allow handleNextQuestion to run again after short delay
@@ -282,36 +299,237 @@ export default function League() {
   };
 
   const completeQuiz = async () => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      console.error("No session ID found");
+      return;
+    }
+
+    // Include the current answer in the final answers array
+    const finalAnswers = [...answers];
+    const currentQuestion = questions[currentQuestionIndex];
+    if (currentQuestion) {
+      const isCorrect = selectedChoice === currentQuestion.correct_answer;
+      finalAnswers.push({
+        question_id: currentQuestion.id,
+        is_correct: isCorrect,
+        difficulty: currentQuestion.difficulty
+      });
+    }
 
     const difficultyBreakdown = {
       easy: {
         total: questions.filter(q => q.difficulty === 'Easy').length,
-        correct: answers.filter(a => a.difficulty === 'Easy' && a.is_correct).length
+        correct: finalAnswers.filter(a => a.difficulty === 'Easy' && a.is_correct).length
       },
       medium: {
         total: questions.filter(q => q.difficulty === 'Medium').length,
-        correct: answers.filter(a => a.difficulty === 'Medium' && a.is_correct).length
+        correct: finalAnswers.filter(a => a.difficulty === 'Medium' && a.is_correct).length
       },
       hard: {
         total: questions.filter(q => q.difficulty === 'Hard').length,
-        correct: answers.filter(a => a.difficulty === 'Hard' && a.is_correct).length
+        correct: finalAnswers.filter(a => a.difficulty === 'Hard' && a.is_correct).length
       }
     };
 
     try {
-      await supabase
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Calculate final score including current answer
+      const finalScore = finalAnswers.filter(a => a.is_correct).length;
+
+      // Update competition session
+      const { error: sessionUpdateError } = await supabase
         .from('competition_sessions')
         .update({
-          correct_answers: score,
-          score_percentage: (score / questions.length) * 100,
+          correct_answers: finalScore,
+          score_percentage: (finalScore / questions.length) * 100,
           end_time: new Date().toISOString(),
           difficulty_breakdown: difficultyBreakdown,
-          answers: answers,
+          answers: finalAnswers,
         })
         .eq('id', sessionId);
+
+      if (sessionUpdateError) {
+        throw sessionUpdateError;
+      }
+
+      // Calculate rewards based on final score
+      let xpReward = 0;
+      let moneyReward = 0;
+      let performanceLevel = '';
+
+      if (finalScore >= 16) {
+        xpReward = 150;
+        moneyReward = 100;
+        performanceLevel = 'Elite';
+      } else if (finalScore >= 13) {
+        xpReward = 100;
+        moneyReward = 50;
+        performanceLevel = 'Pro';
+      } else if (finalScore >= 10) {
+        xpReward = 70;
+        moneyReward = 30;
+        performanceLevel = 'Starter';
+      } else {
+        xpReward = 40;
+        moneyReward = 10;
+        performanceLevel = 'Practice';
+      }
+
+      // Check if user profile exists, create if not
+      let { data: currentProfile, error: profileFetchError } = await supabase
+        .from('profiles')
+        .select('xp, total_games, total_wins, user_id, username')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileFetchError) {
+        // If profile doesn't exist, create it first
+        if (profileFetchError.code === 'PGRST116') {
+          // Get user name from users table or auth metadata
+          let userName = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+          
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: user.id,
+              username: userName,
+              avatar_url: '',
+              nationality: '',
+              xp: 0,
+              total_games: 0,
+              total_wins: 0,
+              rank_label: 'Beginner',
+              created_at: new Date().toISOString()
+            });
+
+          if (createProfileError) {
+            throw createProfileError;
+          }
+          
+          // Fetch the newly created profile
+          const { data: newProfile, error: newProfileError } = await supabase
+            .from('profiles')
+            .select('xp, total_games, total_wins, user_id, username')
+            .eq('user_id', user.id)
+            .single();
+            
+          if (newProfileError) {
+            throw newProfileError;
+          }
+          
+          currentProfile = newProfile;
+        } else {
+          throw profileFetchError;
+        }
+      }
+
+      // Calculate new values
+      const newXP = (currentProfile?.xp || 0) + xpReward;
+      const newTotalGames = (currentProfile?.total_games || 0) + 1;
+      const newTotalWins = finalScore >= 13 ? (currentProfile?.total_wins || 0) + 1 : (currentProfile?.total_wins || 0);
+
+      // Update user's profile
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({ 
+          xp: newXP,
+          total_games: newTotalGames,
+          total_wins: newTotalWins,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (profileUpdateError) {
+        throw profileUpdateError;
+      }
+
+      // Handle wallet operations
+      const { data: currentWallet, error: walletFetchError } = await supabase
+        .from('wallets')
+        .select('balance, user_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletFetchError) {
+        // Create wallet if it doesn't exist
+        const { error: walletCreateError } = await supabase
+          .from('wallets')
+          .insert({
+            user_id: user.id,
+            balance: moneyReward,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (walletCreateError) {
+          throw walletCreateError;
+        }
+      } else {
+        // Update existing wallet
+        const newBalance = (currentWallet?.balance || 0) + moneyReward;
+        
+        const { error: walletUpdateError } = await supabase
+          .from('wallets')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+
+        if (walletUpdateError) {
+          throw walletUpdateError;
+        }
+      }
+
+      // Log XP history
+      const { error: xpHistoryError } = await supabase
+        .from('xp_history')
+        .insert({
+          user_id: user.id,
+          xp_gained: xpReward,
+          source: 'league_competition',
+          description: `League Competition (${performanceLevel}) - Score: ${finalScore}/20`,
+          session_id: sessionId,
+          created_at: new Date().toISOString()
+        });
+
+      if (xpHistoryError) {
+        throw xpHistoryError;
+      }
+
+      // Log transaction history
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          amount: moneyReward,
+          type: 'reward',
+          status: 'completed',
+          description: `League Competition Reward (${performanceLevel}) - Score: ${finalScore}/20`,
+          source: 'league_competition',
+          session_id: sessionId,
+          created_at: new Date().toISOString()
+        });
+
+      if (transactionError) {
+        throw transactionError;
+      }
+
+      console.log(`League completion: ${performanceLevel} performance - Score: ${finalScore}/20, XP: +${xpReward}, Money: +${moneyReward} PKR`);
+
     } catch (err) {
-      console.error('Failed to update quiz session:', err);
+      console.error('Failed to complete quiz and process rewards:', err);
+      // Don't throw error to prevent UI from breaking
     }
   };
 

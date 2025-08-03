@@ -17,8 +17,8 @@ import {
   FaEnvelope,
 } from "react-icons/fa";
 import { MdMenu, MdClose, MdDashboard } from "react-icons/md";
-import { Bot, Target, Trophy } from "lucide-react";
-import { SupabaseUser } from '@/types/user';
+import { Bot, Target, Trophy, Crown, BarChart3 } from "lucide-react";
+import { SupabaseUser, UserProfile } from '@/types/user';
 
 export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -27,6 +27,8 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [userName, setUserName] = useState<string>("");
   const [role, setRole] = useState<string>("");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +41,7 @@ export default function Navbar() {
   useEffect(() => {
     const fetchUserData = async (userId: string) => {
       try {
+        // Fetch user data from users table
         const { data, error } = await supabase
           .from('users')
           .select('*')
@@ -49,12 +52,28 @@ export default function Navbar() {
           console.error("Error fetching user data:", error);
           setUserName("User");
           setRole("user");
-          return;
+        } else {
+          const userData = data as SupabaseUser;
+          setUserName(userData.name || "User");
+          setRole(userData.role || "user");
         }
 
-        const userData = data as SupabaseUser;
-        setUserName(userData.name || "User");
-        setRole(userData.role || "user");
+        // Fetch profile data including avatar
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (profileError) {
+          console.error("Error fetching profile data:", profileError);
+          setUserProfile(null);
+          setAvatarUrl("");
+        } else {
+          setUserProfile(profileData as UserProfile);
+          setAvatarUrl(profileData.avatar_url || "");
+        }
+
       } catch (error) {
         console.error("Error fetching user data:", error);
         toast.error("Failed to fetch user data");
@@ -69,6 +88,8 @@ export default function Navbar() {
       } else {
         setUserName("");
         setRole("");
+        setUserProfile(null);
+        setAvatarUrl("");
       }
     });
 
@@ -193,8 +214,7 @@ export default function Navbar() {
                     : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
                   }`}
               >
-                <Target className="w-5 h-5" />
-                <span>Quiz</span>
+                <Target className="w-5 h-5" />                <span>Quiz</span>
               </button>
             </Link>
 
@@ -210,6 +230,10 @@ export default function Navbar() {
                 <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-red-500 text-white animate-pulse">Live</span>
               </button>
             </Link>
+
+           
+
+
           </div>
         )}
 
@@ -288,8 +312,20 @@ export default function Navbar() {
                 className="flex items-center gap-2 focus:outline-none group"
                 aria-label="User menu"
               >
-                <div className="p-1 rounded-full text-lime-600 transition-colors">
-                  <FaUser className="text-xl" />
+                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-lime-400 transition-all hover:border-lime-500">
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt={userName || "User"}
+                      width={32}
+                      height={32}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-lime-100 flex items-center justify-center">
+                      <FaUser className="text-lime-600 text-sm" />
+                    </div>
+                  )}
                 </div>
                 <span className="text-gray-700 font-medium">{userName || "User"}</span>
                 <svg
@@ -342,7 +378,13 @@ export default function Navbar() {
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
-                        <FaUserCircle className="mr-3 text-lime-500 text-lg" />
+                        <div className= "text-lg overflow-hidden mr-3 ">
+                           
+                            <div className="w-full h-full flex items-center justify-center">
+                              <FaUser className="text-lime-500 " />
+                            </div>
+                         
+                        </div>
                         <span>Profile</span>
                       </Link>
                       <Link
@@ -480,6 +522,36 @@ export default function Navbar() {
                     </div>
                   </button>
                 </Link>
+
+                <Link href="/leaderboard">
+                  <button
+                    className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/leaderboard")
+                        ? "bg-lime-100 text-lime-700"
+                        : "text-gray-700 hover:bg-lime-50"
+                      }`}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Crown className="w-5 h-5" />
+                      <span>Leaderboard</span>
+                    </div>
+                  </button>
+                </Link>
+
+                <Link href="/stats">
+                  <button
+                    className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/stats")
+                        ? "bg-lime-100 text-lime-700"
+                        : "text-gray-700 hover:bg-lime-50"
+                      }`}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <BarChart3 className="w-5 h-5" />
+                      <span>Stats</span>
+                    </div>
+                  </button>
+                </Link>
               </>
             )}
 
@@ -494,7 +566,21 @@ export default function Navbar() {
                   onClick={() => setMenuOpen(false)}
                 >
                   <div className="flex items-center gap-3">
-                    <FaUserCircle className="w-5 h-5" />
+                    <div className="w-5 h-5 rounded-full overflow-hidden border border-lime-400">
+                      {avatarUrl ? (
+                        <Image
+                          src={avatarUrl}
+                          alt={userName || "User"}
+                          width={20}
+                          height={20}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-lime-100 flex items-center justify-center">
+                          <FaUser className="text-lime-600 text-xs" />
+                        </div>
+                      )}
+                    </div>
                     <span>Profile</span>
                   </div>
                 </Link>
