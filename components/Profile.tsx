@@ -6,6 +6,9 @@ import { supabase } from "@/lib/supabaseClient";
 import toast, { Toaster } from 'react-hot-toast';
 import Image from "next/image";
 import { SupabaseUser, UserProfile } from '@/types/user';
+import { TrophyService } from '@/utils/trophyService';
+import { Trophy } from '@/types/trophy';
+import { getRankFromXP, getNextRank, getProgressToNextRank } from '@/utils/rankSystem';
 
 const countries = [
   "Afghanistan", "Albania", "Algeria", "Argentina", "Armenia", "Australia", "Austria",
@@ -42,6 +45,8 @@ export default function Profile() {
   const [totalGames, setTotalGames] = useState<number>(0);
   const [xp, setXp] = useState<number>(0);
   const [rankLabel, setRankLabel] = useState<string>("");
+  const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
+  const [loadingTrophies, setLoadingTrophies] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -109,6 +114,9 @@ export default function Profile() {
           // Use username from profiles if available, otherwise fallback to name
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
         }
+
+        // Fetch user trophies
+        await fetchUserTrophies(user.id);
       } catch (error) {
         console.error("Error fetching user data:", error);
         toast.error("Failed to load profile data");
@@ -119,6 +127,18 @@ export default function Profile() {
 
     fetchUserData();
   }, [router]);
+
+  const fetchUserTrophies = async (userId: string) => {
+    setLoadingTrophies(true);
+    try {
+      const trophies = await TrophyService.getUserTrophies(userId);
+      setUserTrophies(trophies);
+    } catch (error) {
+      console.error("Error fetching trophies:", error);
+    } finally {
+      setLoadingTrophies(false);
+    }
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -676,33 +696,216 @@ export default function Profile() {
                   </div>
 
                   {/* Rank Display */}
-                  {rankLabel && (
-                    <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
-                      <div className="flex items-center justify-center">
-                        <div className="flex items-center">
-                          <div className="p-2 bg-yellow-200 rounded-full mr-3">
-                            <svg
-                              className="w-6 h-6 text-yellow-700"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                              />
-                            </svg>
-                          </div>
+                  <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <div className={`p-2 ${getRankFromXP(xp).bgColor} rounded-full mr-3`}>
+                          <span className="text-xl">{getRankFromXP(xp).icon}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-yellow-700">Current Rank</p>
+                          <p className={`text-xl font-bold ${getRankFromXP(xp).color}`}>
+                            {getRankFromXP(xp).label}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-yellow-600">XP Progress</p>
+                        <p className="text-lg font-bold text-yellow-800">{xp} XP</p>
+                      </div>
+                    </div>
+                    
+                    {/* Progress Bar to Next Rank */}
+                    {(() => {
+                      const nextRankInfo = getNextRank(xp);
+                      if (nextRankInfo) {
+                        const progress = getProgressToNextRank(xp);
+                        return (
                           <div>
-                            <p className="text-sm font-medium text-yellow-700">Current Rank</p>
-                            <p className="text-xl font-bold text-yellow-800">{rankLabel}</p>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs text-yellow-600">
+                                Next: {nextRankInfo.nextRank.label}
+                              </span>
+                              <span className="text-xs text-yellow-600">
+                                {nextRankInfo.xpNeeded} XP needed
+                              </span>
+                            </div>
+                            <div className="w-full bg-yellow-200 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="text-center">
+                            <span className="text-xs text-yellow-600 font-medium">
+                              🏆 Maximum Rank Achieved! 🏆
+                            </span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Trophies Card */}
+              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg
+                      className="w-5 h-5 mr-2 text-yellow-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                      />
+                    </svg>
+                    Trophies & Achievements
+                    <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {userTrophies.length}
+                    </span>
+                  </h3>
+
+                  {loadingTrophies ? (
+                    <div className="flex justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : userTrophies.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">🏆</div>
+                      <p className="text-gray-500 text-sm">No trophies earned yet.</p>
+                      <p className="text-gray-400 text-xs mt-1">Complete competitions to earn your first trophy!</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Trophy Statistics Summary */}
+                      <div className="grid grid-cols-3 gap-3 mb-6">
+                        <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-amber-700">
+                            {userTrophies.filter(t => t.trophy_type === 'bronze').length}
+                          </div>
+                          <div className="text-xs text-amber-600 font-medium flex items-center justify-center">
+                            🥉 Bronze
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-gray-700">
+                            {userTrophies.filter(t => t.trophy_type === 'silver').length}
+                          </div>
+                          <div className="text-xs text-gray-600 font-medium flex items-center justify-center">
+                            🥈 Silver
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-yellow-50 to-amber-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-yellow-700">
+                            {userTrophies.filter(t => t.trophy_type === 'gold').length}
+                          </div>
+                          <div className="text-xs text-yellow-600 font-medium flex items-center justify-center">
+                            🥇 Gold
                           </div>
                         </div>
                       </div>
-                    </div>
+
+                      {/* Trophy List */}
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {userTrophies.map((trophy, index) => {
+                          const colors = TrophyService.getTrophyColors(trophy.trophy_type);
+                          return (
+                            <div
+                              key={trophy.id}
+                              className={`${colors.bg} ${colors.border} border rounded-lg p-4 transition-all hover:shadow-md`}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className="text-3xl flex-shrink-0">
+                                  {TrophyService.getTrophyIcon(trophy.trophy_type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <h4 className={`font-semibold ${colors.text} text-lg leading-tight`}>
+                                        {trophy.title}
+                                      </h4>
+                                      <p className={`${colors.text} opacity-80 text-sm mt-1`}>
+                                        {trophy.description}
+                                      </p>
+                                    </div>
+                                    <div className="text-right flex-shrink-0 ml-2">
+                                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors.accent} text-white`}>
+                                        {trophy.trophy_type.charAt(0).toUpperCase() + trophy.trophy_type.slice(1)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between mt-3">
+                                    <div className="flex items-center text-xs text-gray-500">
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                        />
+                                      </svg>
+                                      Earned {TrophyService.formatTrophyDate(trophy.earned_at)}
+                                    </div>
+                                    <div className={`text-xs font-medium ${colors.text} opacity-70`}>
+                                      #{index + 1}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Next Milestone */}
+                      {(() => {
+                        const nextMilestone = TrophyService.getNextMilestone(xp);
+                        if (nextMilestone) {
+                          return (
+                            <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h5 className="font-medium text-blue-800">Next Trophy</h5>
+                                  <p className="text-blue-700 text-sm">{nextMilestone.title}</p>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-blue-800">
+                                    {nextMilestone.xpNeeded} XP
+                                  </div>
+                                  <div className="text-xs text-blue-600">needed</div>
+                                </div>
+                              </div>
+                              <div className="mt-2 bg-blue-200 rounded-full h-2">
+                                <div
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${Math.min(100, ((xp - (Math.floor(xp / 200) * 200)) / 200) * 100)}%`
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </>
                   )}
                 </div>
               </div>

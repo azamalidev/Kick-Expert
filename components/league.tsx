@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { useRouter } from 'next/navigation';
+import { TrophyService } from '../utils/trophyService';
+import { AwardedTrophy } from '../types/trophy';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -58,6 +60,8 @@ export default function League() {
   const [timer, setTimer] = useState(10);
   const [timerKey, setTimerKey] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [newTrophies, setNewTrophies] = useState<AwardedTrophy[]>([]);
+  const [showTrophyModal, setShowTrophyModal] = useState(false);
   const nextCalled = useRef(false);
   const router = useRouter();
 
@@ -368,21 +372,21 @@ export default function League() {
       let performanceLevel = '';
 
       if (finalScore >= 16) {
-        xpReward = 150;
+        xpReward = 30; // Elite level - non-winners get +30 XP
         moneyReward = 100;
         performanceLevel = 'Elite';
       } else if (finalScore >= 13) {
-        xpReward = 100;
+        xpReward = 20; // Pro level - non-winners get +20 XP
         moneyReward = 50;
         performanceLevel = 'Pro';
       } else if (finalScore >= 10) {
-        xpReward = 70;
+        xpReward = 10; // Starter level - non-winners get +10 XP
         moneyReward = 30;
         performanceLevel = 'Starter';
       } else {
-        xpReward = 40;
+        xpReward = 5; // Below starter level
         moneyReward = 10;
-        performanceLevel = 'Practice';
+        performanceLevel = 'Rookie';
       }
 
       // Check if user profile exists, create if not
@@ -525,6 +529,18 @@ export default function League() {
         throw transactionError;
       }
 
+      // Check and award XP-based trophies
+      try {
+        const trophies = await TrophyService.checkAndAwardXPTrophies(user.id, sessionId);
+        if (trophies.length > 0) {
+          setNewTrophies(trophies);
+          setShowTrophyModal(true);
+        }
+      } catch (trophyError) {
+        console.error('Failed to check trophies:', trophyError);
+        // Don't throw error to prevent UI from breaking
+      }
+
       console.log(`League completion: ${performanceLevel} performance - Score: ${finalScore}/20, XP: +${xpReward}, Money: +${moneyReward} PKR`);
 
     } catch (err) {
@@ -550,6 +566,8 @@ export default function League() {
     setTimer(10);
     setTimerKey(0);
     setLeaderboard([]);
+    setNewTrophies([]);
+    setShowTrophyModal(false);
   };
 
   const getRecommendation = () => {
@@ -1000,6 +1018,53 @@ export default function League() {
           </motion.div>
         )}
       </div>
+
+      {/* Trophy Notification Modal */}
+      {showTrophyModal && newTrophies.length > 0 && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-lg flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border-4 border-yellow-400"
+          >
+            <div className="text-center">
+              <div className="text-6xl mb-4">🏆</div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                {newTrophies.length === 1 ? 'New Trophy Earned!' : 'New Trophies Earned!'}
+              </h2>
+              <div className="space-y-3 mb-6">
+                {newTrophies.map((trophy, index) => (
+                  <div key={index} className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-center justify-center space-x-3">
+                      <span className="text-3xl">{TrophyService.getTrophyIcon(trophy.trophy_type)}</span>
+                      <div>
+                        <div className="font-semibold text-lg text-gray-800">
+                          {trophy.title}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {trophy.description}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setShowTrophyModal(false);
+                  setNewTrophies([]);
+                }}
+                className="px-8 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold rounded-xl shadow-lg transition-all"
+              >
+                Awesome!
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
