@@ -120,7 +120,7 @@ export default function League() {
         const { data: { user } } = await supabase.auth.getUser();
         
         const { data: questionsData, error: questionsError } = await supabase
-          .from('competition_questions')
+          .from('questions')
           .select('*');
 
         if (questionsError) {
