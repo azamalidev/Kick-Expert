@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import toast, { Toaster } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
+import { TrophyService } from '../utils/trophyService';
+import { getRankFromXP, getNextRank, getProgressToNextRank } from '../utils/rankSystem';
+import { Trophy, TrophyStats } from '../types/trophy';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -51,9 +54,13 @@ export default function Dashboard() {
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [transactions, setTransactions] = useState<TransactionEntry[]>([]);
+  const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
+  const [trophyStats, setTrophyStats] = useState<TrophyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [trophiesLoading, setTrophiesLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   // Fallback states for when data is loading
   const [username, setUsername] = useState<string>("Loading...");
@@ -69,12 +76,20 @@ export default function Dashboard() {
   const [supportMessage, setSupportMessage] = useState<string>("");
   const [supportSubject, setSupportSubject] = useState<string>("");
 
+  // Handle client-side mounting to prevent hydration errors
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Fetch user data on component mount
   useEffect(() => {
-    fetchUserData();
-    fetchLeaderboardData();
-    fetchTransactions();
-  }, []);
+    if (mounted) {
+      fetchUserData();
+      fetchLeaderboardData();
+      fetchTransactions();
+      fetchUserTrophies();
+    }
+  }, [mounted]);
 
   const fetchUserData = async () => {
     try {
@@ -220,6 +235,31 @@ export default function Dashboard() {
       toast.error("Failed to load transactions");
     } finally {
       setTransactionsLoading(false);
+    }
+  };
+
+  const fetchUserTrophies = async () => {
+    try {
+      setTrophiesLoading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      // Fetch user trophies
+      const trophies = await TrophyService.getUserTrophies(user.id);
+      setUserTrophies(trophies);
+
+      // Fetch trophy stats
+      const stats = await TrophyService.getTrophyStats(user.id);
+      setTrophyStats(stats);
+
+    } catch (error) {
+      console.error('Error fetching user trophies:', error);
+    } finally {
+      setTrophiesLoading(false);
     }
   };
 
@@ -372,62 +412,127 @@ export default function Dashboard() {
           )}
 
           <div className="rounded-2xl border-gray-100 w-full">
-            {/* Profile Section */}
-            <div className="flex items-center border p-6 border-gray-200 rounded-2xl mb-8">
-              <div className="w-16 h-16 bg-lime-100 rounded-full mr-4 flex items-center justify-center overflow-hidden">
-                {profileData?.avatar_url ? (
-                  <img 
-                    src={profileData.avatar_url} 
-                    alt="Profile" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <svg
-                    className="w-8 h-8 text-lime-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">{username}</h2>
-                <p className="text-gray-600">{userEmail}</p>
-                {profileData?.rank_label && (
-                  <span className="inline-block mt-1 px-2 py-1 bg-lime-100 text-lime-800 text-xs font-semibold rounded-full">
-                    {profileData.rank_label}
-                  </span>
+            {/* Enhanced Profile Section with Rank Progression */}
+            <div className="bg-gradient-to-r from-lime-50 to-green-50 border-2 border-lime-200 p-6 rounded-2xl mb-8 shadow-lg">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                {/* Profile Info */}
+                <div className="flex items-center mb-4 md:mb-0">
+                  <div className="w-20 h-20 bg-lime-100 rounded-full mr-6 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                    {profileData?.avatar_url ? (
+                      <img 
+                        src={profileData.avatar_url} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <svg
+                        className="w-10 h-10 text-lime-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-800 mb-1">{username}</h2>
+                    <p className="text-gray-600 mb-2">{userEmail}</p>
+                    
+                    {/* Current Rank Display */}
+                    {mounted && profileData?.xp !== undefined && (
+                      <div className="flex items-center space-x-3">
+                        {(() => {
+                          const currentRank = getRankFromXP(profileData.xp);
+                          return (
+                            <div className={`flex items-center px-3 py-1 rounded-full ${currentRank.bgColor} ${currentRank.color} font-semibold`}>
+                              <span className="text-lg mr-2">{currentRank.icon}</span>
+                              <span className="text-sm font-bold">{currentRank.label}</span>
+                            </div>
+                          );
+                        })()}
+                        <div className="text-sm text-gray-600">
+                          <span className="font-bold">{profileData.xp.toLocaleString()}</span> XP
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rank Progress Section */}
+                {mounted && profileData?.xp !== undefined && (
+                  <div className="bg-white rounded-xl p-4 shadow-md border border-lime-100 min-w-0 md:w-80">
+                    {(() => {
+                      const nextRankInfo = getNextRank(profileData.xp);
+                      const progress = getProgressToNextRank(profileData.xp);
+                      
+                      if (!nextRankInfo) {
+                        return (
+                          <div className="text-center">
+                            <div className="flex items-center justify-center mb-2">
+                              <span className="text-2xl mr-2">👑</span>
+                              <span className="text-lg font-bold text-yellow-600">Max Rank Achieved!</span>
+                            </div>
+                            <p className="text-sm text-gray-600">You've reached the highest rank!</p>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-gray-600">Next Rank</span>
+                            <div className="flex items-center">
+                              <span className="text-lg mr-1">{nextRankInfo.nextRank.icon}</span>
+                              <span className="text-sm font-bold text-gray-700">{nextRankInfo.nextRank.label}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Progress Bar */}
+                          <div className="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-lime-400 to-lime-500 h-3 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                          
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>{progress.toFixed(1)}% Complete</span>
+                            <span>{nextRankInfo.xpNeeded.toLocaleString()} XP needed</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Stats Section */}
+            {/* Enhanced Stats Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               {/* Wallet Balance */}
-              <div className="bg-gray-50 p-5 py-8 rounded-xl border-2 border-gray-200 hover:border-lime-400 transition duration-200">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 py-8 rounded-xl border-2 border-green-200 hover:border-green-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-lime-100 rounded-lg mr-3">
-                    <svg className="w-6 h-6 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-2 bg-green-100 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Wallet Balance</p>
-                    <p className="text-xl font-bold">${walletBalance.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-green-700">${walletBalance.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
 
               {/* XP Points */}
-              <div className="bg-gray-50 p-5 py-8 rounded-xl border-2 border-gray-200 hover:border-lime-400 transition duration-200">
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-5 py-8 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-2 bg-yellow-100 rounded-lg mr-3">
                     <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -436,13 +541,13 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">XP Points</p>
-                    <p className="text-xl font-bold">{profileData?.xp || 0}</p>
+                    <p className="text-xl font-bold text-yellow-700">{profileData?.xp || 0}</p>
                   </div>
                 </div>
               </div>
 
               {/* Competitions Played */}
-              <div className="bg-gray-50 p-5 py-8 rounded-xl border-2 border-gray-200 hover:border-lime-400 transition duration-200">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 py-8 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-2 bg-blue-100 rounded-lg mr-3">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -451,28 +556,28 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Competitions</p>
-                    <p className="text-xl font-bold">{competitionsPlayed}</p>
+                    <p className="text-xl font-bold text-blue-700">{competitionsPlayed}</p>
                   </div>
                 </div>
               </div>
 
               {/* Win Percentage */}
-              <div className="bg-gray-50 p-5 py-8 rounded-xl border-2 border-gray-200 hover:border-lime-400 transition duration-200">
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg mr-3">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-2 bg-emerald-100 rounded-lg mr-3">
+                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Win %</p>
-                    <p className="text-xl font-bold">{winPercentage}%</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Win Rate</p>
+                    <p className="text-xl font-bold text-emerald-700">{winPercentage}%</p>
                   </div>
                 </div>
               </div>
 
               {/* Total Earnings */}
-              <div className="bg-gray-50 p-5 py-8 rounded-xl border-2 border-gray-200 hover:border-lime-400 transition duration-200">
+              <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-5 py-8 rounded-xl border-2 border-purple-200 hover:border-purple-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
                   <div className="p-2 bg-purple-100 rounded-lg mr-3">
                     <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -481,14 +586,16 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Earnings</p>
-                    <p className="text-xl font-bold">${totalEarnings.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-purple-700">${totalEarnings.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
+
+            
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <button
                 onClick={() => setShowWithdrawModal(true)}
                 className="w-full py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center"
@@ -497,7 +604,7 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Withdraw Funds
-              </button>
+              </button>   
             </div>
 
             {/* Leaderboard Section */}
@@ -743,7 +850,10 @@ export default function Dashboard() {
                                     : 'bg-red-100 text-red-800'
                                 }`}
                               >
-                                {transaction.status}
+                                {transaction.status ? 
+                                  transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) 
+                                  : 'Unknown'
+                                }
                               </span>
                             </div>
                           </div>
@@ -813,7 +923,10 @@ export default function Dashboard() {
                                     : 'bg-red-100 text-red-800'
                                 }`}
                               >
-                                {transaction.status}
+                                {transaction.status ? 
+                                  transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) 
+                                  : 'Unknown'
+                                }
                               </span>
                             </div>
                           </div>
