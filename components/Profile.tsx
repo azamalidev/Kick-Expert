@@ -292,6 +292,34 @@ export default function Profile() {
     }
   };
 
+  const shareTrophyToFacebook = (trophy: Trophy) => {
+    const text = encodeURIComponent(`I just earned the ${trophy.title} trophy! 🏆 ${trophy.description}`);
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin)}&quote=${text}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const shareTrophyToX = (trophy: Trophy) => {
+    const text = encodeURIComponent(`I just earned the ${trophy.title} trophy! 🏆 ${trophy.description}`);
+    const url = `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(window.location.origin)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const shareTrophyToWhatsApp = (trophy: Trophy) => {
+    const text = encodeURIComponent(`I just earned the ${trophy.title} trophy! 🏆 ${trophy.description} Check it out: ${window.location.origin}`);
+    const url = `https://api.whatsapp.com/send?text=${text}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const shareTrophyToInstagram = async (trophy: Trophy) => {
+    const text = `I just earned the ${trophy.title} trophy! 🏆 ${trophy.description} ${window.location.origin}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Trophy info copied to clipboard! Paste it in Instagram to share.');
+    } catch (error) {
+      toast.error('Failed to copy trophy info');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster
@@ -866,6 +894,28 @@ export default function Profile() {
                                     <div className={`text-xs font-medium ${colors.text} opacity-70`}>
                                       #{index + 1}
                                     </div>
+                                  </div>
+                                  <div className="mt-3 flex space-x-2">
+                                    <button onClick={() => shareTrophyToFacebook(trophy)} title="Share on Facebook" className="p-1.5 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
+                                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
+                                      </svg>
+                                    </button>
+                                    <button onClick={() => shareTrophyToX(trophy)} title="Share on X" className="p-1.5 bg-black rounded-full hover:bg-gray-800 transition-colors">
+                                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                      </svg>
+                                    </button>
+                                    <button onClick={() => shareTrophyToInstagram(trophy)} title="Share on Instagram" className="p-1.5 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
+                                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                                      </svg>
+                                    </button>
+                                    <button onClick={() => shareTrophyToWhatsApp(trophy)} title="Share on WhatsApp" className="p-1.5 bg-green-500 rounded-full hover:bg-green-600 transition-colors">
+                                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.09 1.006-.26-.04-.858-.27-1.78-.942-.955-.694-1.602-1.562-1.795-1.826-.193-.265-.02-.405.138-.563.14-.14.279-.326.418-.512.093-.123.186-.247.279-.37.093-.123.047-.232-.027-.326-.07-.093-.232-.279-.418-.511-.14-.186-.279-.372-.372-.511-.093-.14-.14-.14-.232-.07-.093.07-.651.79-1.001 1.256-.186.248-.372.372-.511.372-.14 0-.418-.14-.744-.418-.326-.279-1.116-1.116-1.116-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14.186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
+                                      </svg>
+                                    </button>
                                   </div>
                                 </div>
                               </div>
