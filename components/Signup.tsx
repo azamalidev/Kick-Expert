@@ -39,7 +39,7 @@ export default function Signup() {
     return true;
   }, [name, email, password]);
 
-  const handleSignup = async (e: React.FormEvent) => {
+ const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -50,6 +50,10 @@ export default function Signup() {
     const toastId = toast.loading('Creating your account...');
 
     try {
+      // Get referral code from URL if exists
+      const searchParams = new URLSearchParams(window.location.search);
+      const referralCode = searchParams.get('ref');
+
       // First check if user exists in public.users table
       const { data: existingUser, error: lookupError } = await supabase
         .from('users')
@@ -87,6 +91,7 @@ export default function Signup() {
         options: {
           data: {
             name: name,
+            referral_code: referralCode // Pass referral code to auth.users
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         }
@@ -111,9 +116,18 @@ export default function Signup() {
 
       if (dbError) throw dbError;
 
+      // Create profile entry (if you have a profiles table)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          username: name,
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileError) console.error('Profile creation error:', profileError);
+
       toast.success('Check your email for the confirmation link!', { id: toastId });
-
-
 
     } catch (error: any) {
       console.error("Signup Error:", error.code, error.message);

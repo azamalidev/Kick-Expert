@@ -76,11 +76,11 @@ export default function Profile() {
     try {
       await navigator.clipboard.writeText(text);
       toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.', { 
-        style: { background: '#D1FAE5', color: '#065F46' } 
+        style: { background: '#363636', color: '#fff' } 
       });
     } catch (error) {
       toast.error('Failed to copy trophy details', { 
-        style: { background: '#D1FAE5', color: '#065F46' } 
+        style: { background: '#363636', color: '#fff' } 
       });
     }
   };
@@ -148,7 +148,7 @@ export default function Profile() {
         }
 
         await fetchUserTrophies(user.id);
-        setReferralLink(`${window.location.origin}/signup?ref=${user.id}`);
+        setReferralLink(`${window.location.origin}/?ref=${user.id}`);
         await fetchReferrals(user.id);
         await fetchReferralRewards(user.id);
       } catch (error) {
@@ -236,14 +236,14 @@ export default function Profile() {
         }
       }
       if (rewardsClaimed) {
-        toast.success("New rewards added successfully!", { style: { background: '#D1FAE5', color: '#065F46' } });
+        toast.success("New rewards added successfully!", { style: { background: '#363636', color: '#fff' } });
       } else {
-        toast("No new rewards available to add", { icon: 'ℹ️', style: { background: '#D1FAE5', color: '#065F46' } });
+        toast("No new rewards available to add", { icon: 'ℹ️', style: { background: '#363636', color: '#fff' } });
       }
       await fetchReferralRewards(userId);
     } catch (error: any) {
       console.error("Error adding rewards:", error);
-      toast.error(error.message || "Failed to add rewards", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error(error.message || "Failed to add rewards", { style: { background: '#363636', color: '#fff' } });
     }
   };
 
@@ -254,11 +254,11 @@ export default function Profile() {
         .update({ credited: true, updated_at: new Date().toISOString() })
         .eq('id', rewardId);
       if (error) throw error;
-      toast.success("Reward claimed successfully!", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.success("Reward claimed successfully!", { style: { background: '#363636', color: '#fff' } });
       await fetchReferralRewards((await supabase.auth.getUser()).data.user!.id);
     } catch (error: any) {
       console.error("Error claiming reward:", error);
-      toast.error(error.message || "Failed to claim reward", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error(error.message || "Failed to claim reward", { style: { background: '#363636', color: '#fff' } });
     }
   };
 
@@ -312,7 +312,7 @@ export default function Profile() {
       setAvatarUrl(publicUrl);
     } catch (error: any) {
       console.error("Error uploading avatar:", error);
-      toast.error(error.message || "Failed to update avatar", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error(error.message || "Failed to update avatar", { style: { background: '#363636', color: '#fff' } });
     } finally {
       setIsUploading(false);
     }
@@ -320,13 +320,13 @@ export default function Profile() {
 
   const handleProfileSave = async () => {
     if (!newName.trim()) {
-      toast.error("Name cannot be empty", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("Name cannot be empty", { style: { background: '#363636', color: '#fff' } });
       return;
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      toast.error("User not authenticated", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("User not authenticated", { style: { background: '#363636', color: '#fff' } });
       return;
     }
 
@@ -356,24 +356,24 @@ export default function Profile() {
       setName(newName.trim());
       setUserProfile({ ...userProfile, username: newName.trim(), nationality } as UserProfile);
       setIsEditingProfile(false);
-      toast.success("Profile updated successfully", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.success("Profile updated successfully", { style: { background: '#363636', color: '#fff' } });
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("Failed to update profile", { style: { background: '#363636', color: '#fff' } });
     }
   };
 
   const handlePasswordChange = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all password fields", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("Please fill in all password fields", { style: { background: '#363636', color: '#fff' } });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("New password and confirmation do not match", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("New password and confirmation do not match", { style: { background: '#363636', color: '#fff' } });
       return;
     }
     if (newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error("New password must be at least 6 characters", { style: { background: '#363636', color: '#fff' } });
       return;
     }
 
@@ -384,7 +384,7 @@ export default function Profile() {
       });
 
       if (signInError) {
-        toast.error("Incorrect current password", { style: { background: '#D1FAE5', color: '#065F46' } });
+        toast.error("Incorrect current password", { style: { background: '#363636', color: '#fff' } });
         return;
       }
 
@@ -394,13 +394,13 @@ export default function Profile() {
 
       if (error) throw error;
 
-      toast.success("Password changed successfully", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.success("Password changed successfully", { style: { background: '#363636', color: '#fff' } });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
       console.error("Error updating password:", error.message);
-      toast.error(error.message || "Failed to update password", { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error(error.message || "Failed to update password", { style: { background: '#363636', color: '#fff' } });
     }
   };
 
@@ -426,9 +426,9 @@ export default function Profile() {
     const text = `Join me on this platform and earn rewards! 🚀 ${referralLink}`;
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('Referral link copied to clipboard! Paste it in Instagram to share.', { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.success('Referral link copied to clipboard! Paste it in Instagram to share.', { style: { background: '#363636', color: '#fff' } });
     } catch (error) {
-      toast.error('Failed to copy referral link', { style: { background: '#D1FAE5', color: '#065F46' } });
+      toast.error('Failed to copy referral link', { style: { background: '#363636', color: '#fff' } });
     }
   };
 
@@ -441,19 +441,19 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-white to-lime-50">
+    <div className="min-h-screen bg-gray-50">
       <Toaster
         position="top-center"
         toastOptions={{
           style: {
-            background: '#D1FAE5',
-            color: '#065F46',
+            background: '#363636',
+            color: '#fff',
           },
           success: {
             duration: 3000,
             iconTheme: {
-              primary: '#10B981',
-              secondary: '#FFFFFF',
+              primary: '#10b981',
+              secondary: '#fff',
             },
           },
           error: {
@@ -465,7 +465,7 @@ export default function Profile() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-lime-400 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-8">
@@ -474,21 +474,20 @@ export default function Profile() {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent">
-                      Profile Information
-                    </h2>
+                    <h2 className="text-2xl font-bold text-gray-800">Profile Information</h2>
                     <button
                       onClick={() => setIsEditingProfile(!isEditingProfile)}
-                      className="px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-lg shadow-md transition-all duration-200"
+                      className="px-3 py-1.5 bg-lime-500 hover:bg-lime-600 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       {isEditingProfile ? 'Cancel' : 'Edit Profile'}
                     </button>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-6">
+                    {/* Avatar Section */}
                     <div className="flex-shrink-0">
                       <div className="relative">
-                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-lime-200 shadow-sm">
+                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-lime-300 shadow-sm">
                           {avatarUrl ? (
                             <Image
                               src={avatarUrl}
@@ -500,7 +499,7 @@ export default function Profile() {
                           ) : (
                             <div className="w-full h-full bg-lime-100 flex items-center justify-center">
                               <svg
-                                className="w-10 h-10 text-lime-400"
+                                className="w-10 h-10 text-lime-600"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -523,7 +522,7 @@ export default function Profile() {
                               className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-full shadow-md border border-gray-200 cursor-pointer hover:bg-gray-50"
                             >
                               <svg
-                                className="w-5 h-5 text-lime-400"
+                                className="w-5 h-5 text-lime-600"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -556,7 +555,7 @@ export default function Profile() {
                       {isUploading && (
                         <div className="mt-2 text-sm text-gray-500 flex items-center">
                           <svg
-                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-lime-400"
+                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-lime-500"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -580,6 +579,7 @@ export default function Profile() {
                       )}
                     </div>
 
+                    {/* Profile Details */}
                     <div className="flex-1 space-y-4">
                       {isEditingProfile ? (
                         <>
@@ -589,7 +589,7 @@ export default function Profile() {
                               type="text"
                               value={newName}
                               onChange={(e) => setNewName(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-100 focus:border-lime-400"
                             />
                           </div>
                           <div>
@@ -597,7 +597,7 @@ export default function Profile() {
                             <select
                               value={nationality}
                               onChange={(e) => setNationality(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-100 focus:border-lime-400"
                             >
                               <option value="">Select your country</option>
                               {countries.map((country) => (
@@ -610,7 +610,7 @@ export default function Profile() {
                           <button
                             onClick={handleProfileSave}
                             disabled={isUploading}
-                            className="mt-4 px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50"
+                            className="mt-4 px-4 py-2 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
                           >
                             Save Changes
                           </button>
@@ -618,7 +618,7 @@ export default function Profile() {
                       ) : (
                         <>
                           <div>
-                            <h3 className="text-lg font-semibold text-black">{name}</h3>
+                            <h3 className="text-lg font-semibold text-gray-800">{name}</h3>
                             <div className="text-sm text-lime-600 space-y-1 mt-1">
                               <p>• Every competition win earns a unique digital trophy</p>
                               <p>• Trophy visible in user profile</p>
@@ -628,7 +628,7 @@ export default function Profile() {
                           <div className="space-y-2">
                             <div className="flex items-center text-gray-600">
                               <svg
-                                className="w-4 h-4 mr-2 text-lime-400"
+                                className="w-4 h-4 mr-2 text-lime-500"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -646,12 +646,12 @@ export default function Profile() {
                             {nationality && (
                               <div className="flex items-center text-gray-600">
                                 <svg
-                                  className="w-4 h-4 mr-2 text-lime-400"
+                                  className="w-4 h-4 mr-2 text-lime-500"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
                                   xmlns="http://www.w3.org/2000/svg"
-                              >
+                                >
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -671,7 +671,7 @@ export default function Profile() {
                             {createdAt && (
                               <div className="flex items-center text-gray-600">
                                 <svg
-                                  className="w-4 h-4 mr-2 text-lime-400"
+                                  className="w-4 h-4 mr-2 text-lime-500"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -695,6 +695,7 @@ export default function Profile() {
                 </div>
               </div>
 
+              {/* Incomplete Profile Notice */}
               {!userProfile?.username && !isEditingProfile && (
                 <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-start">
@@ -722,11 +723,12 @@ export default function Profile() {
                 </div>
               )}
 
+              {/* Game Statistics Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent mb-4 flex items-center">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <svg
-                      className="w-5 h-5 mr-2 text-lime-400"
+                      className="w-5 h-5 mr-2 text-lime-500"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -743,15 +745,15 @@ export default function Profile() {
                   </h3>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-lime-50 p-4 rounded-lg">
+                    <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-lime-600">Total Games</p>
-                          <p className="text-2xl font-bold text-black">{totalGames}</p>
+                          <p className="text-sm font-medium text-lime-700">Total Games</p>
+                          <p className="text-2xl font-bold text-lime-800">{totalGames}</p>
                         </div>
                         <div className="p-2 bg-lime-200 rounded-full">
                           <svg
-                            className="w-5 h-5 text-lime-600"
+                            className="w-5 h-5 text-lime-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -768,15 +770,15 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    <div className="bg-lime-50 p-4 rounded-lg">
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-lime-600">Total Wins</p>
-                          <p className="text-2xl font-bold text-black">{totalWins}</p>
+                          <p className="text-sm font-medium text-green-700">Total Wins</p>
+                          <p className="text-2xl font-bold text-green-800">{totalWins}</p>
                         </div>
-                        <div className="p-2 bg-lime-400 rounded-full">
+                        <div className="p-2 bg-green-200 rounded-full">
                           <svg
-                            className="w-5 h-5 text-white"
+                            className="w-5 h-5 text-green-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -793,17 +795,17 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    <div className="bg-lime-50 p-4 rounded-lg">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-lime-600">Win Rate</p>
-                          <p className="text-2xl font-bold text-black">
+                          <p className="text-sm font-medium text-blue-700">Win Rate</p>
+                          <p className="text-2xl font-bold text-blue-800">
                             {totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0}%
                           </p>
                         </div>
-                        <div className="p-2 bg-lime-400 rounded-full">
+                        <div className="p-2 bg-blue-200 rounded-full">
                           <svg
-                            className="w-5 h-5 text-white"
+                            className="w-5 h-5 text-blue-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -820,15 +822,15 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    <div className="bg-lime-50 p-4 rounded-lg">
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium text-lime-600">Experience</p>
-                          <p className="text-2xl font-bold text-black">{xp} XP</p>
+                          <p className="text-sm font-medium text-purple-700">Experience</p>
+                          <p className="text-2xl font-bold text-purple-800">{xp} XP</p>
                         </div>
-                        <div className="p-2 bg-lime-400 rounded-full">
+                        <div className="p-2 bg-purple-200 rounded-full">
                           <svg
-                            className="w-5 h-5 text-white"
+                            className="w-5 h-5 text-purple-700"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -846,25 +848,27 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  <div className="mt-4 bg-lime-50 p-4 rounded-lg border border-lime-200">
+                  {/* Rank Display */}
+                  <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
                         <div className={`p-2 ${getRankFromXP(xp).bgColor} rounded-full mr-3`}>
                           <span className="text-xl">{getRankFromXP(xp).icon}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-lime-600">Current Rank</p>
+                          <p className="text-sm font-medium text-yellow-700">Current Rank</p>
                           <p className={`text-xl font-bold ${getRankFromXP(xp).color}`}>
                             {getRankFromXP(xp).label}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-lime-600">XP Progress</p>
-                        <p className="text-lg font-bold text-black">{xp} XP</p>
+                        <p className="text-sm text-yellow-600">XP Progress</p>
+                        <p className="text-lg font-bold text-yellow-800">{xp} XP</p>
                       </div>
                     </div>
-
+                    
+                    {/* Progress Bar to Next Rank */}
                     {(() => {
                       const nextRankInfo = getNextRank(xp);
                       if (nextRankInfo) {
@@ -872,16 +876,16 @@ export default function Profile() {
                         return (
                           <div>
                             <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs text-lime-600">
+                              <span className="text-xs text-yellow-600">
                                 Next: {nextRankInfo.nextRank.label}
                               </span>
-                              <span className="text-xs text-lime-600">
+                              <span className="text-xs text-yellow-600">
                                 {nextRankInfo.xpNeeded} XP needed
                               </span>
                             </div>
-                            <div className="w-full bg-lime-200 rounded-full h-2">
+                            <div className="w-full bg-yellow-200 rounded-full h-2">
                               <div
-                                className="bg-lime-400 h-2 rounded-full transition-all duration-300"
+                                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${progress}%` }}
                               ></div>
                             </div>
@@ -890,7 +894,7 @@ export default function Profile() {
                       } else {
                         return (
                           <div className="text-center">
-                            <span className="text-xs text-lime-600 font-medium">
+                            <span className="text-xs text-yellow-600 font-medium">
                               🏆 Maximum Rank Achieved! 🏆
                             </span>
                           </div>
@@ -901,11 +905,12 @@ export default function Profile() {
                 </div>
               </div>
 
+              {/* Trophies Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent mb-4 flex items-center">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <svg
-                      className="w-5 h-5 mr-2 text-lime-400"
+                      className="w-5 h-5 mr-2 text-yellow-500"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -919,14 +924,14 @@ export default function Profile() {
                       />
                     </svg>
                     Trophies & Achievements
-                    <span className="ml-2 bg-lime-100 text-lime-600 text-xs font-medium px-2 py-1 rounded-full">
+                    <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
                       {userTrophies.length}
                     </span>
                   </h3>
 
                   {loadingTrophies ? (
                     <div className="flex justify-center py-8">
-                      <div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : userTrophies.length === 0 ? (
                     <div className="text-center py-8">
@@ -936,33 +941,35 @@ export default function Profile() {
                     </div>
                   ) : (
                     <>
+                      {/* Trophy Statistics Summary */}
                       <div className="grid grid-cols-3 gap-3 mb-6">
-                        <div className="bg-lime-50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold text-black">
+                        <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-amber-700">
                             {userTrophies.filter(t => t.trophy_type === 'bronze').length}
                           </div>
-                          <div className="text-xs text-lime-600 font-medium flex items-center justify-center">
+                          <div className="text-xs text-amber-600 font-medium flex items-center justify-center">
                             🥉 Bronze
                           </div>
                         </div>
-                        <div className="bg-lime-50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold text-black">
+                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-gray-700">
                             {userTrophies.filter(t => t.trophy_type === 'silver').length}
                           </div>
-                          <div className="text-xs text-lime-600 font-medium flex items-center justify-center">
+                          <div className="text-xs text-gray-600 font-medium flex items-center justify-center">
                             🥈 Silver
                           </div>
                         </div>
-                        <div className="bg-lime-50 p-3 rounded-lg text-center">
-                          <div className="text-2xl font-bold text-black">
+                        <div className="bg-gradient-to-br from-yellow-50 to-amber-100 p-3 rounded-lg text-center">
+                          <div className="text-2xl font-bold text-yellow-700">
                             {userTrophies.filter(t => t.trophy_type === 'gold').length}
                           </div>
-                          <div className="text-xs text-lime-600 font-medium flex items-center justify-center">
+                          <div className="text-xs text-yellow-600 font-medium flex items-center justify-center">
                             🥇 Gold
                           </div>
                         </div>
                       </div>
 
+                      {/* Trophy List */}
                       <div className="space-y-3 max-h-80 overflow-y-auto">
                         {userTrophies.map((trophy, index) => {
                           const colors = TrophyService.getTrophyColors(trophy.trophy_type);
@@ -992,44 +999,6 @@ export default function Profile() {
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-between mt-3">
-                                    <div className="flex items-center space-x-2">
-                                      <button 
-                                        onClick={() => shareTrophyToFacebook(trophy)}
-                                        className="p-1.5 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
-                                        title="Share on Facebook"
-                                      >
-                                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
-                                        </svg>
-                                      </button>
-                                      <button 
-                                        onClick={() => shareTrophyToX(trophy)}
-                                        className="p-1.5 bg-black rounded-full hover:bg-gray-800 transition-colors"
-                                        title="Share on X"
-                                      >
-                                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                                        </svg>
-                                      </button>
-                                      <button 
-                                        onClick={() => shareTrophyToWhatsApp(trophy)}
-                                        className="p-1.5 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors"
-                                        title="Share on WhatsApp"
-                                      >
-                                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.09 1.006-.26-.04-.858-.27-1.78-.942-.955-.694-1.602-1.562-1.795-1.826-.193-.265-.02-.405.138-.563.14-.14.279-.326.418-.512.093-.123.186-.247.279-.37.093-.123.047-.232-.027-.326-.07-.093-.232-.279-.418-.511-.14-.186-.279-.372-.372-.511-.093-.14-.14-.14-.232-.07-.093.07-.651.79-1.001 1.256-.186.248-.372.372-.511.372-.14 0-.418-.14-.744-.418-.326-.279-1.116-1.116-1.116-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14.186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
-                                        </svg>
-                                      </button>
-                                      <button 
-                                        onClick={() => shareTrophyToInstagram(trophy)}
-                                        className="p-1.5 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition"
-                                        title="Share on Instagram"
-                                      >
-                                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                                        </svg>
-                                      </button>
-                                    </div>
                                     <div className="flex items-center text-xs text-gray-500">
                                       <svg
                                         className="w-3 h-3 mr-1"
@@ -1047,6 +1016,9 @@ export default function Profile() {
                                       </svg>
                                       Earned {TrophyService.formatTrophyDate(trophy.earned_at)}
                                     </div>
+                                    <div className={`text-xs font-medium ${colors.text} opacity-70`}>
+                                      #{index + 1}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1055,26 +1027,27 @@ export default function Profile() {
                         })}
                       </div>
 
+                      {/* Next Milestone */}
                       {(() => {
                         const nextMilestone = TrophyService.getNextMilestone(xp);
                         if (nextMilestone) {
                           return (
-                            <div className="mt-4 bg-lime-50 p-4 rounded-lg border border-lime-200">
+                            <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <h5 className="font-medium text-lime-600">Next Trophy</h5>
-                                  <p className="text-lime-600 text-sm">{nextMilestone.title}</p>
+                                  <h5 className="font-medium text-blue-800">Next Trophy</h5>
+                                  <p className="text-blue-700 text-sm">{nextMilestone.title}</p>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-lg font-bold text-black">
+                                  <div className="text-lg font-bold text-blue-800">
                                     {nextMilestone.xpNeeded} XP
                                   </div>
-                                  <div className="text-xs text-lime-600">needed</div>
+                                  <div className="text-xs text-blue-600">needed</div>
                                 </div>
                               </div>
-                              <div className="mt-2 bg-lime-200 rounded-full h-2">
+                              <div className="mt-2 bg-blue-200 rounded-full h-2">
                                 <div
-                                  className="bg-lime-400 h-2 rounded-full transition-all duration-300"
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                                   style={{
                                     width: `${Math.min(100, ((xp - (Math.floor(xp / 200) * 200)) / 200) * 100)}%`
                                   }}
@@ -1090,11 +1063,12 @@ export default function Profile() {
                 </div>
               </div>
 
+              {/* Referral Program Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
-                  <h3 className="text-xl font-semibold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent mb-4 flex items-center">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <svg
-                      className="w-5 h-5 mr-2 text-lime-400"
+                      className="w-5 h-5 mr-2 text-lime-500"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1107,25 +1081,25 @@ export default function Profile() {
                         d="M18 9a2 2 0 00-2-2H8a2 2 0 00-2 2m12 0v6a2 2 0 01-2 2H8a2 2 0 01-2-2V9m6 6v3m0 0l-3-3m3 3l3-3"
                       />
                     </svg>
-                    🚀 Referral Program
-                    <span className="ml-2 bg-lime-100 text-lime-600 text-xs font-medium px-2 py-1 rounded-full">
+                    Referral Program
+                    <span className="ml-2 bg-lime-100 text-lime-800 text-xs font-medium px-2 py-1 rounded-full">
                       {referredUsers.length}
                     </span>
                   </h3>
 
-                  <div className="mb-6 bg-lime-50 p-4 rounded-lg text-gray-200">
-                    <h4 className="text-lg font-semibold text-lime-600 mb-2">Referral Progress</h4>
+                  <div className="mb-6 bg-gradient-to-r from-lime-50 to-green-50 p-4 rounded-lg border border-lime-200">
+                    <h4 className="text-lg font-semibold text-lime-800 mb-2">Referral Progress</h4>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-lime-600">
+                      <span className="text-sm text-lime-700">
                         Referrals: {getReferralProgress().effectiveCount}
                       </span>
-                      <span className="text-sm text-lime-600">
+                      <span className="text-sm text-lime-700">
                         Next Milestone: {getReferralProgress().nextMilestone} referrals
                       </span>
                     </div>
                     <div className="w-full bg-lime-200 rounded-full h-2">
                       <div
-                        className="bg-lime-400 h-2 rounded-full transition-all duration-300"
+                        className="bg-lime-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${getReferralProgress().progress}%` }}
                       ></div>
                     </div>
@@ -1135,38 +1109,38 @@ export default function Profile() {
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-lime-600 mb-1">Your Referral Link</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Referral Link</label>
                     <div className="flex">
                       <input
                         type="text"
                         value={referralLink}
                         readOnly
-                        className="flex-1 px-3 py-2 border border-lime-400 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-lime-100 focus:border-lime-400"
                       />
                       <button
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(referralLink);
-                            toast.success('Referral link copied!', { style: { background: '#D1FAE5', color: '#065F46' } });
+                            toast.success('Referral link copied!');
                           } catch (err) {
-                            toast.error('Failed to copy', { style: { background: '#D1FAE5', color: '#065F46' } });
+                            toast.error('Failed to copy');
                           }
                         }}
-                        className="px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-r-lg transition-all duration-200"
+                        className="px-4 py-2 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-r-lg transition-colors"
                       >
                         Copy
                       </button>
                     </div>
                     <div className="mt-4 flex justify-center">
-                      <QRCodeCanvas value={referralLink} size={128} bgColor="#F7FEE7" fgColor="#4D7C0F" />
+                      <QRCodeCanvas value={referralLink} size={128} bgColor="#ffffff" fgColor="#000000" />
                     </div>
-                    <p className="text-xs text-lime-600 mt-2 text-center">
+                    <p className="text-xs text-gray-500 mt-2 text-center">
                       Scan this QR code to share your referral link!
                     </p>
                   </div>
 
                   <div className="mb-6">
-                    <h4 className="text-lg font-semibold text-lime-600 mb-2">Share Your Referral Link</h4>
+                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Share Your Referral Link</h4>
                     <div className="flex space-x-3">
                       <button onClick={shareReferralToFacebook} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -1191,34 +1165,34 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  <h4 className="text-lg font-semibold text-lime-600 mb-2">Referred Users</h4>
+                  <h4 className="text-lg font-semibold text-gray-700 mb-2">Referred Users</h4>
                   {referredUsers.length === 0 ? (
-                    <p className="text-lime-600">No referred users yet.</p>
+                    <p className="text-gray-500">No referred users yet.</p>
                   ) : (
                     <ul className="space-y-3 max-h-40 overflow-y-auto">
                       {referredUsers.map((ref) => (
-                        <li key={ref.id} className="bg-lime-50 p-3 rounded-lg">
-                          <p className="text-sm"><span className="font-medium text-lime-600">Referred ID:</span> {ref.referred_id}</p>
-                          <p className="text-sm"><span className="font-medium text-lime-600">Email Confirmed:</span> {ref.email_confirmed ? 'Yes (+50 XP)' : 'No'}</p>
-                          <p className="text-sm"><span className="font-medium text-lime-600">Competition Joined:</span> {ref.competition_joined ? 'Yes (+100 XP)' : 'No'}</p>
-                          <p className="text-sm"><span className="font-medium text-lime-600">Created At:</span> {new Date(ref.created_at).toLocaleString()}</p>
+                        <li key={ref.id} className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-sm"><span className="font-medium text-gray-700">Referred ID:</span> {ref.referred_id}</p>
+                          <p className="text-sm"><span className="font-medium text-gray-700">Email Confirmed:</span> {ref.email_confirmed ? 'Yes (+50 XP)' : 'No'}</p>
+                          <p className="text-sm"><span className="font-medium text-gray-700">Competition Joined:</span> {ref.competition_joined ? 'Yes (+100 XP)' : 'No'}</p>
+                          <p className="text-sm"><span className="font-medium text-gray-700">Created At:</span> {new Date(ref.created_at).toLocaleString()}</p>
                         </li>
                       ))}
                     </ul>
                   )}
 
-                  <h4 className="text-lg font-semibold text-lime-600 mt-6 mb-2">Referral Rewards</h4>
+                  <h4 className="text-lg font-semibold text-gray-700 mt-6 mb-2">Referral Rewards</h4>
                   {referralRewards.length === 0 ? (
-                    <p className="text-lime-600">No rewards earned yet.</p>
+                    <p className="text-gray-500">No rewards earned yet.</p>
                   ) : (
                     <ul className="space-y-3 max-h-40 overflow-y-auto">
                       {referralRewards.map((reward) => (
-                        <li key={reward.id} className="bg-lime-50 p-3 rounded-lg flex justify-between items-center">
+                        <li key={reward.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
                           <div>
-                            <p className="text-sm"><span className="font-medium text-lime-600">Milestone:</span> {reward.milestone} referrals</p>
-                            <p className="text-sm"><span className="font-medium text-lime-600">Reward Type:</span> {reward.reward_type}</p>
-                            <p className="text-sm"><span className="font-medium text-lime-600">Status:</span> {reward.credited ? 'Claimed' : 'Pending'}</p>
-                            <p className="text-sm"><span className="font-medium text-lime-600">Created At:</span> {new Date(reward.created_at).toLocaleString()}</p>
+                            <p className="text-sm"><span className="font-medium text-gray-700">Milestone:</span> {reward.milestone} referrals</p>
+                            <p className="text-sm"><span className="font-medium text-gray-700">Reward Type:</span> {reward.reward_type}</p>
+                            <p className="text-sm"><span className="font-medium text-gray-700">Status:</span> {reward.credited ? 'Claimed' : 'Pending'}</p>
+                            <p className="text-sm"><span className="font-medium text-gray-700">Created At:</span> {new Date(reward.created_at).toLocaleString()}</p>
                           </div>
                           <button
                             onClick={() => claimIndividualReward(reward.id)}
@@ -1226,7 +1200,7 @@ export default function Profile() {
                             className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
                               reward.credited
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white'
+                                : 'bg-lime-500 hover:bg-lime-600 text-white'
                             }`}
                           >
                             {reward.credited ? 'Claimed' : 'Claim'}
@@ -1241,7 +1215,7 @@ export default function Profile() {
                       const { data: { user } } = await supabase.auth.getUser();
                       if (user) await claimRewards(user.id);
                     }}
-                    className="mt-6 px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-lg transition-all duration-200"
+                    className="mt-6 px-4 py-2 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-lg transition-colors"
                   >
                     Check for New Rewards
                   </button>
@@ -1249,112 +1223,86 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="w-full lg:w-1/2">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent mb-4 flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-red-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                    Password Security
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                      <input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
-                        placeholder="At least 6 characters"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-200 focus:border-lime-400"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                    <button
-                      onClick={handlePasswordChange}
-                      className="w-full px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-lg transition-all duration-200"
-                    >
-                      Update Password
-                    </button>
-                  </div>
+            {/* Right Column - Password Security */}
+         <div className="bg-white h-fit p-4 sm:p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 w-full max-w-md lg:max-w-[calc(50%-1rem)]">
+              <div className="flex items-center mb-6 sm:mb-8">
+                <div className="p-2 sm:p-3 mr-3 sm:mr-4 bg-lime-100 rounded-full flex-shrink-0">
+                  <svg
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-lime-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
                 </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Password Security</h2>
               </div>
 
-              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-black bg-gradient-to-r from-black to-lime-400 bg-clip-text text-transparent mb-4 flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    Account Settings
-                  </h3>
-                  <div className="space-y-3">
-                    <button
-                      onClick={async () => {
-                        try {
-                          await supabase.auth.signOut();
-                          toast.success("Logged out successfully", { style: { background: '#D1FAE5', color: '#065F46' } });
-                          router.push("/login");
-                        } catch (error) {
-                          toast.error("Failed to log out", { style: { background: '#D1FAE5', color: '#065F46' } });
-                        }
-                      }}
-                      className="w-full px-4 py-2 bg-gradient-to-r from-lime-300 to-lime-500 hover:from-lime-400 hover:to-lime-600 text-white font-medium rounded-lg transition-all duration-200"
-                    >
-                      Log Out
-                    </button>
-                  </div>
+              <div className="space-y-4 sm:space-y-6">
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-100 text-gray-700 placeholder-gray-400 transition duration-200 text-sm sm:text-base"
+                    placeholder="••••••••"
+                  />
                 </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-100 text-gray-700 placeholder-gray-400 transition duration-200 text-sm sm:text-base"
+                    placeholder="At least 6 characters"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-lime-400 focus:ring-2 focus:ring-lime-100 text-gray-700 placeholder-gray-400 transition duration-200 text-sm sm:text-base"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <button
+                  onClick={handlePasswordChange}
+                  className="w-full py-2 sm:py-3 px-4 sm:px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-sm sm:text-base"
+                >
+                  Update Password
+                  <svg
+                    className="w-4 h-4 sm:w-5 sm:h-5 ml-2 inline"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
+
         )}
       </div>
     </div>

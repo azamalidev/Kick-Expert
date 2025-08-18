@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
 import { Trophy, CheckCircle, Star } from 'lucide-react';
 import { Shield, User, Wifi, Clock, Trophy as PrizeTrophy, LifeBuoy, Lock } from 'lucide-react';
@@ -20,6 +21,12 @@ const LiveCompetition = () => {
   const [user, setUser] = useState<any>(null);
 
   // Check user authentication status on component mount
+
+  // Stripe price IDs from .env.local
+  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1RxT3JDcWcf7DoIJRqP4LNHR";
+  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1RxT3KDcWcf7DoIJb1uvt2eC";
+  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1RxT3LDcWcf7DoIJyIqYc1Y9";
+
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -27,38 +34,57 @@ const LiveCompetition = () => {
         setIsLoggedIn(!!user);
         setUser(user);
       } catch (error) {
-        console.error('Error checking user status:', error);
         setIsLoggedIn(false);
         setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
-
     checkUser();
-
-    // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUser = session?.user || null;
       setIsLoggedIn(!!currentUser);
       setUser(currentUser);
     });
-
-    // Cleanup listener on component unmount
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  const handleRegisterClick = (competition: string) => {
+  // Stripe payment handler
+  const handleStripeRegister = async (priceId: string, competition: string) => {
     if (!isLoggedIn || !user) {
-      // Redirect to signup page with competition as query parameter
+      toast.error('Please sign up or log in to join the competition.');
       router.push(`/signup?competition=${competition}`);
-    } else {
-      // Handle registration for logged in users
-      router.push(`/league`);
+      return;
+    }
+    const toastId = toast.loading('Redirecting to payment...');
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('Stripe API error:', errorData);
+        toast.error(errorData.error || 'Unable to start payment. Please try again.', { id: toastId });
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        toast.success('Redirecting to Stripe...', { id: toastId });
+        setTimeout(() => { window.location.href = data.url; }, 1000);
+      } else {
+        toast.error('Unable to start payment. Please try again.', { id: toastId });
+      }
+    } catch (err) {
+      console.error('Stripe payment error:', err);
+      toast.error('Payment error. Please try again.', { id: toastId });
     }
   };
+
+  // Starter League registration is closed (button disabled)
 
   if (isLoading) {
     return (
@@ -70,6 +96,15 @@ const LiveCompetition = () => {
 
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: { background: '#363636', color: '#fff' },
+          success: { duration: 3000, iconTheme: { primary: '#10b981', secondary: '#fff' } },
+          error: { duration: 4000 },
+          loading: { duration: 2000 },
+        }}
+      />
       {/* Header section */}
       <div className="text-center mb-2 w-full max-w-4xl">
         <p className="text-lime-600 font-semibold text-xl mb-3">Football Trivia</p>
@@ -80,7 +115,7 @@ const LiveCompetition = () => {
 
       <div className="flex flex-col md:flex-row gap-6 mx-auto p-6 w-full max-w-7xl">
         {/* Starter League */}
-        <div className="relative border-2 border-lime-300 w-full max-h-[80vh] rounded-xl p-5 shadow-lg bg-gradient-to-br from-lime-50 to-white transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl opacity-0 animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+  <div className="relative border-2 border-lime-300 w-full max-h-[80vh] rounded-xl p-5 shadow-lg bg-gradient-to-br from-lime-50 to-white transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl opacity-0 animate-fadeIn" style={{ animationDelay: '0.1s' }}>
           <span className="absolute top-3 left-3 bg-lime-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 hover:bg-lime-600">Live</span>
           <div className="flex flex-col items-center mt-6">
             <Trophy className="h-10 w-10 text-yellow-400 mb-3" />
@@ -133,10 +168,10 @@ const LiveCompetition = () => {
           <div className="mt-4">
             <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
             <button 
-              className="w-full mt-2 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold cursor-not-allowed transition-all duration-200 hover:bg-gray-400"
-              disabled
+              onClick={() => handleStripeRegister(STARTER_LEAGUE_PRICE_ID, 'starter-league')}
+              className="w-full mt-2 py-2 bg-lime-400 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-500"
             >
-              Registration Closed
+              {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
             </button>
           </div>
         </div>
@@ -195,10 +230,10 @@ const LiveCompetition = () => {
           <div className="mt-4">
             <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
             <button 
-              onClick={() => handleRegisterClick('pro-league')}
+              onClick={() => handleStripeRegister(PRO_LEAGUE_PRICE_ID, 'pro-league')}
               className="w-full mt-2 py-2 bg-lime-500 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-600"
             >
-              {isLoggedIn ? 'Register Now' : 'Sign Up to Join'}
+              {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
             </button>
           </div>
         </div>
@@ -257,10 +292,10 @@ const LiveCompetition = () => {
           <div className="mt-4">
             <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
             <button 
-              className="w-full mt-2 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold cursor-not-allowed transition-all duration-200 hover:bg-gray-400"
-              disabled
+              onClick={() => handleStripeRegister(ELITE_LEAGUE_PRICE_ID, 'elite-league')}
+              className="w-full mt-2 py-2 bg-lime-700 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-800"
             >
-              Registration Closed
+              {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
             </button>
           </div>
         </div>

@@ -12,6 +12,10 @@ export const routes = {
   signup: '/signup',
   forgotPassword: '/forget',
   callback: '/auth/callback',
+
+   // Stripe checkout routes (NEW ✅)
+  checkoutSuccess: '/checkout/success',
+  checkoutCancel: '/checkout/cancel',
   
   // User routes
   dashboard: '/dashboard',
