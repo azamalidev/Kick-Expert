@@ -64,19 +64,18 @@ export default function League() {
   const [showTrophyModal, setShowTrophyModal] = useState(false);
   const nextCalled = useRef(false);
   const router = useRouter();
-
-  // Dummy player names
-  const dummyNames = [
-    'SoccerFan123', 'GoalMaster', 'StrikerX', 'MidfieldMaestro', 'DefenderPro',
-    'KeeperLegend', 'PitchKing', 'BallWizard', 'TurfTitan', 'NetNinja',
-    'DribbleStar', 'HeaderHero', 'FreekickAce', 'CornerCaptain', 'OffsideOracle',
-    'TackleTiger', 'SprintSavant', 'CrossCrafter', 'VolleyViper', 'ShotSlinger',
-    'PassPrince', 'FoulFox', 'RedCardRogue', 'YellowYeti', 'SoccerSage'
-  ];
-
-  // Initialize waiting phase with countdown and dummy players
+  // Get competitionId from query params (for real flow)
+  const [competitionId, setCompetitionId] = useState<string>('');
   useEffect(() => {
-    if (phase === 'waiting') {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setCompetitionId(params.get('competitionId') || 'league');
+    }
+  }, []);
+
+  // Fetch actual registered players for this competition
+  useEffect(() => {
+    if (phase === 'waiting' && competitionId) {
       const countdownInterval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -87,90 +86,60 @@ export default function League() {
           return prev - 1;
         });
       }, 1000);
-
-      // Simulate players joining
-      const playerInterval = setInterval(() => {
-        setPlayers((prev) => {
-          if (prev.length < 25) {
-            const newPlayer = {
-              id: prev.length + 1,
-              name: dummyNames[prev.length] || `Player${prev.length + 1}`
-            };
-            return [...prev, newPlayer];
-          }
-          return prev;
-        });
-      }, 400);
-
-      return () => {
-        clearInterval(countdownInterval);
-        clearInterval(playerInterval);
+      // Fetch registered players from Supabase
+      const fetchPlayers = async () => {
+        const { data, error } = await supabase
+          .from('competition_registrations')
+          .select('user_id, profiles(username)')
+          .eq('competition_id', competitionId)
+          .eq('status', 'confirmed');
+        if (!error && data) {
+          setPlayers(data.map((p: any, idx: number) => ({ id: idx + 1, name: p.profiles?.username || p.user_id })));
+        }
       };
+      fetchPlayers();
+      return () => clearInterval(countdownInterval);
     }
-  }, [phase]);
+  }, [phase, competitionId]);
 
   // Fetch questions and initialize quiz session when entering quiz phase
   useEffect(() => {
-    if (phase !== 'quiz') return;
-
+    if (phase !== 'quiz' || !competitionId) return;
     const initializeQuiz = async () => {
       try {
         setLoading(true);
-        
+        // Fetch questions for this competition from Supabase
+        const { data: compQuestions, error: cqError } = await supabase
+          .from('competition_questions')
+          .select('question_id, questions(*)')
+          .eq('competition_id', competitionId);
+        if (cqError || !compQuestions) throw cqError || new Error('No questions found');
+        setQuestions(compQuestions.map((q: any) => q.questions));
+        // Create a session for this user/competition
         const { data: { user } } = await supabase.auth.getUser();
-        
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('questions')
-          .select('*');
-
-        if (questionsError) {
-          if (questionsError.message.includes('relation "competition_questions" does not exist')) {
-            throw new Error('Database not set up. Please run the setup scripts in database/ folder first.');
-          }
-          throw questionsError;
-        }
-
-        if (!questionsData || questionsData.length === 0) {
-          throw new Error('No questions found in database. Please run setup-quiz-tables.sql to add sample questions.');
-        }
-
-        const shuffledQuestions = questionsData
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 20);
-
-        setQuestions(shuffledQuestions);
-
         const { data: session, error: sessionError } = await supabase
           .from('competition_sessions')
           .insert({
-            quiz_type: 'league',
-            questions_played: 20,
+            competition_id: competitionId,
+            user_id: user?.id,
+            questions_played: compQuestions.length,
             correct_answers: 0,
             score_percentage: 0,
-            difficulty_breakdown: {
-              easy: { total: shuffledQuestions.filter(q => q.difficulty === 'Easy').length, correct: 0 },
-              medium: { total: shuffledQuestions.filter(q => q.difficulty === 'Medium').length, correct: 0 },
-              hard: { total: shuffledQuestions.filter(q => q.difficulty === 'Hard').length, correct: 0 }
-            },
-            user_id: user?.id || null,
+            start_time: new Date().toISOString(),
+            created_at: new Date().toISOString(),
           })
           .select()
           .single();
-
-        if (sessionError) {
-          throw sessionError;
-        }
-        
+        if (sessionError) throw sessionError;
         setSessionId(session.id);
         setLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load quiz');
+        setError('Failed to load quiz');
         setLoading(false);
       }
     };
-
     initializeQuiz();
-  }, [phase]);
+  }, [phase, competitionId]);
 
   // Timer for each question
   useEffect(() => {
@@ -222,27 +191,29 @@ export default function League() {
 
   // Generate leaderboard when entering results phase
   useEffect(() => {
-    if (phase === 'results') {
-      const leaderboardData: LeaderboardEntry[] = players.map((player, index) => ({
-        id: player.id,
-        name: player.name,
-        score: Math.floor(Math.random() * 21), // Random score between 0 and 20 for dummy players
-        isUser: false,
-      }));
-      
-      // Add user's score
-      leaderboardData.push({
-        id: 0,
-        name: 'You',
-        score,
-        isUser: true,
-      });
-
-      // Sort by score (descending) and assign ranks
-      leaderboardData.sort((a, b) => b.score - a.score);
-      setLeaderboard(leaderboardData);
+    if (phase === 'leaderboard' && competitionId) {
+      // Fetch leaderboard from Supabase
+      const fetchLeaderboard = async () => {
+        const { data, error } = await supabase
+          .from('competition_results')
+          .select('user_id, rank, score, profiles(username)')
+          .eq('competition_id', competitionId)
+          .order('rank', { ascending: true });
+        if (!error && data) {
+          setLeaderboard(data.map((entry: any) => ({
+            id: entry.user_id,
+            name: entry.profiles?.username || entry.user_id,
+            score: entry.score,
+            isUser: false,
+            rank: entry.rank
+          })));
+        } else {
+          setLeaderboard([]);
+        }
+      };
+      fetchLeaderboard();
     }
-  }, [phase, score, players]);
+  }, [phase, competitionId]);
 
   const handleChoiceSelect = (choice: string) => {
     if (!showResult) {
@@ -260,15 +231,12 @@ export default function League() {
     if (questions.length === 0) {
       return;
     }
-
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
-
     // Update score
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
-
     // Save answer record
     if (currentQuestion) {
       const answerRecord = {
@@ -276,10 +244,19 @@ export default function League() {
         is_correct: isCorrect,
         difficulty: currentQuestion.difficulty
       };
-      
       setAnswers((prev) => [...prev, answerRecord]);
+      // Submit answer to Supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('competition_answers').insert({
+        competition_id: competitionId,
+        session_id: sessionId,
+        user_id: user?.id,
+        question_id: currentQuestion.id,
+        selected_answer: selectedChoice,
+        is_correct: isCorrect,
+        submitted_at: new Date().toISOString(),
+      });
     }
-
     // Move to next question or complete the quiz
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -288,15 +265,12 @@ export default function League() {
       setTimer(10);
       setTimerKey((prev) => prev + 1);
     } else {
-      // Wait for score and answers to update before completing
       setTimeout(async () => {
         await completeQuiz();
         setQuizCompleted(true);
         setPhase('results');
       }, 100);
     }
-
-    // Allow handleNextQuestion to run again after short delay
     setTimeout(() => {
       nextCalled.current = false;
     }, 300);
@@ -307,245 +281,30 @@ export default function League() {
       console.error("No session ID found");
       return;
     }
-
-    // Include the current answer in the final answers array
-    const finalAnswers = [...answers];
-    const currentQuestion = questions[currentQuestionIndex];
-    if (currentQuestion) {
-      const isCorrect = selectedChoice === currentQuestion.correct_answer;
-      finalAnswers.push({
-        question_id: currentQuestion.id,
-        is_correct: isCorrect,
-        difficulty: currentQuestion.difficulty
-      });
-    }
-
-    const difficultyBreakdown = {
-      easy: {
-        total: questions.filter(q => q.difficulty === 'Easy').length,
-        correct: finalAnswers.filter(a => a.difficulty === 'Easy' && a.is_correct).length
-      },
-      medium: {
-        total: questions.filter(q => q.difficulty === 'Medium').length,
-        correct: finalAnswers.filter(a => a.difficulty === 'Medium' && a.is_correct).length
-      },
-      hard: {
-        total: questions.filter(q => q.difficulty === 'Hard').length,
-        correct: finalAnswers.filter(a => a.difficulty === 'Hard' && a.is_correct).length
-      }
-    };
-
+    // Aggregate answers, update session, calculate results
     try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        throw userError;
-      }
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Calculate final score including current answer
-      const finalScore = finalAnswers.filter(a => a.is_correct).length;
-
-      // Update competition session
-      const { error: sessionUpdateError } = await supabase
-        .from('competition_sessions')
-        .update({
-          correct_answers: finalScore,
-          score_percentage: (finalScore / questions.length) * 100,
-          end_time: new Date().toISOString(),
-          difficulty_breakdown: difficultyBreakdown,
-          answers: finalAnswers,
-        })
-        .eq('id', sessionId);
-
-      if (sessionUpdateError) {
-        throw sessionUpdateError;
-      }
-
-      // Calculate rewards based on final score
-      let xpReward = 0;
-      let moneyReward = 0;
-      let performanceLevel = '';
-
-      if (finalScore >= 16) {
-        xpReward = 30; // Elite level - non-winners get +30 XP
-        moneyReward = 100;
-        performanceLevel = 'Elite';
-      } else if (finalScore >= 13) {
-        xpReward = 20; // Pro level - non-winners get +20 XP
-        moneyReward = 50;
-        performanceLevel = 'Pro';
-      } else if (finalScore >= 10) {
-        xpReward = 10; // Starter level - non-winners get +10 XP
-        moneyReward = 30;
-        performanceLevel = 'Starter';
-      } else {
-        xpReward = 5; // Below starter level
-        moneyReward = 10;
-        performanceLevel = 'Rookie';
-      }
-
-      // Check if user profile exists, create if not
-      let { data: currentProfile, error: profileFetchError } = await supabase
-        .from('profiles')
-        .select('xp, total_games, total_wins, user_id, username')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileFetchError) {
-        // If profile doesn't exist, create it first
-        if (profileFetchError.code === 'PGRST116') {
-          // Get user name from users table or auth metadata
-          let userName = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
-          
-          const { error: createProfileError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: user.id,
-              username: userName,
-              avatar_url: '',
-              nationality: '',
-              xp: 0,
-              total_games: 0,
-              total_wins: 0,
-              rank_label: 'Beginner',
-              created_at: new Date().toISOString()
-            });
-
-          if (createProfileError) {
-            throw createProfileError;
-          }
-          
-          // Fetch the newly created profile
-          const { data: newProfile, error: newProfileError } = await supabase
-            .from('profiles')
-            .select('xp, total_games, total_wins, user_id, username')
-            .eq('user_id', user.id)
-            .single();
-            
-          if (newProfileError) {
-            throw newProfileError;
-          }
-          
-          currentProfile = newProfile;
-        } else {
-          throw profileFetchError;
-        }
-      }
-
-      // Calculate new values
-      const newXP = (currentProfile?.xp || 0) + xpReward;
-      const newTotalGames = (currentProfile?.total_games || 0) + 1;
-      const newTotalWins = finalScore >= 13 ? (currentProfile?.total_wins || 0) + 1 : (currentProfile?.total_wins || 0);
-
-      // Update user's profile
-      const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .update({ 
-          xp: newXP,
-          total_games: newTotalGames,
-          total_wins: newTotalWins,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
-
-      if (profileUpdateError) {
-        throw profileUpdateError;
-      }
-
-      // Handle wallet operations
-      const { data: currentWallet, error: walletFetchError } = await supabase
-        .from('wallets')
-        .select('balance, user_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletFetchError) {
-        // Create wallet if it doesn't exist
-        const { error: walletCreateError } = await supabase
-          .from('wallets')
-          .insert({
-            user_id: user.id,
-            balance: moneyReward,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        if (walletCreateError) {
-          throw walletCreateError;
-        }
-      } else {
-        // Update existing wallet
-        const newBalance = (currentWallet?.balance || 0) + moneyReward;
-        
-        const { error: walletUpdateError } = await supabase
-          .from('wallets')
-          .update({ 
-            balance: newBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-
-        if (walletUpdateError) {
-          throw walletUpdateError;
-        }
-      }
-
-      // Log XP history
-      const { error: xpHistoryError } = await supabase
-        .from('xp_history')
-        .insert({
-          user_id: user.id,
-          xp_gained: xpReward,
-          source: 'league_competition',
-          description: `League Competition (${performanceLevel}) - Score: ${finalScore}/20`,
-          session_id: sessionId,
-          created_at: new Date().toISOString()
-        });
-
-      if (xpHistoryError) {
-        throw xpHistoryError;
-      }
-
-      // Log transaction history
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          amount: moneyReward,
-          type: 'reward',
-          status: 'completed',
-          description: `League Competition Reward (${performanceLevel}) - Score: ${finalScore}/20`,
-          source: 'league_competition',
-          session_id: sessionId,
-          created_at: new Date().toISOString()
-        });
-
-      if (transactionError) {
-        throw transactionError;
-      }
-
-      // Check and award XP-based trophies
-      try {
-        const trophies = await TrophyService.checkAndAwardXPTrophies(user.id, sessionId);
-        if (trophies.length > 0) {
-          setNewTrophies(trophies);
-          setShowTrophyModal(true);
-        }
-      } catch (trophyError) {
-        console.error('Failed to check trophies:', trophyError);
-        // Don't throw error to prevent UI from breaking
-      }
-
-      console.log(`League completion: ${performanceLevel} performance - Score: ${finalScore}/20, XP: +${xpReward}, Money: +${moneyReward} PKR`);
-
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      // Update session summary
+      const correctAnswers = answers.filter(a => a.is_correct).length;
+      await supabase.from('competition_sessions').update({
+        correct_answers: correctAnswers,
+        score_percentage: (correctAnswers / questions.length) * 100,
+        end_time: new Date().toISOString(),
+      }).eq('id', sessionId);
+      // Calculate rank and insert into results (simple demo logic)
+      await supabase.from('competition_results').insert({
+        competition_id: competitionId,
+        user_id: user.id,
+        rank: 1, // Should be calculated by backend function for real use
+        score: correctAnswers,
+        xp_awarded: correctAnswers * 5,
+        trophy_awarded: correctAnswers >= questions.length - 2,
+        prize_amount: correctAnswers * 10,
+        created_at: new Date().toISOString(),
+      });
     } catch (err) {
-      console.error('Failed to complete quiz and process rewards:', err);
-      // Don't throw error to prevent UI from breaking
+      console.error('Failed to finish competition:', err);
     }
   };
 

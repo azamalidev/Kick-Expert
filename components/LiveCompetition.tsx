@@ -23,9 +23,9 @@ const LiveCompetition = () => {
   // Check user authentication status on component mount
 
   // Stripe price IDs from .env.local
-  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1RxT3JDcWcf7DoIJRqP4LNHR";
-  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1RxT3KDcWcf7DoIJb1uvt2eC";
-  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1RxT3LDcWcf7DoIJyIqYc1Y9";
+  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1Rxr2pRkV53d3IKfQvSZXDDH";
+  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1Rxr2qRkV53d3IKfZ77ovihb";
+  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1Rxr2rRkV53d3IKfnMXFhcqM";
 
   useEffect(() => {
     const checkUser = async () => {
@@ -60,10 +60,16 @@ const LiveCompetition = () => {
     }
     const toastId = toast.loading('Redirecting to payment...');
     try {
+      // Map competition string to actual competitionId (if needed)
+      let competitionId = '';
+      if (competition === 'starter-league') competitionId = process.env.NEXT_PUBLIC_STARTER_LEAGUE_ID || '';
+      else if (competition === 'pro-league') competitionId = process.env.NEXT_PUBLIC_PRO_LEAGUE_ID || '';
+      else if (competition === 'elite-league') competitionId = process.env.NEXT_PUBLIC_ELITE_LEAGUE_ID || '';
+      // If you already have the actual competitionId, use it directly
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId, competitionId, userId: user.id }),
       });
       if (!res.ok) {
         const errorData = await res.json();
