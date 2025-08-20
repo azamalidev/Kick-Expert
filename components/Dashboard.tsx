@@ -49,6 +49,15 @@ interface TransactionEntry {
   created_at: string;
 }
 
+interface SupportTicket {
+  id: string;
+  user_id: string;
+  topic: string;
+  description: string;
+  status: string;
+  created_at: string;
+}
+
 export default function Dashboard() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [walletData, setWalletData] = useState<WalletData | null>(null);
@@ -56,10 +65,12 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<TransactionEntry[]>([]);
   const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
   const [trophyStats, setTrophyStats] = useState<TrophyStats | null>(null);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [trophiesLoading, setTrophiesLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   
   // Fallback states for when data is loading
@@ -73,8 +84,8 @@ export default function Dashboard() {
   const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'wallet' | 'history' | 'notifications' | 'support'>('wallet');
-  const [supportMessage, setSupportMessage] = useState<string>("");
-  const [supportSubject, setSupportSubject] = useState<string>("");
+  const [supportTopic, setSupportTopic] = useState<string>("");
+  const [supportDescription, setSupportDescription] = useState<string>("");
 
   // Handle client-side mounting to prevent hydration errors
   useEffect(() => {
@@ -88,6 +99,7 @@ export default function Dashboard() {
       fetchLeaderboardData();
       fetchTransactions();
       fetchUserTrophies();
+      fetchSupportTickets();
     }
   }, [mounted]);
 
@@ -263,6 +275,35 @@ export default function Dashboard() {
     }
   };
 
+  const fetchSupportTickets = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("User not authenticated");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('support')
+        .select('id, user_id, topic, description, status, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching support tickets:', error);
+        toast.error(`Failed to load support tickets: ${error.message}`);
+        return;
+      }
+
+      if (data) {
+        setSupportTickets(data);
+      }
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      toast.error("Failed to load support tickets due to an unexpected error");
+    }
+  };
+
   const handleWithdraw = async () => {
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount)) {
@@ -333,15 +374,49 @@ export default function Dashboard() {
     }
   };
 
-  const handleSupportSubmit = (e: React.FormEvent) => {
+  const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supportMessage) {
-      toast.error("Please fill in all fields");
+    if (!supportTopic.trim() || !supportDescription.trim()) {
+      toast.error("Please fill in all required fields with valid input");
       return;
     }
-    // In a real app, you would send this to your backend
-    toast.success("Support ticket submitted successfully!");
-    setSupportMessage("");
+
+    setIsSubmitting(true);
+
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        toast.error("User not authenticated. Please log in.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('support')
+        .insert({
+          user_id: user.id,
+          topic: supportTopic.trim(),
+          description: supportDescription.trim(),
+          status: 'open'
+        });
+
+      if (error) {
+        console.error('Supabase error details:', error);
+        toast.error(`Failed to submit support ticket: ${error.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      toast.success("Support ticket submitted successfully!");
+      setSupportTopic("");
+      setSupportDescription("");
+      fetchSupportTickets();
+    } catch (error: any) {
+      console.error('Unexpected error submitting support ticket:', error);
+      toast.error(`Failed to submit support ticket: ${error.message || 'Unexpected error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getTransactionIcon = (type: string) => {
@@ -354,6 +429,19 @@ export default function Dashboard() {
         return <span className="text-blue-500">🎁</span>;
       default:
         return <span className="text-gray-500">💰</span>;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'closed':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -590,8 +678,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
-            
             </div>
 
             {/* Action Buttons */}
@@ -701,12 +787,7 @@ export default function Dashboard() {
 
                         {/* XP Points */}
                         <div className="text-right">
-                          <div className="flex items-center">
-                            <svg className="w-5 h-5 text-yellow-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                            </svg>
-                            <span className="text-xl font-bold text-gray-800">
-                              {user.xp.toLocaleString()}
+                          <div className="flex <=> {user.xp.toLocaleString()}
                             </span>
                           </div>
                           <span className="text-sm text-gray-500">XP</span>
@@ -994,25 +1075,71 @@ export default function Dashboard() {
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Support Center</h3>
                   <div className="space-y-6">
                     <div className="p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-bold mb-3">Contact Support</h4>
+                      <h4 className="font-bold mb-3">Open a Support Ticket</h4>
                       <form onSubmit={handleSupportSubmit}>
                         <div className="mb-4">
-                          <label className="block text-sm font-bold text-gray-700 mb-1">Your Message</label>
-                          <textarea
-                            value={supportMessage}
-                            onChange={(e) => setSupportMessage(e.target.value)}
+                          <label className="block text-sm font-bold text-gray-700 mb-1">Topic</label>
+                          <select
+                            value={supportTopic}
+                            onChange={(e) => setSupportTopic(e.target.value)}
                             className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
-                            placeholder="Describe your issue or question......"
+                          >
+                            <option value="">Select a topic</option>
+                            <option value="Account Issue">Account Issue</option>
+                            <option value="Payment Issue">Payment Issue</option>
+                            <option value="Game Issue">Game Issue</option>
+                            <option value="Technical Issue">Technical Issue</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
+                          <textarea
+                            value={supportDescription}
+                            onChange={(e) => setSupportDescription(e.target.value)}
+                            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+                            placeholder="Describe your issue or question..."
                             rows={4}
                           />
                         </div>
                         <button
                           type="submit"
-                          className="w-full max-w-sm py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
+                          disabled={isSubmitting}
+                          className={`w-full max-w-sm py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          Submit Support Request
+                          {isSubmitting ? 'Submitting...' : 'Submit Support Ticket'}
                         </button>
                       </form>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-bold mb-3">Your Support Tickets</h4>
+                      {supportTickets.length > 0 ? (
+                        <div className="space-y-4">
+                          {supportTickets.map((ticket) => (
+                            <div
+                              key={ticket.id}
+                              className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium text-gray-800">{ticket.topic}</p>
+                                  <p className="text-sm text-gray-500 mt-1">{ticket.description}</p>
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    Submitted: {new Date(ticket.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}
+                                >
+                                  {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No support tickets found.</p>
+                      )}
                     </div>
                   </div>
                 </div>
