@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "@stripe/stripe-js": "^7.8.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.50.4",
@@ -30,7 +31,8 @@
     "recharts": "^3.1.0",
     "stripe": "^18.4.0",
     "styled-components": "^6.1.19",
-    "swiper": "^11.2.8"
+    "swiper": "^11.2.8",
+    "tailwind-scrollbar-hide": "^4.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
