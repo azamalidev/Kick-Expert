@@ -5,9 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
-import { useRouter } from 'next/navigation';
-import { TrophyService } from '../utils/trophyService';
-import { AwardedTrophy } from '../types/trophy';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Trophy, Award, Star, Clock, Users, ChevronRight, Home, RotateCcw } from 'lucide-react';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -41,9 +40,18 @@ interface LeaderboardEntry {
   name: string;
   score: number;
   isUser: boolean;
+  rank: number;
 }
 
-export default function League() {
+interface CompetitionDetails {
+  id: string;
+  name: string;
+  entry_fee: number;
+  prize_structure: any;
+  status: string;
+}
+
+export default function LeaguePage() {
   const [countdown, setCountdown] = useState(10);
   const [players, setPlayers] = useState<Player[]>([]);
   const [phase, setPhase] = useState<'waiting' | 'quiz' | 'results' | 'leaderboard'>('waiting');
@@ -60,18 +68,35 @@ export default function League() {
   const [timer, setTimer] = useState(10);
   const [timerKey, setTimerKey] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [newTrophies, setNewTrophies] = useState<AwardedTrophy[]>([]);
-  const [showTrophyModal, setShowTrophyModal] = useState(false);
+  const [competitionDetails, setCompetitionDetails] = useState<CompetitionDetails | null>(null);
+  const [userRank, setUserRank] = useState<number | null>(null);
   const nextCalled = useRef(false);
   const router = useRouter();
-  // Get competitionId from query params (for real flow)
-  const [competitionId, setCompetitionId] = useState<string>('');
+  const searchParams = useSearchParams();
+  const competitionId = searchParams.get('competitionId') || '';
+
+  // Fetch competition details
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      setCompetitionId(params.get('competitionId') || 'league');
-    }
-  }, []);
+    const fetchCompetitionDetails = async () => {
+      if (!competitionId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('competitions')
+          .select('*')
+          .eq('id', competitionId)
+          .single();
+        
+        if (!error && data) {
+          setCompetitionDetails(data);
+        }
+      } catch (err) {
+        console.error('Error fetching competition details:', err);
+      }
+    };
+    
+    fetchCompetitionDetails();
+  }, [competitionId]);
 
   // Fetch actual registered players for this competition
   useEffect(() => {
@@ -86,6 +111,7 @@ export default function League() {
           return prev - 1;
         });
       }, 1000);
+      
       // Fetch registered players from Supabase
       const fetchPlayers = async () => {
         const { data, error } = await supabase
@@ -93,10 +119,15 @@ export default function League() {
           .select('user_id, profiles(username)')
           .eq('competition_id', competitionId)
           .eq('status', 'confirmed');
+        
         if (!error && data) {
-          setPlayers(data.map((p: any, idx: number) => ({ id: idx + 1, name: p.profiles?.username || p.user_id })));
+          setPlayers(data.map((p: any, idx: number) => ({ 
+            id: idx + 1, 
+            name: p.profiles?.username || `User ${p.user_id.substring(0, 8)}` 
+          })));
         }
       };
+      
       fetchPlayers();
       return () => clearInterval(countdownInterval);
     }
@@ -105,32 +136,44 @@ export default function League() {
   // Fetch questions and initialize quiz session when entering quiz phase
   useEffect(() => {
     if (phase !== 'quiz' || !competitionId) return;
+    
     const initializeQuiz = async () => {
       try {
         setLoading(true);
+        
         // Fetch questions for this competition from Supabase
         const { data: compQuestions, error: cqError } = await supabase
           .from('competition_questions')
           .select('question_id, questions(*)')
-          .eq('competition_id', competitionId);
+          .eq('competition_id', competitionId)
+          .order('order_index', { ascending: true });
+        
         if (cqError || !compQuestions) throw cqError || new Error('No questions found');
+        
         setQuestions(compQuestions.map((q: any) => q.questions));
+        
         // Create a session for this user/competition
         const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+        
         const { data: session, error: sessionError } = await supabase
           .from('competition_sessions')
           .insert({
             competition_id: competitionId,
-            user_id: user?.id,
+            user_id: user.id,
             questions_played: compQuestions.length,
             correct_answers: 0,
             score_percentage: 0,
             start_time: new Date().toISOString(),
-            created_at: new Date().toISOString(),
           })
           .select()
           .single();
+        
         if (sessionError) throw sessionError;
+        
         setSessionId(session.id);
         setLoading(false);
       } catch (err) {
@@ -138,6 +181,7 @@ export default function League() {
         setLoading(false);
       }
     };
+    
     initializeQuiz();
   }, [phase, competitionId]);
 
@@ -194,23 +238,38 @@ export default function League() {
     if (phase === 'leaderboard' && competitionId) {
       // Fetch leaderboard from Supabase
       const fetchLeaderboard = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        
         const { data, error } = await supabase
           .from('competition_results')
           .select('user_id, rank, score, profiles(username)')
           .eq('competition_id', competitionId)
-          .order('rank', { ascending: true });
+          .order('rank', { ascending: true })
+          .limit(20);
+        
         if (!error && data) {
-          setLeaderboard(data.map((entry: any) => ({
+          const leaderboardData = data.map((entry: any) => ({
             id: entry.user_id,
-            name: entry.profiles?.username || entry.user_id,
+            name: entry.profiles?.username || `User ${entry.user_id.substring(0, 8)}`,
             score: entry.score,
-            isUser: false,
+            isUser: user?.id === entry.user_id,
             rank: entry.rank
-          })));
+          }));
+          
+          setLeaderboard(leaderboardData);
+          
+          // Find user's rank
+          if (user) {
+            const userEntry = leaderboardData.find((entry: any) => entry.id === user.id);
+            if (userEntry) {
+              setUserRank(userEntry.rank);
+            }
+          }
         } else {
           setLeaderboard([]);
         }
       };
+      
       fetchLeaderboard();
     }
   }, [phase, competitionId]);
@@ -231,12 +290,15 @@ export default function League() {
     if (questions.length === 0) {
       return;
     }
+    
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
+    
     // Update score
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
+    
     // Save answer record
     if (currentQuestion) {
       const answerRecord = {
@@ -244,9 +306,12 @@ export default function League() {
         is_correct: isCorrect,
         difficulty: currentQuestion.difficulty
       };
+      
       setAnswers((prev) => [...prev, answerRecord]);
+      
       // Submit answer to Supabase
       const { data: { user } } = await supabase.auth.getUser();
+      
       await supabase.from('competition_answers').insert({
         competition_id: competitionId,
         session_id: sessionId,
@@ -257,6 +322,7 @@ export default function League() {
         submitted_at: new Date().toISOString(),
       });
     }
+    
     // Move to next question or complete the quiz
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -271,6 +337,7 @@ export default function League() {
         setPhase('results');
       }, 100);
     }
+    
     setTimeout(() => {
       nextCalled.current = false;
     }, 300);
@@ -281,30 +348,89 @@ export default function League() {
       console.error("No session ID found");
       return;
     }
+    
     // Aggregate answers, update session, calculate results
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      
       // Update session summary
       const correctAnswers = answers.filter(a => a.is_correct).length;
+      const scorePercentage = (correctAnswers / questions.length) * 100;
+      
       await supabase.from('competition_sessions').update({
         correct_answers: correctAnswers,
-        score_percentage: (correctAnswers / questions.length) * 100,
+        score_percentage: scorePercentage,
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
-      // Calculate rank and insert into results (simple demo logic)
-      await supabase.from('competition_results').insert({
-        competition_id: competitionId,
-        user_id: user.id,
-        rank: 1, // Should be calculated by backend function for real use
-        score: correctAnswers,
-        xp_awarded: correctAnswers * 5,
-        trophy_awarded: correctAnswers >= questions.length - 2,
-        prize_amount: correctAnswers * 10,
-        created_at: new Date().toISOString(),
-      });
+      
+      // Calculate rank based on score and time (this should be handled by a database function in production)
+      const { data: allScores } = await supabase
+        .from('competition_sessions')
+        .select('user_id, correct_answers, end_time')
+        .eq('competition_id', competitionId)
+        .not('end_time', 'is', null);
+      
+      if (allScores) {
+        // Sort by correct answers (desc) and end time (asc - faster completion is better)
+        const sortedScores = allScores
+          .map(session => ({
+            user_id: session.user_id,
+            score: session.correct_answers,
+            end_time: new Date(session.end_time).getTime()
+          }))
+          .sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return a.end_time - b.end_time;
+          });
+        
+        const userRank = sortedScores.findIndex(score => score.user_id === user.id) + 1;
+        
+        // Insert into competition_results
+        await supabase.from('competition_results').insert({
+          competition_id: competitionId,
+          user_id: user.id,
+          rank: userRank,
+          score: correctAnswers,
+          xp_awarded: correctAnswers * 5,
+          trophy_awarded: userRank <= 3,
+          prize_amount: calculatePrizeAmount(userRank),
+          created_at: new Date().toISOString(),
+        });
+        
+        // Award trophies for top 3
+        if (userRank <= 3) {
+          const trophyType = userRank === 1 ? 'gold' : userRank === 2 ? 'silver' : 'bronze';
+          const title = userRank === 1 ? 'Champion' : userRank === 2 ? 'Runner-up' : 'Third Place';
+          const description = `Finished ${userRank}${userRank === 1 ? 'st' : userRank === 2 ? 'nd' : 'rd'} in ${competitionDetails?.name}`;
+          
+          await supabase.from('competition_trophies').insert({
+            competition_id: competitionId,
+            user_id: user.id,
+            trophy_type: trophyType,
+            title: title,
+            description: description,
+            awarded_at: new Date().toISOString(),
+          });
+        }
+      }
     } catch (err) {
       console.error('Failed to finish competition:', err);
+    }
+  };
+
+  const calculatePrizeAmount = (rank: number): number => {
+    if (!competitionDetails?.prize_structure) return 0;
+    
+    try {
+      const prizeStructure = typeof competitionDetails.prize_structure === 'string' 
+        ? JSON.parse(competitionDetails.prize_structure)
+        : competitionDetails.prize_structure;
+      
+      return prizeStructure[rank] || 0;
+    } catch (e) {
+      console.error('Error parsing prize structure:', e);
+      return 0;
     }
   };
 
@@ -325,8 +451,7 @@ export default function League() {
     setTimer(10);
     setTimerKey(0);
     setLeaderboard([]);
-    setNewTrophies([]);
-    setShowTrophyModal(false);
+    setUserRank(null);
   };
 
   const getRecommendation = () => {
@@ -334,8 +459,8 @@ export default function League() {
       return {
         message: "Elite League Champion!",
         description: "Your skills are top-tier! Keep dominating in the Elite League!",
-        leagueLink: "/league",
-        leagueText: "Play Again in Elite League",
+        leagueLink: "/competitions",
+        leagueText: "Join Another Competition",
         emoji: "🏆",
         bgColor: "from-emerald-100 to-emerald-200"
       };
@@ -343,8 +468,8 @@ export default function League() {
       return {
         message: "Pro League Star!",
         description: "Great performance! Try the Pro League again or aim for Elite!",
-        leagueLink: "/league",
-        leagueText: "Play Again in Pro League",
+        leagueLink: "/competitions",
+        leagueText: "Join Another Competition",
         emoji: "⭐",
         bgColor: "from-blue-100 to-blue-200"
       };
@@ -352,8 +477,8 @@ export default function League() {
       return {
         message: "Solid Starter League Performance!",
         description: "Well done! Keep practicing in the Starter League or step up to Pro!",
-        leagueLink: "/league",
-        leagueText: "Play Again in Starter League",
+        leagueLink: "/competitions",
+        leagueText: "Join Another Competition",
         emoji: "👍",
         bgColor: "from-lime-100 to-lime-200"
       };
@@ -361,7 +486,7 @@ export default function League() {
       return {
         message: "Keep Practicing!",
         description: "You're getting there! Try again to improve your score!",
-        leagueLink: "/league",
+        leagueLink: "/competitions",
         leagueText: "Try Again",
         emoji: "💪",
         bgColor: "from-yellow-100 to-yellow-200"
@@ -407,9 +532,11 @@ export default function League() {
             transition={{ duration: 0.5 }}
             className="p-6 sm:p-8 text-center"
           >
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">
-              Preparing League Competition
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+              {competitionDetails?.name || 'League Competition'}
             </h1>
+            <p className="text-gray-600 mb-6">Get ready to compete against other players!</p>
+            
             <div className="relative w-32 h-32 mx-auto mb-8">
               <svg className="w-full h-full" viewBox="0 0 100 100">
                 <circle
@@ -442,9 +569,11 @@ export default function League() {
                 <span className="text-4xl font-bold text-gray-800">{countdown}</span>
               </div>
             </div>
+            
             <p className="text-lg text-gray-600 mb-6">
-              {players.length} of 25 players have joined
+              {players.length} players have joined
             </p>
+            
             <div className="max-h-64 overflow-y-auto px-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <AnimatePresence>
@@ -472,7 +601,7 @@ export default function League() {
             <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 sm:p-6 rounded-lg">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
                 <h1 className="text-xl sm:text-2xl font-bold text-white text-center sm:text-left">
-                  League Competition
+                  {competitionDetails?.name || 'League Competition'}
                 </h1>
                 <div className="flex items-center justify-center sm:justify-end space-x-3 sm:space-x-4">
                   <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full flex items-center">
@@ -491,9 +620,7 @@ export default function League() {
               {/* Improved timer */}
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Clock className="w-5 h-5 text-white" />
                   <span className="text-white font-medium text-sm">
                     {Math.ceil(timer)}s
                   </span>
@@ -649,7 +776,7 @@ export default function League() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-3xl sm:text-4xl font-bold text-gray-800">
-                  {score}/20
+                  {score}/{questions.length}
                 </span>
                 <span className="text-gray-500 text-xs sm:text-sm mt-1">Your Score</span>
               </div>
@@ -709,8 +836,17 @@ export default function League() {
             className="p-4 sm:p-8"
           >
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center">
-              League Leaderboard 🏆
+              {competitionDetails?.name} Leaderboard 🏆
             </h1>
+            
+            {userRank && (
+              <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 rounded-lg text-white text-center mb-6">
+                <h3 className="text-lg font-semibold mb-2">Your Ranking</h3>
+                <div className="text-3xl font-bold">{userRank}</div>
+                <p className="text-sm">out of {leaderboard.length} players</p>
+              </div>
+            )}
+            
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-lime-500 to-lime-600">
@@ -747,7 +883,7 @@ export default function League() {
                           {entry.isUser && <span className="ml-2 text-lime-500">(You)</span>}
                         </td>
                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {entry.score}/20
+                          {entry.score}/{questions.length}
                         </td>
                       </motion.tr>
                     ))}
@@ -760,70 +896,35 @@ export default function League() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleRestartQuiz}
-                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base"
+                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
               >
+                <RotateCcw size={16} className="mr-2" />
                 Try Again
               </motion.button>
+              <Link href="/competitions">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-lime-500 hover:bg-lime-600 text-white font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
+                >
+                  <Award size={16} className="mr-2" />
+                  Join Another
+                </motion.button>
+              </Link>
               <Link href="/">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
                 >
-                  Back to Dashboard
+                  <Home size={16} className="mr-2" />
+                  Dashboard
                 </motion.button>
               </Link>
             </div>
           </motion.div>
         )}
       </div>
-
-      {/* Trophy Notification Modal */}
-      {showTrophyModal && newTrophies.length > 0 && (
-        <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-lg flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border-4 border-yellow-400"
-          >
-            <div className="text-center">
-              <div className="text-6xl mb-4">🏆</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                {newTrophies.length === 1 ? 'New Trophy Earned!' : 'New Trophies Earned!'}
-              </h2>
-              <div className="space-y-3 mb-6">
-                {newTrophies.map((trophy, index) => (
-                  <div key={index} className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
-                    <div className="flex items-center justify-center space-x-3">
-                      <span className="text-3xl">{TrophyService.getTrophyIcon(trophy.trophy_type)}</span>
-                      <div>
-                        <div className="font-semibold text-lg text-gray-800">
-                          {trophy.title}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {trophy.description}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setShowTrophyModal(false);
-                  setNewTrophies([]);
-                }}
-                className="px-8 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold rounded-xl shadow-lg transition-all"
-              >
-                Awesome!
-              </motion.button>
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }
