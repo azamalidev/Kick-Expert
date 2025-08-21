@@ -15,10 +15,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface Competition {
+  id: string;
+  name: string;
+  start_time: string;
+  entry_fee: number;
+  status: string;
+  created_at: string;
+}
+
 interface CompetitionModalProps {
   isOpen: boolean;
   onClose: () => void;
   competition: {
+    id: string;
     name: string;
     price: string;
     difficulty: string;
@@ -26,11 +36,75 @@ interface CompetitionModalProps {
     minPlayers: number;
     prizes: string[];
     priceId: string;
-    id: string;
+    entry_fee: number;
   };
   onProceedToPayment: (priceId: string, competitionId: string) => void;
   startTime: Date;
 }
+
+interface AlreadyRegisteredModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  competitionName: string;
+  paidAmount: number;
+}
+
+const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
+  isOpen,
+  onClose,
+  competitionName,
+  paidAmount
+}) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative flex-shrink-0">
+              <h2 className="text-xl font-bold text-center">Already Registered</h2>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto scrollbar-hide flex-1 text-center">
+              <div className="flex justify-center mb-4">
+                <CheckCircle className="text-lime-600" size={48} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                You've already registered for {competitionName}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                You have already paid ${paidAmount} for this competition. 
+                We'll notify you when it's time to play!
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
+              <button
+                onClick={onClose}
+                className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const CompetitionModal: React.FC<CompetitionModalProps> = ({
   isOpen,
@@ -194,8 +268,13 @@ const LiveCompetition = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [alreadyRegisteredModalOpen, setAlreadyRegisteredModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<any>(null);
-  const [competitions, setCompetitions] = useState<any[]>([]);
+  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [alreadyRegisteredData, setAlreadyRegisteredData] = useState<{
+    competitionName: string;
+    paidAmount: number;
+  }>({ competitionName: '', paidAmount: 0 });
 
   // Stripe price IDs from .env.local
   const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1Rxr2pRkV53d3IKfQvSZXDDH";
@@ -209,6 +288,7 @@ const LiveCompetition = () => {
         setIsLoggedIn(!!user);
         setUser(user);
       } catch (error) {
+        console.error('Error checking user:', error);
         setIsLoggedIn(false);
         setUser(null);
       } finally {
@@ -216,26 +296,28 @@ const LiveCompetition = () => {
       }
     };
 
-    // Fetch next Saturday's competition for each league
+    // Fetch competitions from database
     const fetchCompetitions = async () => {
       try {
-        const today = new Date();
-        const nextSaturday = new Date(today);
-        nextSaturday.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7 || 7));
-        nextSaturday.setUTCHours(0, 0, 0, 0);
-
-        // Fetch all competitions for next Saturday
         const { data, error } = await supabase
           .from('competitions')
           .select('*')
-          .gte('start_time', nextSaturday.toISOString())
-          .lt('start_time', new Date(nextSaturday.getTime() + 24 * 60 * 60 * 1000).toISOString());
+          .eq('status', 'upcoming')
+          .order('start_time', { ascending: true });
 
-        if (!error && data) {
+        if (error) {
+          console.error('Error fetching competitions:', error);
+          toast.error('Failed to load competitions');
+          return;
+        }
+
+        if (data) {
+          console.log('Fetched competitions:', data);
           setCompetitions(data);
         }
       } catch (error) {
         console.error('Error fetching competitions:', error);
+        toast.error('Failed to load competitions');
       }
     };
 
@@ -253,53 +335,98 @@ const LiveCompetition = () => {
     };
   }, []);
 
-  // Get next Saturday for a given league
-  const getNextSaturday = (league: string) => {
-    const today = new Date();
-    const nextSaturday = new Date(today);
-    nextSaturday.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7 || 7));
-    // Set correct hour for each league
-    if (league === 'Starter League') nextSaturday.setUTCHours(15, 0, 0, 0); // 3:00 PM UTC
-    else if (league === 'Pro League') nextSaturday.setUTCHours(16, 0, 0, 0); // 4:00 PM UTC
-    else if (league === 'Elite League') nextSaturday.setUTCHours(17, 0, 0, 0); // 5:00 PM UTC
-    return nextSaturday;
-  };
-
-  const handleOpenModal = (competition: any) => {
+  const handleOpenModal = async (competition: any) => {
     if (!isLoggedIn || !user) {
       toast.error('Please sign up or log in to join the competition.');
       router.push(`/signup?competition=${competition.name.toLowerCase().replace(' ', '-')}`);
       return;
     }
 
-    // Check if user is already registered
-    const checkRegistration = async () => {
+    // Check if user is already registered for this competition
+    try {
       const { data, error } = await supabase
         .from('competition_registrations')
-        .select('id')
+        .select('status, paid_amount')
         .eq('competition_id', competition.id)
         .eq('user_id', user.id)
         .single();
 
-      if (data) {
-        toast.error('You are already registered for this competition!');
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error checking registration:', error);
+        toast.error('Error checking registration status');
         return;
       }
 
+      if (data) {
+        if (data.status === 'confirmed') {
+          // Show modal instead of toast
+          setAlreadyRegisteredData({
+            competitionName: competition.name,
+            paidAmount: data.paid_amount
+          });
+          setAlreadyRegisteredModalOpen(true);
+          return;
+        } else if (data.status === 'pending') {
+          // Allow to proceed with payment if status is pending
+          setSelectedCompetition(competition);
+          setModalOpen(true);
+          return;
+        }
+      }
+
+      // User is not registered, allow registration
       setSelectedCompetition(competition);
       setModalOpen(true);
-    };
 
-    checkRegistration();
+    } catch (error) {
+      console.error('Error checking registration:', error);
+      toast.error('Error checking registration status');
+    }
   };
 
   const handleStripeRegister = async (priceId: string, competitionId: string) => {
-    const toastId = toast.loading('Redirecting to payment...');
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+
+    // Double-check registration status before proceeding to payment
     try {
+      const { data, error } = await supabase
+        .from('competition_registrations')
+        .select('status, paid_amount')
+        .eq('competition_id', competitionId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking registration before payment:', error);
+        toast.error('Error verifying registration status');
+        return;
+      }
+
+      if (data && data.status === 'confirmed') {
+        // Show modal instead of toast
+        setAlreadyRegisteredData({
+          competitionName: selectedCompetition.name,
+          paidAmount: data.paid_amount
+        });
+        setModalOpen(false);
+        setAlreadyRegisteredModalOpen(true);
+        return;
+      }
+
+      // Proceed with payment
+      const toastId = toast.loading('Redirecting to payment...');
+      
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, competitionId, userId: user.id }),
+        body: JSON.stringify({ 
+          priceId, 
+          competitionId, 
+          userId: user.id 
+        }),
       });
 
       if (!res.ok) {
@@ -309,16 +436,18 @@ const LiveCompetition = () => {
         return;
       }
 
-      const data = await res.json();
-      if (data.url) {
+      const result = await res.json();
+      if (result.url) {
         toast.success('Redirecting to Stripe...', { id: toastId });
-        setTimeout(() => { window.location.href = data.url; }, 1000);
+        setTimeout(() => { 
+          window.location.href = result.url; 
+        }, 1000);
       } else {
         toast.error('Unable to start payment. Please try again.', { id: toastId });
       }
     } catch (err) {
       console.error('Stripe payment error:', err);
-      toast.error('Payment error. Please try again.', { id: toastId });
+      toast.error('Payment error. Please try again.');
     }
   };
 
@@ -330,44 +459,90 @@ const LiveCompetition = () => {
     );
   }
 
-  const competitionData = [
-    {
-      id: competitions.find(c => c.name === 'Starter League')?.id || 'starter',
-      name: 'Starter League',
-      price: competitions.find(c => c.name === 'Starter League') ? `$${competitions.find(c => c.name === 'Starter League').entry_fee}.00` : '$2.00',
-      difficulty: 'Easy',
-      questions: 15,
-      minPlayers: 10,
-      prizes: ['1st: $10', '2nd: $5', '3rd: $2'],
-      priceId: STARTER_LEAGUE_PRICE_ID,
-      status: 'Min reached',
-  startTime: competitions.find(c => c.name === 'Starter League') ? new Date(competitions.find(c => c.name === 'Starter League').start_time) : null,
-    },
-    {
-      id: competitions.find(c => c.name === 'Pro League')?.id || 'pro',
-      name: 'Pro League',
-      price: competitions.find(c => c.name === 'Pro League') ? `$${competitions.find(c => c.name === 'Pro League').entry_fee}.00` : '$10.00',
-      difficulty: 'Medium',
-      questions: 20,
-      minPlayers: 25,
-      prizes: ['1st: $50', '2nd: $25', '3rd: $10'],
-      priceId: PRO_LEAGUE_PRICE_ID,
-      status: '3 more to start',
-  startTime: competitions.find(c => c.name === 'Pro League') ? new Date(competitions.find(c => c.name === 'Pro League').start_time) : null,
-    },
-    {
-      id: competitions.find(c => c.name === 'Elite League')?.id || 'elite',
-      name: 'Elite League',
-      price: competitions.find(c => c.name === 'Elite League') ? `$${competitions.find(c => c.name === 'Elite League').entry_fee}.00` : '$50.00',
-      difficulty: 'Hard',
-      questions: 30,
-      minPlayers: 30,
-      prizes: ['1st: $200', '2nd: $100', '3rd: $50'],
-      priceId: ELITE_LEAGUE_PRICE_ID,
-      status: 'Min reached',
-  startTime: competitions.find(c => c.name === 'Elite League') ? new Date(competitions.find(c => c.name === 'Elite League').start_time) : null,
+  // Helper function to get price ID based on competition name
+  const getPriceId = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return STARTER_LEAGUE_PRICE_ID;
+      case 'Pro League':
+        return PRO_LEAGUE_PRICE_ID;
+      case 'Elite League':
+        return ELITE_LEAGUE_PRICE_ID;
+      default:
+        return STARTER_LEAGUE_PRICE_ID;
     }
-  ];
+  };
+
+  // Helper function to get difficulty based on competition name
+  const getDifficulty = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return 'Easy';
+      case 'Pro League':
+        return 'Medium';
+      case 'Elite League':
+        return 'Hard';
+      default:
+        return 'Easy';
+    }
+  };
+
+  // Helper function to get questions count based on competition name
+  const getQuestionsCount = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return 15;
+      case 'Pro League':
+        return 20;
+      case 'Elite League':
+        return 30;
+      default:
+        return 15;
+    }
+  };
+
+  // Helper function to get min players based on competition name
+  const getMinPlayers = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return 10;
+      case 'Pro League':
+        return 25;
+      case 'Elite League':
+        return 30;
+      default:
+        return 10;
+    }
+  };
+
+  // Helper function to get prizes based on competition name and entry fee
+  const getPrizes = (name: string, entryFee: number) => {
+    switch (name) {
+      case 'Starter League':
+        return [`1st: $${Math.floor(entryFee * 5)}`, `2nd: $${Math.floor(entryFee * 2.5)}`, `3rd: $${entryFee}`];
+      case 'Pro League':
+        return [`1st: $${Math.floor(entryFee * 2.5)}`, `2nd: $${Math.floor(entryFee * 1.25)}`, `3rd: $${Math.floor(entryFee * 0.5)}`];
+      case 'Elite League':
+        return [`1st: $${Math.floor(entryFee * 4)}`, `2nd: $${Math.floor(entryFee * 2)}`, `3rd: $${entryFee}`];
+      default:
+        return [`1st: $${Math.floor(entryFee * 5)}`, `2nd: $${Math.floor(entryFee * 2.5)}`, `3rd: $${entryFee}`];
+    }
+  };
+
+  // Transform competitions data for display
+  const competitionData = competitions.map((comp, index) => ({
+    id: comp.id,
+    name: comp.name,
+    price: `$${comp.entry_fee}.00`,
+    difficulty: getDifficulty(comp.name),
+    questions: getQuestionsCount(comp.name),
+    minPlayers: getMinPlayers(comp.name),
+    prizes: getPrizes(comp.name, comp.entry_fee),
+    priceId: getPriceId(comp.name),
+    status: 'Min reached', // You can calculate this based on registrations if needed
+    startTime: new Date(comp.start_time),
+    entry_fee: comp.entry_fee
+  }));
 
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
@@ -386,7 +561,14 @@ const LiveCompetition = () => {
         onClose={() => setModalOpen(false)}
         competition={selectedCompetition}
         onProceedToPayment={handleStripeRegister}
-        startTime={selectedCompetition ? getNextSaturday(selectedCompetition.name) : new Date()}
+        startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
+      />
+
+      <AlreadyRegisteredModal
+        isOpen={alreadyRegisteredModalOpen}
+        onClose={() => setAlreadyRegisteredModalOpen(false)}
+        competitionName={alreadyRegisteredData.competitionName}
+        paidAmount={alreadyRegisteredData.paidAmount}
       />
 
       {/* Header section */}
@@ -398,92 +580,82 @@ const LiveCompetition = () => {
       </div>
 
       <div className="flex flex-col md:flex-row gap-6 mx-auto p-6 w-full max-w-7xl">
-        {competitionData.map((comp, index) => (
-          <div
-            key={index}
-            className="relative border-2 border-lime-300 w-full max-h-[80vh] rounded-xl p-5 shadow-lg bg-gradient-to-br from-lime-50 to-white transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl opacity-0 animate-fadeIn"
-            style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
-          >
-            <span className="absolute top-3 left-3 bg-lime-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 hover:bg-lime-600">Live</span>
-            <div className="flex flex-col items-center mt-6">
-              <Trophy className="h-10 w-10 text-yellow-400 mb-3" />
-              <h2 className="text-xl font-extrabold text-gray-800"># {comp.name}</h2>
-              <p className="text-sm text-gray-600">
-                {comp.name === 'Starter League' ? 'Perfect for beginners' :
-                  comp.name === 'Pro League' ? 'For serious fans' : 'Expert level only'}
-              </p>
-            </div>
-
-            <div className="mt-4 space-y-2 text-sm font-semibold">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Entry Fee:</span>
-                <span className="font-bold">{comp.price}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Questions:</span>
-                <span className="font-bold">{comp.questions}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Min Players:</span>
-                <span className="font-bold">{comp.minPlayers}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Difficulty:</span>
-                <div className="flex items-center">
-                  <Star className="h-4 w-4 text-lime-500 mr-1.5" />
-                  <span className="font-bold text-lime-500">{comp.difficulty}</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Start Time:</span>
-                <span className="font-bold">
-                  {comp.startTime
-                    ? comp.startTime.toLocaleString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false,
-                        timeZone: 'UTC',
-                      }) + ' UTC'
-                    : 'N/A'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 text-lime-600 mr-1.5" />
-                <span className="text-gray-700 font-semibold">{comp.status}</span>
-              </div>
-              <div className="flex items-center mt-1.5">
-                <span className="text-gray-600 mr-1.5">Prizes:</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {comp.prizes.map((prize, i) => (
-                    <React.Fragment key={i}>
-                      <Trophy className="h-4 w-4 text-yellow-400" />
-                      <span className="text-lime-600 font-bold">{prize.split(': ')[1]}</span>
-                      {i < comp.prizes.length - 1 && <span className="mx-1 text-gray-400">▪</span>}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
-              <button
-                onClick={() => handleOpenModal(comp)}
-                className="w-full mt-2 py-2 bg-lime-400 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-500"
-                style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
-              >
-                {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
-              </button>
-            </div>
+        {competitionData.length === 0 ? (
+          <div className="text-center w-full">
+            <p className="text-gray-600 text-lg">No upcoming competitions available at the moment.</p>
           </div>
-        ))}
+        ) : (
+          competitionData.map((comp, index) => (
+            <div
+              key={comp.id}
+              className="relative border-2 border-lime-300 w-full max-h-[80vh] rounded-xl p-5 shadow-lg bg-gradient-to-br from-lime-50 to-white transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl opacity-0 animate-fadeIn"
+              style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
+            >
+              <span className="absolute top-3 left-3 bg-lime-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 hover:bg-lime-600">Live</span>
+              <div className="flex flex-col items-center mt-6">
+                <Trophy className="h-10 w-10 text-yellow-400 mb-3" />
+                <h2 className="text-xl font-extrabold text-gray-800"># {comp.name}</h2>
+                <p className="text-sm text-gray-600">
+                  {comp.name === 'Starter League' ? 'Perfect for beginners' :
+                    comp.name === 'Pro League' ? 'For serious fans' : 'Expert level only'}
+                </p>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm font-semibold">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Entry Fee:</span>
+                  <span className="font-bold">{comp.price}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Questions:</span>
+                  <span className="font-bold">{comp.questions}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Min Players:</span>
+                  <span className="font-bold">{comp.minPlayers}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Difficulty:</span>
+                  <div className="flex items-center">
+                    <Star className="h-4 w-4 text-lime-500 mr-1.5" />
+                    <span className="font-bold text-lime-500">{comp.difficulty}</span>
+                  </div>
+                </div>
+                
+              </div>
+
+              <div className="mt-4">
+                <div className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-lime-600 mr-1.5" />
+                  <span className="text-gray-700 font-semibold">{comp.status}</span>
+                </div>
+                <div className="flex items-center mt-1.5">
+                  <span className="text-gray-600 mr-1.5">Prizes:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {comp.prizes.map((prize, i) => (
+                      <React.Fragment key={i}>
+                        <Trophy className="h-4 w-4 text-yellow-400" />
+                        <span className="text-lime-600 font-bold">{prize.split(': ')[1]}</span>
+                        {i < comp.prizes.length - 1 && <span className="mx-1 text-gray-400">▪</span>}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
+                <button
+                  onClick={() => handleOpenModal(comp)}
+                  className="w-full mt-2 py-2 bg-lime-400 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-500"
+                  style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                >
+                  {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Rules Section */}
@@ -600,6 +772,6 @@ const LiveCompetition = () => {
       `}</style>
     </div>
   );
-};
+}
 
 export default LiveCompetition;

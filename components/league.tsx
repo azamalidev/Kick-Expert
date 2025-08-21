@@ -73,7 +73,7 @@ export default function LeaguePage() {
   const nextCalled = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const competitionId = searchParams.get('competitionId') || '';
+  const competitionId = searchParams ? searchParams.get('competitionId') || '' : '';
 
   // Fetch competition details
   useEffect(() => {

@@ -33,14 +33,14 @@ async function main() {
   });
   console.log('Pro League Price ID:', proPrice.id);
 
-  // Elite League ($50.00)
+  // Elite League ($30.00)
   const eliteProduct = await stripe.products.create({
     name: 'Elite League',
     description: 'Expert level only',
   });
   const elitePrice = await stripe.prices.create({
     product: eliteProduct.id,
-    unit_amount: 5000, // $50.00
+    unit_amount: 3000, // $30.00
     currency: 'usd',
   });
   console.log('Elite League Price ID:', elitePrice.id);
