@@ -43,6 +43,249 @@ interface LeaderboardEntry {
   isUser: boolean;
 }
 
+// Function to get user's IP address
+const getIPAddress = async (): Promise<string> => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip;
+  } catch (error) {
+    console.error('Failed to get IP address:', error);
+    return 'unknown';
+  }
+};
+
+// Function to record IP activity
+const recordIPActivity = async (
+  competitionId: string, 
+  userId: string, 
+  actionType: 'join' | 'answer' | 'complete'
+) => {
+  try {
+    const ipAddress = await getIPAddress();
+    
+    const { error } = await supabase
+      .from('competition_ip_monitoring')
+      .upsert({
+        competition_id: competitionId,
+        user_id: userId,
+        ip_address: ipAddress,
+        action_type: actionType,
+        created_at: new Date().toISOString()
+      }, {
+        onConflict: 'competition_id,user_id,ip_address,action_type'
+      });
+
+    if (error) {
+      console.error('Error recording IP activity:', error);
+    }
+  } catch (error) {
+    console.error('Failed to record IP activity:', error);
+  }
+};
+
+// Function to check for suspicious activity
+const checkSuspiciousActivity = async (competitionId: string, userId: string): Promise<boolean> => {
+  try {
+    const ipAddress = await getIPAddress();
+    
+    // Check if this IP has been used by multiple users in this competition
+    const { data: ipUsers, error: ipError } = await supabase
+      .from('competition_ip_monitoring')
+      .select('user_id')
+      .eq('competition_id', competitionId)
+      .eq('ip_address', ipAddress)
+      .neq('user_id', userId);
+
+    if (ipError) {
+      console.error('Error checking IP activity:', ipError);
+      return false;
+    }
+
+    // If this IP has been used by multiple users, it's suspicious
+    if (ipUsers && ipUsers.length > 0) {
+      console.warn('Suspicious activity detected: IP used by multiple users');
+      return true;
+    }
+
+    // Check if this user has used multiple IPs in this competition
+    const { data: userIPs, error: userError } = await supabase
+      .from('competition_ip_monitoring')
+      .select('ip_address')
+      .eq('competition_id', competitionId)
+      .eq('user_id', userId);
+
+    if (userError) {
+      console.error('Error checking user IP activity:', userError);
+      return false;
+    }
+
+    // If this user has used multiple IPs, it's suspicious
+    const uniqueIPs = new Set(userIPs?.map(record => record.ip_address) || []);
+    if (uniqueIPs.size > 1) {
+      console.warn('Suspicious activity detected: User used multiple IPs');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Failed to check suspicious activity:', error);
+    return false;
+  }
+};
+
+// Function to measure network speed
+const measureNetworkSpeed = async (): Promise<{ latency: number; downloadSpeed: number; uploadSpeed: number }> => {
+  try {
+    // Measure latency
+    const latencyStart = performance.now();
+    await fetch('https://www.google.com/favicon.ico', { 
+      cache: 'no-store',
+      mode: 'no-cors'
+    });
+    const latency = performance.now() - latencyStart;
+
+    // Simple download speed test (small file)
+    const downloadStart = performance.now();
+    const downloadResponse = await fetch('https://httpbin.org/bytes/10000', { cache: 'no-store' });
+    const downloadBlob = await downloadResponse.blob();
+    const downloadTime = performance.now() - downloadStart;
+    const downloadSize = downloadBlob.size;
+    const downloadSpeed = (downloadSize * 8) / (downloadTime / 1000) / 1000000; // Mbps
+
+    // Simple upload speed test (simulated)
+    const uploadStart = performance.now();
+    await fetch('https://httpbin.org/post', {
+      method: 'POST',
+      body: new Blob([new ArrayBuffer(5000)]),
+      cache: 'no-store'
+    });
+    const uploadTime = performance.now() - uploadStart;
+    const uploadSize = 5000;
+    const uploadSpeed = (uploadSize * 8) / (uploadTime / 1000) / 1000000; // Mbps
+
+    return {
+      latency: Math.round(latency),
+      downloadSpeed: parseFloat(downloadSpeed.toFixed(2)),
+      uploadSpeed: parseFloat(uploadSpeed.toFixed(2))
+    };
+  } catch (error) {
+    console.error('Speed test failed:', error);
+    return { latency: 0, downloadSpeed: 0, uploadSpeed: 0 };
+  }
+};
+
+// Function to generate browser fingerprint
+const generateBrowserFingerprint = async (): Promise<{ 
+  fingerprint: string; 
+  userAgent: string; 
+  deviceInfo: any 
+}> => {
+  try {
+    // Collect browser/device information
+    const userAgent = navigator.userAgent;
+    const screen = `${screen.width}x${screen.height}`;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const language = navigator.language;
+    const platform = navigator.platform;
+    const hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
+    const deviceMemory = (navigator as any).deviceMemory || 'unknown';
+    
+    // Create a fingerprint hash
+    const fingerprintData = `${userAgent}-${screen}-${timezone}-${language}-${platform}-${hardwareConcurrency}-${deviceMemory}`;
+    
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < fingerprintData.length; i++) {
+      const char = fingerprintData.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    const fingerprint = hash.toString(16);
+    
+    const deviceInfo = {
+      screen,
+      timezone,
+      language,
+      platform,
+      hardwareConcurrency,
+      deviceMemory,
+      colorDepth: screen.colorDepth,
+      pixelDepth: screen.pixelDepth,
+      cookiesEnabled: navigator.cookieEnabled,
+      doNotTrack: navigator.doNotTrack,
+      plugins: Array.from(navigator.plugins).map(p => p.name).join(',')
+    };
+
+    return {
+      fingerprint,
+      userAgent,
+      deviceInfo
+    };
+  } catch (error) {
+    console.error('Fingerprint generation failed:', error);
+    return { 
+      fingerprint: 'error', 
+      userAgent: 'error', 
+      deviceInfo: {} 
+    };
+  }
+};
+
+// Function to record speed metrics
+const recordSpeedMetrics = async (competitionId: string, userId: string) => {
+  try {
+    const speedMetrics = await measureNetworkSpeed();
+    const ipAddress = await getIPAddress();
+    
+    const { error } = await supabase
+      .from('competition_speed_detection')
+      .insert({
+        competition_id: competitionId,
+        user_id: userId,
+        latency_ms: speedMetrics.latency,
+        download_speed_mbps: speedMetrics.downloadSpeed,
+        upload_speed_mbps: speedMetrics.uploadSpeed,
+        detected_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Error recording speed metrics:', error);
+    }
+  } catch (error) {
+    console.error('Failed to record speed metrics:', error);
+  }
+};
+
+// Function to record browser fingerprint
+const recordBrowserFingerprint = async (competitionId: string, userId: string) => {
+  try {
+    const { fingerprint, userAgent, deviceInfo } = await generateBrowserFingerprint();
+    const ipAddress = await getIPAddress();
+    
+    const { error } = await supabase
+      .from('competition_browser_fingerprints')
+      .upsert({
+        competition_id: competitionId,
+        user_id: userId,
+        fingerprint_id: fingerprint,
+        user_agent: userAgent,
+        ip_address: ipAddress,
+        device_info: deviceInfo,
+        created_at: new Date().toISOString()
+      }, {
+        onConflict: 'competition_id,user_id,fingerprint_id'
+      });
+
+    if (error) {
+      console.error('Error recording browser fingerprint:', error);
+    }
+  } catch (error) {
+    console.error('Failed to record browser fingerprint:', error);
+  }
+};
+
 export default function League() {
   const [countdown, setCountdown] = useState(10);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -62,9 +305,13 @@ export default function League() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [newTrophies, setNewTrophies] = useState<AwardedTrophy[]>([]);
   const [showTrophyModal, setShowTrophyModal] = useState(false);
+  const [suspiciousActivity, setSuspiciousActivity] = useState(false);
+  const [speedMetrics, setSpeedMetrics] = useState<{latency: number, downloadSpeed: number, uploadSpeed: number} | null>(null);
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
   const nextCalled = useRef(false);
   const router = useRouter();
-  // Get competitionId from query params (for real flow)
+  
+  // Get competitionId from query params
   const [competitionId, setCompetitionId] = useState<string>('');
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -86,6 +333,7 @@ export default function League() {
           return prev - 1;
         });
       }, 1000);
+      
       // Fetch registered players from Supabase
       const fetchPlayers = async () => {
         const { data, error } = await supabase
@@ -93,10 +341,12 @@ export default function League() {
           .select('user_id, profiles(username)')
           .eq('competition_id', competitionId)
           .eq('status', 'confirmed');
+          
         if (!error && data) {
           setPlayers(data.map((p: any, idx: number) => ({ id: idx + 1, name: p.profiles?.username || p.user_id })));
         }
       };
+      
       fetchPlayers();
       return () => clearInterval(countdownInterval);
     }
@@ -105,16 +355,48 @@ export default function League() {
   // Fetch questions and initialize quiz session when entering quiz phase
   useEffect(() => {
     if (phase !== 'quiz' || !competitionId) return;
+    
     const initializeQuiz = async () => {
       try {
         setLoading(true);
+        
+        // Check for suspicious activity before starting quiz
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const isSuspicious = await checkSuspiciousActivity(competitionId, user.id);
+          setSuspiciousActivity(isSuspicious);
+          
+          if (isSuspicious) {
+            setError('Suspicious activity detected. Please contact support.');
+            setLoading(false);
+            return;
+          }
+          
+          // Record IP activity for joining the competition
+          await recordIPActivity(competitionId, user.id, 'join');
+          
+          // Record speed metrics and browser fingerprint
+          await recordSpeedMetrics(competitionId, user.id);
+          await recordBrowserFingerprint(competitionId, user.id);
+          
+          // Get and set speed metrics for display
+          const metrics = await measureNetworkSpeed();
+          setSpeedMetrics(metrics);
+          
+          // Get and set fingerprint for display
+          const { fingerprint } = await generateBrowserFingerprint();
+          setFingerprint(fingerprint);
+        }
+        
         // Fetch questions for this competition from Supabase
         const { data: compQuestions, error: cqError } = await supabase
           .from('competition_questions')
           .select('question_id, questions(*)')
           .eq('competition_id', competitionId);
+          
         if (cqError || !compQuestions) throw cqError || new Error('No questions found');
         setQuestions(compQuestions.map((q: any) => q.questions));
+        
         // Create a session for this user/competition
         const { data: { user } } = await supabase.auth.getUser();
         const { data: session, error: sessionError } = await supabase
@@ -130,6 +412,7 @@ export default function League() {
           })
           .select()
           .single();
+          
         if (sessionError) throw sessionError;
         setSessionId(session.id);
         setLoading(false);
@@ -138,6 +421,7 @@ export default function League() {
         setLoading(false);
       }
     };
+    
     initializeQuiz();
   }, [phase, competitionId]);
 
@@ -199,6 +483,7 @@ export default function League() {
           .select('user_id, rank, score, profiles(username)')
           .eq('competition_id', competitionId)
           .order('rank', { ascending: true });
+          
         if (!error && data) {
           setLeaderboard(data.map((entry: any) => ({
             id: entry.user_id,
@@ -211,6 +496,7 @@ export default function League() {
           setLeaderboard([]);
         }
       };
+      
       fetchLeaderboard();
     }
   }, [phase, competitionId]);
@@ -231,12 +517,15 @@ export default function League() {
     if (questions.length === 0) {
       return;
     }
+    
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
+    
     // Update score
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
+    
     // Save answer record
     if (currentQuestion) {
       const answerRecord = {
@@ -245,6 +534,7 @@ export default function League() {
         difficulty: currentQuestion.difficulty
       };
       setAnswers((prev) => [...prev, answerRecord]);
+      
       // Submit answer to Supabase
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('competition_answers').insert({
@@ -256,7 +546,13 @@ export default function League() {
         is_correct: isCorrect,
         submitted_at: new Date().toISOString(),
       });
+      
+      // Record IP activity for answering a question
+      if (user) {
+        await recordIPActivity(competitionId, user.id, 'answer');
+      }
     }
+    
     // Move to next question or complete the quiz
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -271,6 +567,7 @@ export default function League() {
         setPhase('results');
       }, 100);
     }
+    
     setTimeout(() => {
       nextCalled.current = false;
     }, 300);
@@ -281,10 +578,15 @@ export default function League() {
       console.error("No session ID found");
       return;
     }
+    
     // Aggregate answers, update session, calculate results
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+      
+      // Record IP activity for completing the competition
+      await recordIPActivity(competitionId, user.id, 'complete');
+      
       // Update session summary
       const correctAnswers = answers.filter(a => a.is_correct).length;
       await supabase.from('competition_sessions').update({
@@ -292,6 +594,7 @@ export default function League() {
         score_percentage: (correctAnswers / questions.length) * 100,
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
+      
       // Calculate rank and insert into results (simple demo logic)
       await supabase.from('competition_results').insert({
         competition_id: competitionId,
@@ -327,6 +630,9 @@ export default function League() {
     setLeaderboard([]);
     setNewTrophies([]);
     setShowTrophyModal(false);
+    setSuspiciousActivity(false);
+    setSpeedMetrics(null);
+    setFingerprint(null);
   };
 
   const getRecommendation = () => {
@@ -392,6 +698,24 @@ export default function League() {
           >
             Try Again
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (suspiciousActivity) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow-md max-w-md text-center">
+          <h2 className="text-xl font-bold text-red-500 mb-4">Suspicious Activity Detected</h2>
+          <p className="mb-6 text-gray-600">
+            We've detected unusual activity from your account. Please contact support if you believe this is an error.
+          </p>
+          <Link href="/">
+            <button className="px-6 py-2 bg-lime-500 text-white rounded-lg hover:bg-lime-600 transition font-medium">
+              Return to Dashboard
+            </button>
+          </Link>
         </div>
       </div>
     );
@@ -506,6 +830,22 @@ export default function League() {
                 </div>
               </div>
             </div>
+
+            {/* Speed metrics display (debug) */}
+            {speedMetrics && (
+              <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Latency: {speedMetrics.latency}ms</span>
+                  <span>Download: {speedMetrics.downloadSpeed} Mbps</span>
+                  <span>Upload: {speedMetrics.uploadSpeed} Mbps</span>
+                </div>
+                {fingerprint && (
+                  <div className="mt-2">
+                    Fingerprint: {fingerprint.substring(0, 8)}...
+                  </div>
+                )}
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
               <motion.div
