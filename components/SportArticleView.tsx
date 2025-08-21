@@ -7,7 +7,7 @@ import { articles } from "./SportsArticle";
 export default function SportArticleView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const id = searchParams.get('id');
+  const id = searchParams?.get('id');
   
   // Find the article with the matching ID
   const article = articles.find(item => item.id.toString() === id);

@@ -18,7 +18,7 @@ export default function Login() {
   // Handle email confirmation from URL parameters
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const confirmed = searchParams.get('confirmed');
+      const confirmed = searchParams ? searchParams.get('confirmed') : null;
       if (confirmed === 'true') {
         toast.success('Email confirmed successfully! Please login.');
         return;

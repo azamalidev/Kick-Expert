@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'pending'|'success'|'error'>('pending');
@@ -105,5 +105,13 @@ export default function CheckoutSuccessPage() {
       <div className={`text-lg mb-4 ${status === 'success' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-gray-600'}`}>{message}</div>
       {status === 'pending' && <div className="animate-spin h-8 w-8 border-4 border-lime-500 border-t-transparent rounded-full"></div>}
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
