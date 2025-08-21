@@ -70,6 +70,7 @@ export default function LeaguePage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [competitionDetails, setCompetitionDetails] = useState<CompetitionDetails | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
+  const [suspiciousActivity, setSuspiciousActivity] = useState(false);
   const nextCalled = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -182,6 +183,7 @@ export default function LeaguePage() {
       }
     };
     
+    
     initializeQuiz();
   }, [phase, competitionId]);
 
@@ -270,6 +272,7 @@ export default function LeaguePage() {
         }
       };
       
+      
       fetchLeaderboard();
     }
   }, [phase, competitionId]);
@@ -291,13 +294,16 @@ export default function LeaguePage() {
       return;
     }
     
+    
     const currentQuestion = questions[currentQuestionIndex];
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
+    
     
     // Update score
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
+    
     
     // Save answer record
     if (currentQuestion) {
@@ -308,6 +314,7 @@ export default function LeaguePage() {
       };
       
       setAnswers((prev) => [...prev, answerRecord]);
+      
       
       // Submit answer to Supabase
       const { data: { user } } = await supabase.auth.getUser();
@@ -338,6 +345,7 @@ export default function LeaguePage() {
       }, 100);
     }
     
+    
     setTimeout(() => {
       nextCalled.current = false;
     }, 300);
@@ -348,6 +356,7 @@ export default function LeaguePage() {
       console.error("No session ID found");
       return;
     }
+    
     
     // Aggregate answers, update session, calculate results
     try {
@@ -522,6 +531,24 @@ export default function LeaguePage() {
     );
   }
 
+  if (suspiciousActivity) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow-md max-w-md text-center">
+          <h2 className="text-xl font-bold text-red-500 mb-4">Suspicious Activity Detected</h2>
+          <p className="mb-6 text-gray-600">
+            We've detected unusual activity from your account. Please contact support if you believe this is an error.
+          </p>
+          <Link href="/">
+            <button className="px-6 py-2 bg-lime-500 text-white rounded-lg hover:bg-lime-600 transition font-medium">
+              Return to Dashboard
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen mt-14 bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 p-4 sm:p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-lg sm:shadow-xl overflow-hidden">
@@ -633,6 +660,24 @@ export default function LeaguePage() {
                 </div>
               </div>
             </div>
+
+            {/* Speed metrics display (debug) */}
+            {/* 
+            {speedMetrics && (
+              <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Latency: {speedMetrics.latency}ms</span>
+                  <span>Download: {speedMetrics.downloadSpeed} Mbps</span>
+                  <span>Upload: {speedMetrics.uploadSpeed} Mbps</span>
+                </div>
+                {fingerprint && (
+                  <div className="mt-2">
+                    Fingerprint: {fingerprint.substring(0, 8)}...
+                  </div>
+                )}
+              </div>
+            )}
+            */}
 
             <AnimatePresence mode="wait">
               <motion.div
