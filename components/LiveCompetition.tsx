@@ -277,9 +277,9 @@ const LiveCompetition = () => {
   }>({ competitionName: '', paidAmount: 0 });
 
   // Stripe price IDs from .env.local
-  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1Rxr2pRkV53d3IKfQvSZXDDH";
-  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1Rxr2qRkV53d3IKfZ77ovihb";
-  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1Rxr2rRkV53d3IKfnMXFhcqM";
+  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1RybzcRkV53d3IKfXrOebfrd";
+  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1RybzdRkV53d3IKfGO5XLYZi";
+  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1RybzeRkV53d3IKf4w0ccE7j";
 
   useEffect(() => {
     const checkUser = async () => {
