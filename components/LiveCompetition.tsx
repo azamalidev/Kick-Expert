@@ -24,6 +24,15 @@ interface Competition {
   created_at: string;
 }
 
+interface CompetitionRegistration {
+  id: string;
+  competition_id: string;
+  user_id: string;
+  status: string;
+  paid_amount: number;
+  created_at: string;
+}
+
 interface CompetitionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,6 +46,7 @@ interface CompetitionModalProps {
     prizes: string[];
     priceId: string;
     entry_fee: number;
+    isRegistered?: boolean;
   };
   onProceedToPayment: (priceId: string, competitionId: string) => void;
   startTime: Date;
@@ -244,15 +254,24 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
 
             {/* Footer - Sticky Payment Button */}
             <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
-              <button
-                onClick={() => onProceedToPayment(competition.priceId, competition.id)}
-                className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
-              >
-                <span>Proceed to Payment</span>
-                <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </button>
+              {competition.isRegistered ? (
+                <button
+                  className="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg cursor-not-allowed"
+                  disabled
+                >
+                  Already Registered
+                </button>
+              ) : (
+                <button
+                  onClick={() => onProceedToPayment(competition.priceId, competition.id)}
+                  className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
+                >
+                  <span>Proceed to Payment</span>
+                  <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </button>
+              )}
             </div>
           </motion.div>
         </div>
@@ -271,6 +290,7 @@ const LiveCompetition = () => {
   const [alreadyRegisteredModalOpen, setAlreadyRegisteredModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<any>(null);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [registrations, setRegistrations] = useState<CompetitionRegistration[]>([]);
   const [alreadyRegisteredData, setAlreadyRegisteredData] = useState<{
     competitionName: string;
     paidAmount: number;
@@ -287,12 +307,12 @@ const LiveCompetition = () => {
         const { data: { user } } = await supabase.auth.getUser();
         setIsLoggedIn(!!user);
         setUser(user);
+        return user;
       } catch (error) {
         console.error('Error checking user:', error);
         setIsLoggedIn(false);
         setUser(null);
-      } finally {
-        setIsLoading(false);
+        return null;
       }
     };
 
@@ -308,26 +328,65 @@ const LiveCompetition = () => {
         if (error) {
           console.error('Error fetching competitions:', error);
           toast.error('Failed to load competitions');
-          return;
+          return [];
         }
 
-        if (data) {
-          console.log('Fetched competitions:', data);
-          setCompetitions(data);
-        }
+        return data || [];
       } catch (error) {
         console.error('Error fetching competitions:', error);
         toast.error('Failed to load competitions');
+        return [];
       }
     };
 
-    checkUser();
-    fetchCompetitions();
+    // Fetch user registrations
+    const fetchRegistrations = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('competition_registrations')
+          .select('*')
+          .eq('user_id', userId);
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (error) {
+          console.error('Error fetching registrations:', error);
+          return [];
+        }
+
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching registrations:', error);
+        return [];
+      }
+    };
+
+    const initializeData = async () => {
+      const user = await checkUser();
+      const competitionsData = await fetchCompetitions();
+      
+      let registrationsData: CompetitionRegistration[] = [];
+      if (user) {
+        registrationsData = await fetchRegistrations(user.id);
+      }
+      
+      setCompetitions(competitionsData);
+      setRegistrations(registrationsData);
+      setIsLoading(false);
+    };
+
+    initializeData();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user || null;
       setIsLoggedIn(!!currentUser);
       setUser(currentUser);
+      
+      // If user logs in, fetch their registrations
+      if (currentUser) {
+        const registrationsData = await fetchRegistrations(currentUser.id);
+        setRegistrations(registrationsData);
+      } else {
+        setRegistrations([]);
+      }
     });
 
     return () => {
@@ -343,45 +402,35 @@ const LiveCompetition = () => {
     }
 
     // Check if user is already registered for this competition
-    try {
-      const { data, error } = await supabase
-        .from('competition_registrations')
-        .select('status, paid_amount')
-        .eq('competition_id', competition.id)
-        .eq('user_id', user.id)
-        .single();
+    const registration = registrations.find(reg => 
+      reg.competition_id === competition.id && reg.status === 'confirmed'
+    );
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Error checking registration:', error);
-        toast.error('Error checking registration status');
-        return;
-      }
+    if (registration) {
+      // Show modal instead of toast
+      setAlreadyRegisteredData({
+        competitionName: competition.name,
+        paidAmount: registration.paid_amount
+      });
+      setAlreadyRegisteredModalOpen(true);
+      return;
+    }
 
-      if (data) {
-        if (data.status === 'confirmed') {
-          // Show modal instead of toast
-          setAlreadyRegisteredData({
-            competitionName: competition.name,
-            paidAmount: data.paid_amount
-          });
-          setAlreadyRegisteredModalOpen(true);
-          return;
-        } else if (data.status === 'pending') {
-          // Allow to proceed with payment if status is pending
-          setSelectedCompetition(competition);
-          setModalOpen(true);
-          return;
-        }
-      }
+    // Check if user has a pending registration
+    const pendingRegistration = registrations.find(reg => 
+      reg.competition_id === competition.id && reg.status === 'pending'
+    );
 
-      // User is not registered, allow registration
+    if (pendingRegistration) {
+      // Allow to proceed with payment if status is pending
       setSelectedCompetition(competition);
       setModalOpen(true);
-
-    } catch (error) {
-      console.error('Error checking registration:', error);
-      toast.error('Error checking registration status');
+      return;
     }
+
+    // User is not registered, allow registration
+    setSelectedCompetition(competition);
+    setModalOpen(true);
   };
 
   const handleStripeRegister = async (priceId: string, competitionId: string) => {
@@ -391,34 +440,25 @@ const LiveCompetition = () => {
     }
 
     // Double-check registration status before proceeding to payment
+    const registration = registrations.find(reg => 
+      reg.competition_id === competitionId && reg.status === 'confirmed'
+    );
+
+    if (registration) {
+      // Show modal instead of toast
+      setAlreadyRegisteredData({
+        competitionName: selectedCompetition.name,
+        paidAmount: registration.paid_amount
+      });
+      setModalOpen(false);
+      setAlreadyRegisteredModalOpen(true);
+      return;
+    }
+
+    // Proceed with payment
+    const toastId = toast.loading('Redirecting to payment...');
+    
     try {
-      const { data, error } = await supabase
-        .from('competition_registrations')
-        .select('status, paid_amount')
-        .eq('competition_id', competitionId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking registration before payment:', error);
-        toast.error('Error verifying registration status');
-        return;
-      }
-
-      if (data && data.status === 'confirmed') {
-        // Show modal instead of toast
-        setAlreadyRegisteredData({
-          competitionName: selectedCompetition.name,
-          paidAmount: data.paid_amount
-        });
-        setModalOpen(false);
-        setAlreadyRegisteredModalOpen(true);
-        return;
-      }
-
-      // Proceed with payment
-      const toastId = toast.loading('Redirecting to payment...');
-      
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -529,6 +569,13 @@ const LiveCompetition = () => {
     }
   };
 
+  // Check if user is registered for a competition
+  const isUserRegistered = (competitionId: string) => {
+    return registrations.some(reg => 
+      reg.competition_id === competitionId && reg.status === 'confirmed'
+    );
+  };
+
   // Transform competitions data for display
   const competitionData = competitions.map((comp, index) => ({
     id: comp.id,
@@ -541,7 +588,8 @@ const LiveCompetition = () => {
     priceId: getPriceId(comp.name),
     status: 'Min reached', // You can calculate this based on registrations if needed
     startTime: new Date(comp.start_time),
-    entry_fee: comp.entry_fee
+    entry_fee: comp.entry_fee,
+    isRegistered: isUserRegistered(comp.id)
   }));
 
   return (
@@ -647,10 +695,13 @@ const LiveCompetition = () => {
                 <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
                 <button
                   onClick={() => handleOpenModal(comp)}
-                  className="w-full mt-2 py-2 bg-lime-400 text-white rounded-lg font-semibold transition-all duration-200 hover:bg-lime-500"
-                  style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                  className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
+                  style={{ 
+                    backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212',
+                    cursor: 'pointer'
+                  }}
                 >
-                  {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
+                  {comp.isRegistered ? 'Already Registered' : (isLoggedIn ? 'Register & Pay' : 'Sign Up to Join')}
                 </button>
               </div>
             </div>

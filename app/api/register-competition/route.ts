@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       .select("id")
       .eq("user_id", userId)
       .eq("competition_id", competitionId)
-      .single();
+      .maybeSingle();
     if (existing) {
       return NextResponse.json({ success: false, error: "Already registered." }, { status: 409 });
     }
