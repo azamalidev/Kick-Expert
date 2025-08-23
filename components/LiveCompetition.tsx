@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
-import { Trophy, CheckCircle, Star, Calendar, Clock, Award, Users, X } from 'lucide-react';
+import { Trophy, CheckCircle, Star, Calendar, Clock, Award, Users, X, CreditCard } from 'lucide-react';
 import { Shield, User, Wifi, Clock as ClockIcon, Trophy as PrizeTrophy, LifeBuoy, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,6 +14,13 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// Declare PayPal types
+declare global {
+  interface Window {
+    paypal: any;
+  }
+}
 
 interface Competition {
   id: string;
@@ -48,8 +55,24 @@ interface CompetitionModalProps {
     entry_fee: number;
     isRegistered?: boolean;
   };
-  onProceedToPayment: (priceId: string, competitionId: string) => void;
+  onProceedToPayment: (priceId: string, competitionId: string, method: 'stripe' | 'paypal') => void;
   startTime: Date;
+}
+
+interface PaymentMethodModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectMethod: (method: 'stripe' | 'paypal') => void;
+  competitionName: string;
+  entryFee: number;
+}
+
+interface PayPalPaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  competition: any;
+  user: any;
+  onPaymentSuccess: () => void;
 }
 
 interface AlreadyRegisteredModalProps {
@@ -58,6 +81,210 @@ interface AlreadyRegisteredModalProps {
   competitionName: string;
   paidAmount: number;
 }
+
+const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
+  isOpen,
+  onClose,
+  competition,
+  user,
+  onPaymentSuccess
+}) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePayPalPayment = async () => {
+    setIsProcessing(true);
+    try {
+      // Create PayPal order
+      const res = await fetch('/api/paypal-create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          competitionId: competition.id, 
+          userId: user.id,
+          entryFee: competition.entry_fee
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create PayPal order');
+      }
+
+      const result = await res.json();
+      
+      // Redirect to PayPal approval URL
+      if (result.approvalUrl) {
+        window.location.href = result.approvalUrl;
+      } else {
+        throw new Error('No approval URL received from PayPal');
+      }
+    } catch (error) {
+      console.error('PayPal payment error:', error);
+      toast.error('Failed to process PayPal payment. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white relative">
+              <h2 className="text-xl font-bold text-center">Pay with PayPal</h2>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 text-white hover:text-blue-200 transition-colors"
+                disabled={isProcessing}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <p className="text-gray-600">Payment for <span className="font-semibold">{competition.name}</span></p>
+                <p className="text-2xl font-bold text-blue-600">${competition.entry_fee}</p>
+              </div>
+
+              {isProcessing ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-gray-600">Redirecting to PayPal...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p className="text-blue-800 text-sm">
+                      You will be redirected to PayPal to complete your payment securely.
+                    </p>
+                  </div>
+                  
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={onClose}
+                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePayPalPayment}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
+                    >
+                      <span>Continue to PayPal</span>
+                      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
+  isOpen,
+  onClose,
+  onSelectMethod,
+  competitionName,
+  entryFee
+}) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative">
+              <h2 className="text-xl font-bold text-center">Select Payment Method</h2>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <p className="text-gray-600">Payment for <span className="font-semibold">{competitionName}</span></p>
+                <p className="text-2xl font-bold text-lime-600">${entryFee}</p>
+              </div>
+
+              <div className="space-y-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onSelectMethod('stripe')}
+                  className="w-full flex items-center justify-between p-4 border border-gray-300 rounded-lg hover:border-lime-500 hover:bg-lime-50 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                      <CreditCard className="text-white" size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-semibold">Credit/Debit Card</p>
+                      <p className="text-sm text-gray-500">Pay with Stripe</p>
+                    </div>
+                  </div>
+                  <div className="text-blue-600 font-semibold">Stripe</div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onSelectMethod('paypal')}
+                  className="w-full flex items-center justify-between p-4 border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                        <path d="M7.2 18c-.3 0-.6-.1-.8-.4L3 14.5c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l2.9 2.9L18.7 5.3c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1L8 17.6c-.2.2-.5.4-.8.4z"/>
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <p className="font-semibold">PayPal</p>
+                      <p className="text-sm text-gray-500">Pay with your PayPal account</p>
+                    </div>
+                  </div>
+                  <div className="text-blue-600 font-semibold">PayPal</div>
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-300">
+              <button
+                onClick={onClose}
+                className="w-full text-gray-600 hover:text-gray-800 font-semibold py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
   isOpen,
@@ -129,9 +356,13 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
     minutes: number;
     seconds: number;
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setShowPaymentMethods(false);
+      return;
+    }
 
     const calculateTimeLeft = () => {
       const now = new Date();
@@ -163,121 +394,139 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
     );
   };
 
+  const handleProceedToPayment = () => {
+    setShowPaymentMethods(true);
+  };
+
+  const handlePaymentMethodSelect = (method: 'stripe' | 'paypal') => {
+    onProceedToPayment(competition.priceId, competition.id, method);
+    setShowPaymentMethods(false);
+  };
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh] "
-          >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative flex-shrink-0">
-              <h2 className="text-xl font-bold text-center">Join {competition.name}</h2>
-              <button
-                onClick={onClose}
-                className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="p-6 overflow-y-auto scrollbar-hide flex-1">
-              <div className="flex items-center justify-center mb-4">
-                <Calendar className="text-lime-600 mr-2" size={18} />
-                <span className="font-semibold">
-                  {startTime.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </span>
-              </div>
-
-              <div className="bg-lime-50 rounded-lg p-4 mb-4">
-                <h3 className="font-semibold text-lime-800 mb-2">Countdown to Start</h3>
-                <div className="flex justify-center space-x-2">
-                  {formatTimeUnit(timeLeft.days, 'Days')}
-                  {formatTimeUnit(timeLeft.hours, 'Hours')}
-                  {formatTimeUnit(timeLeft.minutes, 'Mins')}
-                  {formatTimeUnit(timeLeft.seconds, 'Secs')}
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Entry Fee:</span>
-                  <span className="font-semibold">{competition.price}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Difficulty:</span>
-                  <span className="font-semibold text-lime-600">{competition.difficulty}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Questions:</span>
-                  <span className="font-semibold">{competition.questions}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Min Players:</span>
-                  <span className="font-semibold">{competition.minPlayers}</span>
-                </div>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
-                  <Award size={16} className="mr-1" /> Prize Pool
-                </h4>
-                <ul className="text-sm text-yellow-700">
-                  {competition.prizes.map((prize, index) => (
-                    <li key={index} className="flex items-center">
-                      <Trophy size={14} className="mr-2 text-yellow-600" />
-                      {prize}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <h4 className="font-semibold text-blue-800 mb-1">Rules</h4>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• 30 seconds per question</li>
-                  <li>• No external help allowed</li>
-                  <li>• One attempt per player</li>
-                  <li>• Prizes distributed to top 3</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Footer - Sticky Payment Button */}
-            <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
-              {competition.isRegistered ? (
+    <>
+      <AnimatePresence>
+        {isOpen && !showPaymentMethods && (
+          <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh] "
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative flex-shrink-0">
+                <h2 className="text-xl font-bold text-center">Join {competition.name}</h2>
                 <button
-                  className="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg cursor-not-allowed"
-                  disabled
+                  onClick={onClose}
+                  className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
                 >
-                  Already Registered
+                  <X size={20} />
                 </button>
-              ) : (
-                <button
-                  onClick={() => onProceedToPayment(competition.priceId, competition.id)}
-                  className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
-                >
-                  <span>Proceed to Payment</span>
-                  <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </div>
+              </div>
 
-      )}
-    </AnimatePresence>
+              {/* Scrollable Content */}
+              <div className="p-6 overflow-y-auto scrollbar-hide flex-1">
+                <div className="flex items-center justify-center mb-4">
+                  <Calendar className="text-lime-600 mr-2" size={18} />
+                  <span className="font-semibold">
+                    {startTime.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+
+                <div className="bg-lime-50 rounded-lg p-4 mb-4">
+                  <h3 className="font-semibold text-lime-800 mb-2">Countdown to Start</h3>
+                  <div className="flex justify-center space-x-2">
+                    {formatTimeUnit(timeLeft.days, 'Days')}
+                    {formatTimeUnit(timeLeft.hours, 'Hours')}
+                    {formatTimeUnit(timeLeft.minutes, 'Mins')}
+                    {formatTimeUnit(timeLeft.seconds, 'Secs')}
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Entry Fee:</span>
+                    <span className="font-semibold">{competition.price}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Difficulty:</span>
+                    <span className="font-semibold text-lime-600">{competition.difficulty}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Questions:</span>
+                    <span className="font-semibold">{competition.questions}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Min Players:</span>
+                    <span className="font-semibold">{competition.minPlayers}</span>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                    <Award size={16} className="mr-1" /> Prize Pool
+                  </h4>
+                  <ul className="text-sm text-yellow-700">
+                    {competition.prizes.map((prize, index) => (
+                      <li key={index} className="flex items-center">
+                        <Trophy size={14} className="mr-2 text-yellow-600" />
+                        {prize}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                  <h4 className="font-semibold text-blue-800 mb-1">Rules</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• 30 seconds per question</li>
+                    <li>• No external help allowed</li>
+                    <li>• One attempt per player</li>
+                    <li>• Prizes distributed to top 3</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Footer - Sticky Payment Button */}
+              <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
+                {competition.isRegistered ? (
+                  <button
+                    className="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg cursor-not-allowed"
+                    disabled
+                  >
+                    Already Registered
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleProceedToPayment}
+                    className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <span>Proceed to Payment</span>
+                    <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <PaymentMethodModal
+        isOpen={showPaymentMethods}
+        onClose={() => setShowPaymentMethods(false)}
+        onSelectMethod={handlePaymentMethodSelect}
+        competitionName={competition.name}
+        entryFee={competition.entry_fee}
+      />
+    </>
   );
 };
 
@@ -287,6 +536,7 @@ const LiveCompetition = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [paypalModalOpen, setPaypalModalOpen] = useState(false);
   const [alreadyRegisteredModalOpen, setAlreadyRegisteredModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<any>(null);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
@@ -433,7 +683,7 @@ const LiveCompetition = () => {
     setModalOpen(true);
   };
 
-  const handleStripeRegister = async (priceId: string, competitionId: string) => {
+  const handlePayment = async (priceId: string, competitionId: string, method: 'stripe' | 'paypal') => {
     if (!user) {
       toast.error('User not authenticated');
       return;
@@ -455,7 +705,14 @@ const LiveCompetition = () => {
       return;
     }
 
-    // Proceed with payment
+    if (method === 'stripe') {
+      await handleStripeRegister(priceId, competitionId);
+    } else {
+      setPaypalModalOpen(true);
+    }
+  };
+
+  const handleStripeRegister = async (priceId: string, competitionId: string) => {
     const toastId = toast.loading('Redirecting to payment...');
     
     try {
@@ -489,6 +746,26 @@ const LiveCompetition = () => {
       console.error('Stripe payment error:', err);
       toast.error('Payment error. Please try again.');
     }
+  };
+
+  const handlePaypalPaymentSuccess = () => {
+    // Refresh registrations after successful payment
+    const fetchRegistrations = async () => {
+      if (user) {
+        const { data } = await supabase
+          .from('competition_registrations')
+          .select('*')
+          .eq('user_id', user.id);
+        
+        if (data) {
+          setRegistrations(data);
+        }
+      }
+    };
+    
+    fetchRegistrations();
+    setPaypalModalOpen(false);
+    setModalOpen(false);
   };
 
   if (isLoading) {
@@ -604,13 +881,25 @@ const LiveCompetition = () => {
         }}
       />
 
-      <CompetitionModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        competition={selectedCompetition}
-        onProceedToPayment={handleStripeRegister}
-        startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
-      />
+      {selectedCompetition && (
+        <CompetitionModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          competition={selectedCompetition}
+          onProceedToPayment={handlePayment}
+          startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
+        />
+      )}
+
+      {selectedCompetition && (
+        <PayPalPaymentModal
+          isOpen={paypalModalOpen}
+          onClose={() => setPaypalModalOpen(false)}
+          competition={selectedCompetition}
+          user={user}
+          onPaymentSuccess={handlePaypalPaymentSuccess}
+        />
+      )}
 
       <AlreadyRegisteredModal
         isOpen={alreadyRegisteredModalOpen}
