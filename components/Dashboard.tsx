@@ -827,7 +827,7 @@ export default function Dashboard() {
             </div>
 
             {/* Leaderboard Section */}
-            <div className="bg-white rounded-2xl p-6 my-8 shadow-md border border-gray-100">
+            {/* <div className="bg-white rounded-2xl p-6 my-8 shadow-md border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800 flex items-center">
                   <div className="p-2 bg-yellow-100 rounded-lg mr-3">
@@ -882,7 +882,7 @@ export default function Dashboard() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          {/* Rank Badge */}
+                         
                           <div
                             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-4 ${
                               index === 0
@@ -897,7 +897,6 @@ export default function Dashboard() {
                             {user.rank_position}
                           </div>
 
-                          {/* Avatar */}
                           <div className="w-12 h-12 bg-lime-100 rounded-full mr-4 flex items-center justify-center overflow-hidden">
                             {user.avatar_url ? (
                               <img
@@ -922,7 +921,6 @@ export default function Dashboard() {
                             )}
                           </div>
 
-                          {/* User Info */}
                           <div>
                             <h4 className="font-bold text-gray-800">
                               {user.username}
@@ -938,8 +936,6 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </div>
-
-                        {/* XP Points */}
                         <div className="text-right">
                           <div className="flex justify-end items-center">
                             <span className="font-semibold">
@@ -972,7 +968,7 @@ export default function Dashboard() {
                   <p className="text-gray-500">No leaderboard data available</p>
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Recent Transactions Section */}
             <div className="bg-white rounded-2xl p-6 mt-8 shadow-xl border border-gray-100">

@@ -154,7 +154,9 @@ export default function Signup() {
         accepted_terms: acceptTerms,
         terms_accepted_at: new Date().toISOString(),
         email_opt_in: emailOptIn,
-        email_opt_in_at: emailOptIn ? new Date().toISOString() : null
+        email_opt_in_at: emailOptIn ? new Date().toISOString() : null,
+        is_sso_user: false,
+        is_anonymous: false
       };
 
       const { error: dbError } = await supabase

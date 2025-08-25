@@ -619,11 +619,11 @@ export default function Profile() {
                         <>
                           <div>
                             <h3 className="text-lg font-semibold text-gray-800">{name}</h3>
-                            <div className="text-sm text-lime-600 space-y-1 mt-1">
+                            {/* <div className="text-sm text-lime-600 space-y-1 mt-1">
                               <p>• Every competition win earns a unique digital trophy</p>
                               <p>• Trophy visible in user profile</p>
                               <p>• Shareable on social media (Instagram, X, Facebook, WhatsApp)</p>
-                            </div>
+                            </div> */}
                           </div>
                           <div className="space-y-2">
                             <div className="flex items-center text-gray-600">

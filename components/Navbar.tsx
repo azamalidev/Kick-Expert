@@ -231,6 +231,18 @@ export default function Navbar() {
               </button>
             </Link>
 
+                  <Link href="/leaderboard">
+                    <button
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/leaderboard")
+                          ? "bg-lime-100 text-lime-700 shadow-inner"
+                          : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
+                        }`}
+                    >
+                      <Crown className="w-5 h-5" />
+                      <span>Leaderboard</span>
+                    </button>
+                  </Link>
+
            
 
 
