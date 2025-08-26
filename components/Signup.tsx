@@ -32,6 +32,14 @@ export default function Signup() {
       toast.error('Please enter a valid email address');
       return false;
     }
+    
+    // Disposable email validation
+    const disposableDomains = ["mailinator.com", "tempmail.com", "10minutemail.com"];
+    if (disposableDomains.some(domain => email.endsWith(domain))) {
+      toast.error("Disposable emails are not allowed");
+      return false;
+    }
+    
     if (!password) {
       toast.error('Password is required');
       return false;
