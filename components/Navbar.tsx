@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import toast from 'react-hot-toast';
 import {
@@ -30,6 +30,7 @@ export default function Navbar() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -90,13 +91,18 @@ export default function Navbar() {
         setRole("");
         setUserProfile(null);
         setAvatarUrl("");
+        
+        // If user logs out and is on a protected page, redirect to home
+        if (pathname !== "/" && pathname !== "/login" && pathname !== "/signup") {
+          router.push("/");
+        }
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [pathname, router]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -140,10 +146,25 @@ export default function Navbar() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      toast.success("Logged out successfully");
+      
+      // Clear all user state
+      setUser(null);
+      setUserName("");
+      setRole("");
+      setUserProfile(null);
+      setAvatarUrl("");
+      
+      // Close all open menus
       setDropdownOpen(false);
       setNotificationOpen(false);
       setMenuOpen(false);
+      
+      // Show success message
+      toast.success("Logged out successfully");
+      
+      // Redirect to home page
+      router.push("/");
+      
     } catch (error: any) {
       console.error("Logout Error:", error.message);
       toast.error("Failed to log out");
@@ -152,7 +173,8 @@ export default function Navbar() {
 
   const scrollToSection = (sectionId: string) => {
     if (pathname !== "/") {
-      window.location.href = `/#${sectionId}`;
+      // If not on homepage, navigate to homepage with hash
+      router.push(`/#${sectionId}`);
       return;
     }
 
@@ -244,7 +266,6 @@ export default function Navbar() {
                   </Link>
 
            
-
 
           </div>
         )}

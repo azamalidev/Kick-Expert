@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { FiMail, FiUser, FiCheckCircle, FiEye, FiX, FiSend } from 'react-icons/fi';
+import { FiMail, FiUser, FiCheckCircle, FiEye, FiX, FiSend, FiSearch, FiFilter } from 'react-icons/fi';
 import { supabase } from '../../lib/supabaseClient';
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ type Ticket = {
   user_id: string;
   topic: string;
   issue_description: string;
-  status: 'open' | 'closed';
+  status: 'open' | 'in-progress' | 'closed';
   created_at: string;
 };
 
@@ -23,6 +23,17 @@ type Message = {
   created_at: string;
 };
 
+// Topic options
+const TOPIC_OPTIONS = [
+  'Billing Issue',
+  'Technical Problem',
+  'Feature Request',
+  'Account Issue',
+  'General Inquiry',
+  'Bug Report',
+  'Other'
+];
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────────
@@ -32,9 +43,12 @@ const Support = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [replyText, setReplyText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'open' | 'closed'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'open' | 'in-progress' | 'closed'>('all');
   const [loading, setLoading] = useState(false);
   const [msgLoading, setMsgLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [topicFilter, setTopicFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // ──────────────────────────────────────────────────────────────────────────────
   // Fetch tickets
@@ -95,9 +109,23 @@ const Support = () => {
   // Filtering
   // ──────────────────────────────────────────────────────────────────────────────
   const filteredTickets = tickets.filter((ticket) => {
-    if (activeTab === 'open') return ticket.status === 'open';
-    if (activeTab === 'closed') return ticket.status === 'closed';
-    return true;
+    // Status filter
+    let statusMatch = true;
+    if (activeTab === 'open') statusMatch = ticket.status === 'open';
+    if (activeTab === 'in-progress') statusMatch = ticket.status === 'in-progress';
+    if (activeTab === 'closed') statusMatch = ticket.status === 'closed';
+    
+    // Topic filter
+    const topicMatch = topicFilter === 'all' || ticket.topic === topicFilter;
+    
+    // Search term filter
+    const searchMatch = 
+      searchTerm === '' || 
+      ticket.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.issue_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.user_id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return statusMatch && topicMatch && searchMatch;
   });
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -151,26 +179,26 @@ const Support = () => {
   };
 
   // ──────────────────────────────────────────────────────────────────────────────
-  // Close ticket
+  // Update ticket status
   // ──────────────────────────────────────────────────────────────────────────────
-  const handleCloseTicket = async (id: number) => {
+  const handleUpdateTicketStatus = async (id: number, status: 'open' | 'in-progress' | 'closed') => {
     try {
-      const { error } = await supabase.from('support').update({ status: 'closed' }).eq('id', id);
+      const { error } = await supabase.from('support').update({ status }).eq('id', id);
 
       if (error) {
-        console.error('Ticket close error:', error);
-        toast.error(`Failed to close ticket: ${error.message}`);
+        console.error('Ticket status update error:', error);
+        toast.error(`Failed to update ticket: ${error.message}`);
         return;
       }
 
-      toast.success('Ticket closed');
-      setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: 'closed' } : t)));
+      toast.success(`Ticket ${status === 'closed' ? 'closed' : 'updated'}`);
+      setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
       if (selectedTicket?.id === id) {
-        setSelectedTicket({ ...selectedTicket, status: 'closed' });
+        setSelectedTicket({ ...selectedTicket, status });
       }
     } catch (err) {
-      console.error('Ticket close exception:', err);
-      toast.error('Failed to close ticket');
+      console.error('Ticket status update exception:', err);
+      toast.error('Failed to update ticket');
     }
   };
 
@@ -182,6 +210,15 @@ const Support = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'bg-yellow-100 text-yellow-800';
+      case 'in-progress': return 'bg-blue-100 text-blue-800';
+      case 'closed': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   // ──────────────────────────────────────────────────────────────────────────────
   // Render
   // ──────────────────────────────────────────────────────────────────────────────
@@ -191,6 +228,69 @@ const Support = () => {
         <div className="flex flex-col space-y-6">
           {/* Header */}
           <h1 className="text-3xl font-bold text-gray-800">Support Center</h1>
+
+          {/* Search and Filter Section */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+              {/* Search Input */}
+              <div className="relative flex-grow">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search tickets by topic, description, or user ID..."
+                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              {/* Filter Toggle Button */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <FiFilter className="mr-2" />
+                Filters
+              </button>
+            </div>
+            
+            {/* Additional Filters (shown when toggled) */}
+            {showFilters && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Topic Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Topic</label>
+                  <select
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={topicFilter}
+                    onChange={(e) => setTopicFilter(e.target.value)}
+                  >
+                    <option value="all">All Topics</option>
+                    {TOPIC_OPTIONS.map((topic) => (
+                      <option key={topic} value={topic}>{topic}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Status Filter (alternative to tabs) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    value={activeTab}
+                    onChange={(e) => setActiveTab(e.target.value as any)}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="open">Open</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Tabs */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -214,6 +314,16 @@ const Support = () => {
                 onClick={() => setActiveTab('open')}
               >
                 Open
+              </button>
+              <button
+                className={`px-6 py-3 font-medium ${
+                  activeTab === 'in-progress'
+                    ? 'text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('in-progress')}
+              >
+                In Progress
               </button>
               <button
                 className={`px-6 py-3 font-medium ${
@@ -268,11 +378,7 @@ const Support = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                ticket.status === 'open'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-green-100 text-green-800'
-                              }`}
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}
                             >
                               {ticket.status}
                             </span>
@@ -315,6 +421,11 @@ const Support = () => {
                     <span className="flex items-center">
                       <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></span>
                       Open Ticket
+                    </span>
+                  ) : selectedTicket.status === 'in-progress' ? (
+                    <span className="flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
+                      In Progress
                     </span>
                   ) : (
                     <span className="flex items-center">
@@ -359,11 +470,19 @@ const Support = () => {
                   </div>
                 </div>
 
-                {/* Subject */}
+                {/* Topic */}
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Topic</h3>
                   <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
                     <p className="text-sm font-medium text-indigo-800">{selectedTicket.topic}</p>
+                  </div>
+                </div>
+
+                {/* Issue Description */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Issue Description</h3>
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <p className="text-sm text-gray-800 whitespace-pre-line">{selectedTicket.issue_description}</p>
                   </div>
                 </div>
 
@@ -418,20 +537,23 @@ const Support = () => {
             {/* Modal Footer */}
             <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t border-gray-100 bg-gray-50 space-y-3 sm:space-y-0">
               <div className="flex space-x-2 w-full sm:w-auto">
-                <button
-                  onClick={() =>
-                    selectedTicket.status === 'open' && handleCloseTicket(selectedTicket.id)
-                  }
-                  disabled={selectedTicket.status === 'closed'}
-                  className={`px-4 py-2 rounded-lg flex items-center transition-all ${
-                    selectedTicket.status === 'open'
-                      ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  <FiCheckCircle className="mr-2" />
-                  Close Ticket
-                </button>
+                {selectedTicket.status !== 'closed' && (
+                  <>
+                    <button
+                      onClick={() => handleUpdateTicketStatus(selectedTicket.id, 'in-progress')}
+                      className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors flex items-center"
+                    >
+                      Mark as In Progress
+                    </button>
+                    <button
+                      onClick={() => handleUpdateTicketStatus(selectedTicket.id, 'closed')}
+                      className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors flex items-center"
+                    >
+                      <FiCheckCircle className="mr-2" />
+                      Close Ticket
+                    </button>
+                  </>
+                )}
                 <button
                   className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
                   onClick={() => {
