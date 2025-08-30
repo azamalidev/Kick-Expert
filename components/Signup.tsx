@@ -15,7 +15,7 @@ export default function Signup() {
   const [dateOfBirth, setDateOfBirth] = useState<string>("");
   const [gender, setGender] = useState<string>("");
   const [acceptTerms, setAcceptTerms] = useState<boolean>(false);
-  const [emailOptIn, setEmailOptIn] = useState<boolean>(true); // Default to true for better UX
+  const [emailOptIn, setEmailOptIn] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
 
@@ -68,6 +68,62 @@ export default function Signup() {
     }
     return true;
   }, [name, email, password, dateOfBirth, gender, acceptTerms]);
+
+  // Function to get user's IP address
+  const getUserIP = async (): Promise<string> => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Failed to fetch IP address:', error);
+      return 'unknown';
+    }
+  };
+
+  // Function to record user consents
+  const recordUserConsents = async (userId: string) => {
+    try {
+      const userIP = await getUserIP();
+      const currentDate = new Date().toISOString();
+      
+      // Record terms acceptance
+      const { error: termsError } = await supabase
+        .from('user_consents')
+        .insert([
+          {
+            user_id: userId,
+            consent_type: 'terms',
+            version: '1.0', // You might want to dynamically set this based on your current terms version
+            accepted_at: currentDate,
+            ip_address: userIP
+          }
+        ]);
+
+      if (termsError) throw termsError;
+
+      // Record privacy policy acceptance
+      const { error: privacyError } = await supabase
+        .from('user_consents')
+        .insert([
+          {
+            user_id: userId,
+            consent_type: 'privacy',
+            version: '1.0', // You might want to dynamically set this based on your current privacy policy version
+            accepted_at: currentDate,
+            ip_address: userIP
+          }
+        ]);
+
+      if (privacyError) throw privacyError;
+
+      console.log('User consents recorded successfully');
+    } catch (error) {
+      console.error('Error recording user consents:', error);
+      // Don't throw the error here as we don't want to block the signup process
+      // You might want to log this to an error tracking service
+    }
+  };
 
  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +220,9 @@ export default function Signup() {
         .insert([userData]);
 
       if (dbError) throw dbError;
+
+      // Record user consents in the user_consents table
+      await recordUserConsents(user.id);
 
       // Create profile entry (if you have a profiles table)
       const { error: profileError } = await supabase
@@ -475,7 +534,7 @@ export default function Signup() {
             </div>
           </div>
         </div>
-      </div>
+      </div> 
     </div>
   );
 }

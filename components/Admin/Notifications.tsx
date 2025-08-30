@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { FiBell, FiCheck, FiAlertCircle, FiDollarSign, FiUser, FiClock, FiChevronDown, FiPlus, FiX, FiMail, FiInbox } from 'react-icons/fi';
+import { FiBell, FiCheck, FiAlertCircle, FiDollarSign, FiUser, FiClock, FiChevronDown, FiPlus, FiX, FiMail, FiInbox, FiSettings } from 'react-icons/fi';
 
 type Notification = {
   id: number;
   date: string;
   time: string;
-  type: 'Support' | 'Wallet' | 'System' | 'Game' | 'Info' | 'Alert';
+  type: 'Support' | 'Wallet' | 'System' | 'Game' | 'Info' | 'Alert' | 'Marketing' | 'Referral';
   message: string;
   details: string;
   status: 'Unread' | 'Read';
   userId?: string;
   amount?: number;
+};
+
+// User preferences type
+type UserPreferences = {
+  emailNotifications: boolean;
+  marketingEmails: boolean;
+  referralEmails: boolean;
 };
 
 const Notifications = () => {
@@ -74,6 +81,24 @@ const Notifications = () => {
       message: 'Ticket #4567 resolved',
       details: 'Support ticket regarding payment issue has been resolved.',
       status: 'Read'
+    },
+    {
+      id: 7,
+      date: '6/20/2025',
+      time: '3:30:45 PM',
+      type: 'Marketing',
+      message: 'Special weekend promotion',
+      details: 'Get 20% bonus on all deposits this weekend! Use code WEEKEND20.',
+      status: 'Read'
+    },
+    {
+      id: 8,
+      date: '6/19/2025',
+      time: '10:15:22 AM',
+      type: 'Referral',
+      message: 'Referral program updated',
+      details: 'We have updated our referral program. Now earn $15 for each friend who signs up and deposits.',
+      status: 'Read'
     }
   ];
 
@@ -83,6 +108,7 @@ const Notifications = () => {
   const [selectedDate, setSelectedDate] = useState<string>('All Dates');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [newNotification, setNewNotification] = useState({
     recipient: 'All Users',
     subject: '',
@@ -90,6 +116,26 @@ const Notifications = () => {
     type: 'Info',
     deliveryMethod: ['In-App']
   });
+  
+  // User preferences state
+  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
+    emailNotifications: true,
+    marketingEmails: true,
+    referralEmails: true
+  });
+
+  // Load user preferences from localStorage on component mount
+  useEffect(() => {
+    const savedPreferences = localStorage.getItem('userNotificationPreferences');
+    if (savedPreferences) {
+      setUserPreferences(JSON.parse(savedPreferences));
+    }
+  }, []);
+
+  // Save preferences to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('userNotificationPreferences', JSON.stringify(userPreferences));
+  }, [userPreferences]);
 
   // Filter notifications based on selections
   const filteredNotifications = notifications.filter(notification => {
@@ -123,6 +169,8 @@ const Notifications = () => {
       case 'System': return <FiBell className="text-blue-600 text-lg" />;
       case 'Game': return <FiUser className="text-purple-600 text-lg" />;
       case 'Alert': return <FiAlertCircle className="text-red-600 text-lg" />;
+      case 'Marketing': return <FiMail className="text-pink-600 text-lg" />;
+      case 'Referral': return <FiUser className="text-indigo-600 text-lg" />;
       default: return <FiBell className="text-gray-600 text-lg" />;
     }
   };
@@ -185,6 +233,16 @@ const Notifications = () => {
     });
   };
 
+  // Handle preference changes
+  const handlePreferenceChange = (key: keyof UserPreferences) => {
+    setUserPreferences(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+    
+    toast.success(`Notification preferences updated`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -200,6 +258,13 @@ const Notifications = () => {
                 <FiBell className="mr-1" />
                 {notifications.filter(n => n.status === 'Unread').length} Unread
               </span>
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="flex items-center space-x-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors shadow-md"
+              >
+                <FiSettings />
+                <span>Notification Settings</span>
+              </button>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="flex items-center space-x-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md"
@@ -228,6 +293,8 @@ const Notifications = () => {
                     <option>Game</option>
                     <option>Info</option>
                     <option>Alert</option>
+                    <option>Marketing</option>
+                    <option>Referral</option>
                   </select>
                 </div>
               </div>
@@ -306,6 +373,8 @@ const Notifications = () => {
                                 notification.type === 'System' ? 'bg-blue-100 text-blue-800' :
                                 notification.type === 'Game' ? 'bg-purple-100 text-purple-800' :
                                 notification.type === 'Alert' ? 'bg-red-100 text-red-800' :
+                                notification.type === 'Marketing' ? 'bg-pink-100 text-pink-800' :
+                                notification.type === 'Referral' ? 'bg-indigo-100 text-indigo-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {notification.type}
@@ -375,8 +444,8 @@ const Notifications = () => {
 
       {/* Create Notification Modal */}
       {isCreateModalOpen && (
-        <div className="fixed  inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white  rounded-xl shadow-2xl w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-800">Create User Notification</h2>
@@ -390,10 +459,6 @@ const Notifications = () => {
 
             {/* Modal Content */}
             <div className="p-6 space-y-6">
-              {/* <p className="text-gray-600">
-                Compose a notification to send to users. This will be logged.
-              </p> */}
-
               <div className="space-y-4">
                 <div>
                   <label className="block text-base font-medium text-gray-700 mb-2">Recipient</label>
@@ -430,7 +495,7 @@ const Notifications = () => {
                   />
                 </div>
 
-                {/* <div>
+                <div>
                   <label className="block text-base font-medium text-gray-700 mb-2">Notification Type</label>
                   <select
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -440,10 +505,27 @@ const Notifications = () => {
                     <option value="Info">Info</option>
                     <option value="Alert">Alert</option>
                     <option value="System">System</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Referral">Referral</option>
                   </select>
-                </div> */}
+                </div>
 
-              
+                <div>
+                  <label className="block text-base font-medium text-gray-700 mb-2">Delivery Method</label>
+                  <div className="flex flex-wrap gap-4">
+                    {['In-App', 'Email', 'SMS'].map((method) => (
+                      <label key={method} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newNotification.deliveryMethod.includes(method)}
+                          onChange={() => toggleDeliveryMethod(method)}
+                          className="rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>{method}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -465,6 +547,93 @@ const Notifications = () => {
                 }`}
               >
                 Send Notification
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Settings Modal */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800">Notification Settings</h2>
+              <button
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <FiX className="text-xl text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              <p className="text-gray-600">
+                Customize your notification preferences. These settings control which notifications you receive via email.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-800">Email Notifications</h3>
+                    <p className="text-gray-600 text-sm">Receive all email notifications</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userPreferences.emailNotifications}
+                      onChange={() => handlePreferenceChange('emailNotifications')}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-800">Marketing Emails</h3>
+                    <p className="text-gray-600 text-sm">Receive promotional offers and updates</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userPreferences.marketingEmails}
+                      onChange={() => handlePreferenceChange('marketingEmails')}
+                      disabled={!userPreferences.emailNotifications}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-11 h-6 ${!userPreferences.emailNotifications ? 'bg-gray-100' : 'bg-gray-200'} peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${userPreferences.marketingEmails && userPreferences.emailNotifications ? 'peer-checked:bg-indigo-600' : ''}`}></div>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-800">Referral Emails</h3>
+                    <p className="text-gray-600 text-sm">Receive referral program updates</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={userPreferences.referralEmails}
+                      onChange={() => handlePreferenceChange('referralEmails')}
+                      disabled={!userPreferences.emailNotifications}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-11 h-6 ${!userPreferences.emailNotifications ? 'bg-gray-100' : 'bg-gray-200'} peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${userPreferences.referralEmails && userPreferences.emailNotifications ? 'peer-checked:bg-indigo-600' : ''}`}></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>
