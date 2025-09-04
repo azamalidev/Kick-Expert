@@ -93,9 +93,9 @@ export default function Navbar() {
         setAvatarUrl("");
         
         // If user logs out and is on a protected page, redirect to home
-        if (pathname !== "/" && pathname !== "/login" && pathname !== "/signup") {
-          router.push("/");
-        }
+        // if (pathname !== "/" && pathname !== "/login" && pathname !== "/signup") {
+        //   router.push("/");
+        // }
       }
     });
 
