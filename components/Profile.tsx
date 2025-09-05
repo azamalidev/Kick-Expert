@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import toast, { Toaster } from 'react-hot-toast';
 import Image from "next/image";
 import { QRCodeCanvas } from 'qrcode.react';
+import html2canvas from 'html2canvas';
 import { SupabaseUser, UserProfile } from '@/types/user';
 import { TrophyService } from '@/utils/trophyService';
 import { Trophy } from '@/types/trophy';
@@ -24,6 +25,14 @@ const countries = [
   "Slovenia", "South Africa", "South Korea", "Spain", "Sri Lanka", "Sweden", "Switzerland",
   "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
   "Uruguay", "Venezuela", "Vietnam"
+];
+
+const ranks = [
+  { label: 'Beginner', minXP: 0, maxXP: 499, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
+  { label: 'Novice', minXP: 500, maxXP: 999, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
+  { label: 'Competent', minXP: 1000, maxXP: 1999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
+  { label: 'Proficient', minXP: 2000, maxXP: 4999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
+  { label: 'Expert', minXP: 5000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
 ];
 
 export default function Profile() {
@@ -52,34 +61,61 @@ export default function Profile() {
   const [referralRewards, setReferralRewards] = useState<any[]>([]);
   const router = useRouter();
 
+  // Trophy image generation
+  const generateTrophyImage = async (trophy: Trophy) => {
+    const element = document.getElementById(`trophy-${trophy.id}`);
+    if (!element) return null;
+
+    const canvas = await html2canvas(element, { scale: 2 });
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.font = 'bold 20px Arial';
+      ctx.fillStyle = '#333';
+      ctx.fillText(`Rank: ${rankLabel} (${xp} XP)`, 20, canvas.height - 40);
+      ctx.font = '16px Arial';
+      ctx.fillText('Join me on the platform!', 20, canvas.height - 20);
+    }
+    return canvas.toDataURL('image/png');
+  };
+
   // Trophy sharing functions
   const shareTrophyToFacebook = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy on this platform! 🏆\n\n"${trophy.title}" - ${trophy.description}\n\nJoin me and compete for trophies!`);
+    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy on this platform! 🏆\n\n"${trophy.title}" - ${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete for trophies!`);
     const url = `https://www.facebook.com/sharer/sharer.php?quote=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const shareTrophyToX = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆 "${trophy.title}"\nJoin me and compete!`);
+    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆 "${trophy.title}"\nCurrent Rank: ${rankLabel} (${xp} XP)\nJoin me and compete!`);
     const url = `https://twitter.com/intent/tweet?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const shareTrophyToWhatsApp = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nJoin me and compete!`);
+    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete!`);
     const url = `https://api.whatsapp.com/send?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const shareTrophyToInstagram = async (trophy: Trophy) => {
-    const text = `I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nJoin me and compete!`;
+    const text = `I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete!`;
+    const image = await generateTrophyImage(trophy);
     try {
       await navigator.clipboard.writeText(text);
       toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.', { 
         style: { background: '#363636', color: '#fff' } 
       });
+      if (image) {
+        const link = document.createElement('a');
+        link.href = image;
+        link.download = `trophy-${trophy.title}.png`;
+        link.click();
+        toast.success('Trophy image downloaded for sharing!', { 
+          style: { background: '#363636', color: '#fff' } 
+        });
+      }
     } catch (error) {
-      toast.error('Failed to copy trophy details', { 
+      toast.error('Failed to copy trophy details or generate image', { 
         style: { background: '#363636', color: '#fff' } 
       });
     }
@@ -905,6 +941,57 @@ export default function Profile() {
                 </div>
               </div>
 
+              {/* Rank Ladder Card */}
+              <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg
+                      className="w-5 h-5 mr-2 text-lime-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                    Rank Ladder & XP Progression
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Progress through ranks by earning XP from games, wins, and referrals. Each rank requires a specific XP threshold.
+                  </p>
+                  <div className="space-y-3">
+                    {ranks.map((rank, index) => (
+                      <div
+                        key={rank.label}
+                        className={`flex items-center justify-between p-4 rounded-lg border ${rankLabel === rank.label ? 'border-lime-500 bg-lime-50' : 'border-gray-200 bg-white'}`}
+                      >
+                        <div className="flex items-center">
+                          <div className={`p-2 ${rank.bgColor} rounded-full mr-3`}>
+                            <span className="text-xl">{rank.icon}</span>
+                          </div>
+                          <div>
+                            <p className={`font-semibold ${rank.color}`}>{rank.label}</p>
+                            <p className="text-xs text-gray-500">
+                              {rank.minXP} - {rank.maxXP === Infinity ? '∞' : rank.maxXP} XP
+                            </p>
+                          </div>
+                        </div>
+                        {rankLabel === rank.label && (
+                          <span className="text-xs font-medium text-lime-600 bg-lime-100 px-2 py-1 rounded-full">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* Trophies Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
@@ -976,6 +1063,7 @@ export default function Profile() {
                           return (
                             <div
                               key={trophy.id}
+                              id={`trophy-${trophy.id}`}
                               className={`${colors.bg} ${colors.border} border rounded-lg p-4 transition-all hover:shadow-md`}
                             >
                               <div className="flex items-start space-x-3">
@@ -1021,6 +1109,28 @@ export default function Profile() {
                                     </div>
                                   </div>
                                 </div>
+                              </div>
+                              <div className="mt-4 flex space-x-3">
+                                <button onClick={() => shareTrophyToFacebook(trophy)} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
+                                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
+                                  </svg>
+                                </button>
+                                <button onClick={() => shareTrophyToX(trophy)} title="Share on X" className="p-2 bg-black rounded-full hover:bg-gray-800 transition-colors">
+                                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                  </svg>
+                                </button>
+                                <button onClick={() => shareTrophyToWhatsApp(trophy)} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
+                                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
+                                  </svg>
+                                </button>
+                                <button onClick={() => shareTrophyToInstagram(trophy)} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
+                                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                                  </svg>
+                                </button>
                               </div>
                             </div>
                           );
@@ -1154,7 +1264,7 @@ export default function Profile() {
                       </button>
                       <button onClick={shareReferralToWhatsApp} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.09 1.006-.26-.04-.858-.27-1.78-.942-.955-.694-1.602-1.562-1.795-1.826-.193-.265-.02-.405.138-.563.14-.14.279-.326.418-.512.093-.123.186-.247.279-.37.093-.123.047-.232-.027-.326-.07-.093-.232-.279-.418-.511-.14-.186-.279-.372-.372-.511-.093-.14-.14-.14-.232-.07-.093.07-.651.79-1.001 1.256-.186.248-.372.372-.511.372-.14 0-.418-.14-.744-.418-.326-.279-1.116-1.116-1.116-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14.186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
                         </svg>
                       </button>
                       <button onClick={shareReferralToInstagram} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
@@ -1224,7 +1334,7 @@ export default function Profile() {
             </div>
 
             {/* Right Column - Password Security */}
-         <div className="bg-white h-fit p-4 sm:p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 w-full max-w-md lg:max-w-[calc(50%-1rem)]">
+            <div className="bg-white h-fit p-4 sm:p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 w-full max-w-md lg:max-w-[calc(50%-1rem)]">
               <div className="flex items-center mb-6 sm:mb-8">
                 <div className="p-2 sm:p-3 mr-3 sm:mr-4 bg-lime-100 rounded-full flex-shrink-0">
                   <svg
