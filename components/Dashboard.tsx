@@ -3,6 +3,13 @@
 import { useState, useEffect } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { createClient } from "@supabase/supabase-js";
+import { TrophyService } from "../utils/trophyService";
+import {
+  getRankFromXP,
+  getNextRank,
+  getProgressToNextRank,
+} from "../utils/rankSystem";
+import { Trophy, TrophyStats } from "../types/trophy";
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -13,6 +20,10 @@ const supabase = createClient(
 interface ProfileData {
   username: string;
   email: string;
+  xp: number;
+  total_games: number;
+  total_wins: number;
+  rank_label: string;
   avatar_url?: string;
 }
 
@@ -58,10 +69,13 @@ export default function Dashboard() {
     []
   );
   const [transactions, setTransactions] = useState<TransactionEntry[]>([]);
+  const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
+  const [trophyStats, setTrophyStats] = useState<TrophyStats | null>(null);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [trophiesLoading, setTrophiesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -69,6 +83,9 @@ export default function Dashboard() {
   const [username, setUsername] = useState<string>("Loading...");
   const [userEmail, setUserEmail] = useState<string>("Loading...");
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [entryCredits, setEntryCredits] = useState<number>(2);
+  const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(0);
+  const [winPercentage, setWinPercentage] = useState<number>(0);
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
   const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
@@ -89,6 +106,7 @@ export default function Dashboard() {
       fetchUserData();
       fetchLeaderboardData();
       fetchTransactions();
+      fetchUserTrophies();
       fetchSupportTickets();
     }
   }, [mounted]);
@@ -112,7 +130,7 @@ export default function Dashboard() {
       // Fetch profile data
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("username, avatar_url")
+        .select("username, xp, total_games, total_wins, rank_label, avatar_url")
         .eq("user_id", user.id)
         .single();
 
@@ -122,12 +140,24 @@ export default function Dashboard() {
         setProfileData({
           username: profile.username || "User",
           email: user.email || "",
+          xp: profile.xp || 0,
+          total_games: profile.total_games || 0,
+          total_wins: profile.total_wins || 0,
+          rank_label: profile.rank_label || "Beginner",
           avatar_url: profile.avatar_url,
         });
 
         // Update state variables
         setUsername(profile.username || "User");
         setUserEmail(user.email || "");
+        setCompetitionsPlayed(profile.total_games || 0);
+
+        // Calculate win percentage
+        const winPercent =
+          profile.total_games > 0
+            ? Math.round((profile.total_wins / profile.total_games) * 100)
+            : 0;
+        setWinPercentage(winPercent);
       }
 
       // Fetch wallet data
@@ -234,6 +264,32 @@ export default function Dashboard() {
       toast.error("Failed to load transactions");
     } finally {
       setTransactionsLoading(false);
+    }
+  };
+
+  const fetchUserTrophies = async () => {
+    try {
+      setTrophiesLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      // Fetch user trophies
+      const trophies = await TrophyService.getUserTrophies(user.id);
+      setUserTrophies(trophies);
+
+      // Fetch trophy stats
+      const stats = await TrophyService.getTrophyStats(user.id);
+      setTrophyStats(stats);
+    } catch (error) {
+      console.error("Error fetching user trophies:", error);
+    } finally {
+      setTrophiesLoading(false);
     }
   };
 
@@ -474,7 +530,7 @@ export default function Dashboard() {
           )}
 
           <div className="rounded-2xl border-gray-100 w-full">
-            {/* Simplified Profile Section without Rank Progression */}
+            {/* Enhanced Profile Section with Rank Progression */}
             <div className="bg-gradient-to-r from-lime-50 to-green-50 border-2 border-lime-200 p-6 rounded-2xl mb-8 shadow-lg">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 {/* Profile Info */}
@@ -508,13 +564,99 @@ export default function Dashboard() {
                       {username}
                     </h2>
                     <p className="text-gray-600 mb-2">{userEmail}</p>
+
+                    {/* Current Rank Display */}
+                    {mounted && profileData?.xp !== undefined && (
+                      <div className="flex items-center space-x-3">
+                        {(() => {
+                          const currentRank = getRankFromXP(profileData.xp);
+                          return (
+                            <div
+                              className={`flex items-center px-3 py-1 rounded-full ${currentRank.bgColor} ${currentRank.color} font-semibold`}
+                            >
+                              <span className="text-lg mr-2">
+                                {currentRank.icon}
+                              </span>
+                              <span className="text-sm font-bold">
+                                {currentRank.label}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        <div className="text-sm text-gray-600">
+                          <span className="font-bold">
+                            {profileData.xp.toLocaleString()}
+                          </span>{" "}
+                          XP
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Rank Progress Section */}
+                {mounted && profileData?.xp !== undefined && (
+                  <div className="bg-white rounded-xl p-4 shadow-md border border-lime-100 min-w-0 md:w-80">
+                    {(() => {
+                      const nextRankInfo = getNextRank(profileData.xp);
+                      const progress = getProgressToNextRank(profileData.xp);
+
+                      if (!nextRankInfo) {
+                        return (
+                          <div className="text-center">
+                            <div className="flex items-center justify-center mb-2">
+                              <span className="text-2xl mr-2">👑</span>
+                              <span className="text-lg font-bold text-yellow-600">
+                                Max Rank Achieved!
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              You've reached the highest rank!
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-gray-600">
+                              Next Rank
+                            </span>
+                            <div className="flex items-center">
+                              <span className="text-lg mr-1">
+                                {nextRankInfo.nextRank.icon}
+                              </span>
+                              <span className="text-sm font-bold text-gray-700">
+                                {nextRankInfo.nextRank.label}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-lime-400 to-lime-500 h-3 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>{progress.toFixed(1)}% Complete</span>
+                            <span>
+                              {nextRankInfo.xpNeeded.toLocaleString()} XP needed
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Focused Financial Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+            {/* Enhanced Stats Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
               {/* Wallet Balance */}
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 py-8 rounded-xl border-2 border-green-200 hover:border-green-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
@@ -539,6 +681,93 @@ export default function Dashboard() {
                     </p>
                     <p className="text-xl font-bold text-green-700">
                       ${walletBalance.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* XP Points */}
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-5 py-8 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 transition duration-200 shadow-md hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-yellow-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      XP Points
+                    </p>
+                    <p className="text-xl font-bold text-yellow-700">
+                      {profileData?.xp || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Competitions Played */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 py-8 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition duration-200 shadow-md hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Competitions
+                    </p>
+                    <p className="text-xl font-bold text-blue-700">
+                      {competitionsPlayed}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Win Percentage */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-2 bg-emerald-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-emerald-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Win Rate
+                    </p>
+                    <p className="text-xl font-bold text-emerald-700">
+                      {winPercentage}%
                     </p>
                   </div>
                 </div>
@@ -596,6 +825,150 @@ export default function Dashboard() {
                 Withdraw Funds
               </button>
             </div>
+
+            {/* Leaderboard Section */}
+            {/* <div className="bg-white rounded-2xl p-6 my-8 shadow-md border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-yellow-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                      />
+                    </svg>
+                  </div>
+                  Top Players Leaderboard
+                </h3>
+                <button
+                  onClick={fetchLeaderboardData}
+                  disabled={leaderboardLoading}
+                  className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {leaderboardLoading ? (
+                    <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    "Refresh"
+                  )}
+                </button>
+              </div>
+
+              {leaderboardLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mr-3"></div>
+                  <span className="text-gray-600">Loading leaderboard...</span>
+                </div>
+              ) : leaderboardData.length > 0 ? (
+                <div className="space-y-3">
+                  {leaderboardData.map((user, index) => (
+                    <div
+                      key={user.user_id}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-lg ${
+                        index === 0
+                          ? "bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-200"
+                          : index === 1
+                            ? "bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200"
+                            : index === 2
+                              ? "bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200"
+                              : "bg-gray-50 border-gray-200 hover:border-lime-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                         
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-4 ${
+                              index === 0
+                                ? "bg-yellow-500 text-white"
+                                : index === 1
+                                  ? "bg-gray-400 text-white"
+                                  : index === 2
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-lime-500 text-white"
+                            }`}
+                          >
+                            {user.rank_position}
+                          </div>
+
+                          <div className="w-12 h-12 bg-lime-100 rounded-full mr-4 flex items-center justify-center overflow-hidden">
+                            {user.avatar_url ? (
+                              <img
+                                src={user.avatar_url}
+                                alt={user.username}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <svg
+                                className="w-6 h-6 text-lime-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                              </svg>
+                            )}
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold text-gray-800">
+                              {user.username}
+                            </h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="inline-block px-2 py-1 bg-lime-100 text-lime-800 text-xs font-semibold rounded-full">
+                                {user.rank_label}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {user.total_games} games • {user.win_rate}% win
+                                rate
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex justify-end items-center">
+                            <span className="font-semibold">
+                              {user.xp.toLocaleString()}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-500">XP</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg
+                      className="w-8 h-8 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500">No leaderboard data available</p>
+                </div>
+              )}
+            </div> */}
 
             {/* Recent Transactions Section */}
             <div className="bg-white rounded-2xl p-6 mt-8 shadow-xl border border-gray-100">

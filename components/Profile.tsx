@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
@@ -11,20 +10,37 @@ import { SupabaseUser, UserProfile } from '@/types/user';
 import { TrophyService } from '@/utils/trophyService';
 import { Trophy } from '@/types/trophy';
 import { getRankFromXP, getNextRank, getProgressToNextRank } from '@/utils/rankSystem';
+import ReactCountryFlag from 'react-country-flag';
 
 const countries = [
-  "Afghanistan", "Albania", "Algeria", "Argentina", "Armenia", "Australia", "Austria",
-  "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium", "Brazil", "Bulgaria",
-  "Cambodia", "Canada", "Chile", "China", "Colombia", "Croatia", "Cyprus", "Czech Republic",
-  "Denmark", "Ecuador", "Egypt", "Estonia", "Finland", "France", "Georgia", "Germany",
-  "Ghana", "Greece", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland",
-  "Israel", "Italy", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kuwait", "Latvia",
-  "Lebanon", "Lithuania", "Luxembourg", "Malaysia", "Mexico", "Morocco", "Netherlands",
-  "New Zealand", "Nigeria", "Norway", "Pakistan", "Peru", "Philippines", "Poland",
-  "Portugal", "Qatar", "Romania", "Russia", "Saudi Arabia", "Singapore", "Slovakia",
-  "Slovenia", "South Africa", "South Korea", "Spain", "Sri Lanka", "Sweden", "Switzerland",
-  "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
-  "Uruguay", "Venezuela", "Vietnam"
+  { name: "Afghanistan", code: "AF" }, { name: "Albania", code: "AL" }, { name: "Algeria", code: "DZ" },
+  { name: "Argentina", code: "AR" }, { name: "Armenia", code: "AM" }, { name: "Australia", code: "AU" },
+  { name: "Austria", code: "AT" }, { name: "Azerbaijan", code: "AZ" }, { name: "Bahrain", code: "BH" },
+  { name: "Bangladesh", code: "BD" }, { name: "Belarus", code: "BY" }, { name: "Belgium", code: "BE" },
+  { name: "Brazil", code: "BR" }, { name: "Bulgaria", code: "BG" }, { name: "Cambodia", code: "KH" },
+  { name: "Canada", code: "CA" }, { name: "Chile", code: "CL" }, { name: "China", code: "CN" },
+  { name: "Colombia", code: "CO" }, { name: "Croatia", code: "HR" }, { name: "Cyprus", code: "CY" },
+  { name: "Czech Republic", code: "CZ" }, { name: "Denmark", code: "DK" }, { name: "Ecuador", code: "EC" },
+  { name: "Egypt", code: "EG" }, { name: "Estonia", code: "EE" }, { name: "Finland", code: "FI" },
+  { name: "France", code: "FR" }, { name: "Georgia", code: "GE" }, { name: "Germany", code: "DE" },
+  { name: "Ghana", code: "GH" }, { name: "Greece", code: "GR" }, { name: "Hungary", code: "HU" },
+  { name: "Iceland", code: "IS" }, { name: "India", code: "IN" }, { name: "Indonesia", code: "ID" },
+  { name: "Iran", code: "IR" }, { name: "Iraq", code: "IQ" }, { name: "Ireland", code: "IE" },
+  { name: "Israel", code: "IL" }, { name: "Italy", code: "IT" }, { name: "Japan", code: "JP" },
+  { name: "Jordan", code: "JO" }, { name: "Kazakhstan", code: "KZ" }, { name: "Kenya", code: "KE" },
+  { name: "Kuwait", code: "KW" }, { name: "Latvia", code: "LV" }, { name: "Lebanon", code: "LB" },
+  { name: "Lithuania", code: "LT" }, { name: "Luxembourg", code: "LU" }, { name: "Malaysia", code: "MY" },
+  { name: "Mexico", code: "MX" }, { name: "Morocco", code: "MA" }, { name: "Netherlands", code: "NL" },
+  { name: "New Zealand", code: "NZ" }, { name: "Nigeria", code: "NG" }, { name: "Norway", code: "NO" },
+  { name: "Pakistan", code: "PK" }, { name: "Peru", code: "PE" }, { name: "Philippines", code: "PH" },
+  { name: "Poland", code: "PL" }, { name: "Portugal", code: "PT" }, { name: "Qatar", code: "QA" },
+  { name: "Romania", code: "RO" }, { name: "Russia", code: "RU" }, { name: "Saudi Arabia", code: "SA" },
+  { name: "Singapore", code: "SG" }, { name: "Slovakia", code: "SK" }, { name: "Slovenia", code: "SI" },
+  { name: "South Africa", code: "ZA" }, { name: "South Korea", code: "KR" }, { name: "Spain", code: "ES" },
+  { name: "Sri Lanka", code: "LK" }, { name: "Sweden", code: "SE" }, { name: "Switzerland", code: "CH" },
+  { name: "Thailand", code: "TH" }, { name: "Turkey", code: "TR" }, { name: "Ukraine", code: "UA" },
+  { name: "United Arab Emirates", code: "AE" }, { name: "United Kingdom", code: "GB" }, { name: "United States", code: "US" },
+  { name: "Uruguay", code: "UY" }, { name: "Venezuela", code: "VE" }, { name: "Vietnam", code: "VN" }
 ];
 
 const ranks = [
@@ -59,13 +75,13 @@ export default function Profile() {
   const [referralLink, setReferralLink] = useState<string>("");
   const [referredUsers, setReferredUsers] = useState<any[]>([]);
   const [referralRewards, setReferralRewards] = useState<any[]>([]);
+  const [competitionCredits, setCompetitionCredits] = useState<number>(0);
   const router = useRouter();
 
   // Trophy image generation
   const generateTrophyImage = async (trophy: Trophy) => {
     const element = document.getElementById(`trophy-${trophy.id}`);
     if (!element) return null;
-
     const canvas = await html2canvas(element, { scale: 2 });
     const ctx = canvas.getContext('2d');
     if (ctx) {
@@ -102,21 +118,21 @@ export default function Profile() {
     const image = await generateTrophyImage(trophy);
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.', { 
-        style: { background: '#363636', color: '#fff' } 
+      toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.', {
+        style: { background: '#363636', color: '#fff' }
       });
       if (image) {
         const link = document.createElement('a');
         link.href = image;
         link.download = `trophy-${trophy.title}.png`;
         link.click();
-        toast.success('Trophy image downloaded for sharing!', { 
-          style: { background: '#363636', color: '#fff' } 
+        toast.success('Trophy image downloaded for sharing!', {
+          style: { background: '#363636', color: '#fff' }
         });
       }
     } catch (error) {
-      toast.error('Failed to copy trophy details or generate image', { 
-        style: { background: '#363636', color: '#fff' } 
+      toast.error('Failed to copy trophy details or generate image', {
+        style: { background: '#363636', color: '#fff' }
       });
     }
   };
@@ -129,7 +145,6 @@ export default function Profile() {
         router.push("/login");
         return;
       }
-
       setEmail(user.email || "");
       try {
         const { data, error } = await supabase
@@ -137,24 +152,20 @@ export default function Profile() {
           .select('name, created_at')
           .eq('id', user.id)
           .single();
-
         if (error || !data) {
           console.error("Error fetching user data:", error);
           toast.error("Profile data not found");
           return;
         }
-
         const userData = data as SupabaseUser;
         setName(userData.name || "");
         setNewName(userData.name || "");
         setCreatedAt(userData.created_at || "");
-
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label')
+          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label, competition_credits')
           .eq('user_id', user.id)
           .single();
-
         if (profileError) {
           console.error("Error fetching profile data:", profileError);
           setUserProfile(null);
@@ -164,12 +175,14 @@ export default function Profile() {
           setTotalGames(0);
           setXp(0);
           setRankLabel("");
+          setCompetitionCredits(0);
           setUserProfile({
             user_id: user.id,
             username: userData.name || "",
             avatar_url: "",
             nationality: "",
-            created_at: userData.created_at || ""
+            created_at: userData.created_at || "",
+            competition_credits: 0
           });
         } else {
           const profile = profileData as any;
@@ -180,11 +193,11 @@ export default function Profile() {
           setTotalGames(profile.total_games || 0);
           setXp(profile.xp || 0);
           setRankLabel(profile.rank_label || "Beginner");
+          setCompetitionCredits(profile.competition_credits || 0);
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
         }
-
         await fetchUserTrophies(user.id);
-        setReferralLink(`${window.location.origin}/?ref=${user.id}`);
+        setReferralLink(`${window.location.origin}/signup?ref=${user.id}`);
         await fetchReferrals(user.id);
         await fetchReferralRewards(user.id);
       } catch (error) {
@@ -194,7 +207,6 @@ export default function Profile() {
         setLoading(false);
       }
     };
-
     fetchUserData();
   }, [router]);
 
@@ -240,13 +252,12 @@ export default function Profile() {
 
   const claimRewards = async (userId: string) => {
     const milestones = [
-      { count: 3, reward_type: 'Starter Wallet Credit' },
-      { count: 5, reward_type: 'Pro Wallet Credit' },
-      { count: 10, reward_type: 'Elite Wallet Credit' },
+      { count: 3, reward_type: 'Starter Wallet Credit', credits: 10 },
+      { count: 5, reward_type: 'Pro Wallet Credit', credits: 25 },
+      { count: 10, reward_type: 'Elite Wallet Credit', credits: 50 },
     ];
     const effectiveCount = referredUsers.filter(r => r.email_confirmed && r.competition_joined).length;
     const existingMilestones = referralRewards.map(r => r.milestone);
-
     try {
       let rewardsClaimed = false;
       for (const milestone of milestones) {
@@ -283,15 +294,33 @@ export default function Profile() {
     }
   };
 
-  const claimIndividualReward = async (rewardId: string) => {
+  const claimIndividualReward = async (rewardId: string, rewardType: string) => {
+    const rewardAmounts: { [key: string]: number } = {
+      'Starter Wallet Credit': 10,
+      'Pro Wallet Credit': 25,
+      'Elite Wallet Credit': 50,
+    };
+    const amount = rewardAmounts[rewardType] || 0;
+
     try {
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('referral_rewards')
         .update({ credited: true, updated_at: new Date().toISOString() })
         .eq('id', rewardId);
-      if (error) throw error;
-      toast.success("Reward claimed successfully!", { style: { background: '#363636', color: '#fff' } });
-      await fetchReferralRewards((await supabase.auth.getUser()).data.user!.id);
+      if (updateError) throw updateError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const { error: creditError } = await supabase
+        .from('profiles')
+        .update({ competition_credits: supabase.raw('competition_credits + ?', [amount]) })
+        .eq('user_id', user.id);
+      if (creditError) throw creditError;
+
+      setCompetitionCredits(prev => prev + amount);
+      toast.success(`Reward claimed successfully! Added ${amount} competition credits.`, { style: { background: '#363636', color: '#fff' } });
+      await fetchReferralRewards(user.id);
     } catch (error: any) {
       console.error("Error claiming reward:", error);
       toast.error(error.message || "Failed to claim reward", { style: { background: '#363636', color: '#fff' } });
@@ -300,10 +329,8 @@ export default function Profile() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-
     const file = e.target.files[0];
     setAvatarFile(file);
-
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
@@ -315,26 +342,20 @@ export default function Profile() {
 
   const uploadAvatar = async () => {
     if (!avatarFile) return;
-
     setIsUploading(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Not authenticated");
-
       const fileExt = avatarFile.name.split('.').pop();
       const fileName = `${user.id}-${Math.random()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
-
       const { error: uploadError } = await supabase.storage
         .from('profileimages')
         .upload(filePath, avatarFile);
-
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage
         .from('profileimages')
         .getPublicUrl(filePath);
-
       const { error: updateError } = await supabase
         .from('profiles')
         .upsert({
@@ -342,9 +363,7 @@ export default function Profile() {
           avatar_url: publicUrl,
           updated_at: new Date().toISOString(),
         });
-
       if (updateError) throw updateError;
-
       setAvatarUrl(publicUrl);
     } catch (error: any) {
       console.error("Error uploading avatar:", error);
@@ -359,21 +378,17 @@ export default function Profile() {
       toast.error("Name cannot be empty", { style: { background: '#363636', color: '#fff' } });
       return;
     }
-
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       toast.error("User not authenticated", { style: { background: '#363636', color: '#fff' } });
       return;
     }
-
     try {
       const { error: userError } = await supabase
         .from('users')
         .update({ name: newName.trim() })
         .eq('id', user.id);
-
       if (userError) throw userError;
-
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -382,13 +397,10 @@ export default function Profile() {
           nationality: nationality,
           updated_at: new Date().toISOString(),
         });
-
       if (profileError) throw profileError;
-
       if (avatarFile) {
         await uploadAvatar();
       }
-
       setName(newName.trim());
       setUserProfile({ ...userProfile, username: newName.trim(), nationality } as UserProfile);
       setIsEditingProfile(false);
@@ -412,24 +424,19 @@ export default function Profile() {
       toast.error("New password must be at least 6 characters", { style: { background: '#363636', color: '#fff' } });
       return;
     }
-
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email,
         password: currentPassword,
       });
-
       if (signInError) {
         toast.error("Incorrect current password", { style: { background: '#363636', color: '#fff' } });
         return;
       }
-
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
-
       if (error) throw error;
-
       toast.success("Password changed successfully", { style: { background: '#363636', color: '#fff' } });
       setCurrentPassword("");
       setNewPassword("");
@@ -476,6 +483,11 @@ export default function Profile() {
     return { effectiveCount, nextMilestone, progress };
   };
 
+  const getCountryCode = (countryName: string) => {
+    const country = countries.find(c => c.name === countryName);
+    return country ? country.code : '';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster
@@ -497,7 +509,6 @@ export default function Profile() {
           },
         }}
       />
-
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {loading ? (
           <div className="flex justify-center py-20">
@@ -518,7 +529,6 @@ export default function Profile() {
                       {isEditingProfile ? 'Cancel' : 'Edit Profile'}
                     </button>
                   </div>
-
                   <div className="flex flex-col sm:flex-row gap-6">
                     {/* Avatar Section */}
                     <div className="flex-shrink-0">
@@ -614,7 +624,6 @@ export default function Profile() {
                         </div>
                       )}
                     </div>
-
                     {/* Profile Details */}
                     <div className="flex-1 space-y-4">
                       {isEditingProfile ? (
@@ -637,8 +646,8 @@ export default function Profile() {
                             >
                               <option value="">Select your country</option>
                               {countries.map((country) => (
-                                <option key={country} value={country}>
-                                  {country}
+                                <option key={country.code} value={country.name}>
+                                  {country.name}
                                 </option>
                               ))}
                             </select>
@@ -655,11 +664,6 @@ export default function Profile() {
                         <>
                           <div>
                             <h3 className="text-lg font-semibold text-gray-800">{name}</h3>
-                            {/* <div className="text-sm text-lime-600 space-y-1 mt-1">
-                              <p>• Every competition win earns a unique digital trophy</p>
-                              <p>• Trophy visible in user profile</p>
-                              <p>• Shareable on social media (Instagram, X, Facebook, WhatsApp)</p>
-                            </div> */}
                           </div>
                           <div className="space-y-2">
                             <div className="flex items-center text-gray-600">
@@ -681,26 +685,12 @@ export default function Profile() {
                             </div>
                             {nationality && (
                               <div className="flex items-center text-gray-600">
-                                <svg
-                                  className="w-4 h-4 mr-2 text-lime-500"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                                  />
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                                  />
-                                </svg>
+                                <ReactCountryFlag
+                                  countryCode={getCountryCode(nationality)}
+                                  svg
+                                  style={{ width: '1.5em', height: '1.5em', marginRight: '0.5em' }}
+                                  title={nationality}
+                                />
                                 {nationality}
                               </div>
                             )}
@@ -730,7 +720,6 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-
               {/* Incomplete Profile Notice */}
               {!userProfile?.username && !isEditingProfile && (
                 <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -758,7 +747,6 @@ export default function Profile() {
                   </div>
                 </div>
               )}
-
               {/* Game Statistics Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
@@ -779,7 +767,6 @@ export default function Profile() {
                     </svg>
                     Game Statistics
                   </h3>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
@@ -805,7 +792,6 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-
                     <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
@@ -830,7 +816,6 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-
                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
@@ -857,7 +842,6 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
@@ -883,7 +867,6 @@ export default function Profile() {
                       </div>
                     </div>
                   </div>
-
                   {/* Rank Display */}
                   <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
                     <div className="flex items-center justify-between mb-3">
@@ -903,7 +886,6 @@ export default function Profile() {
                         <p className="text-lg font-bold text-yellow-800">{xp} XP</p>
                       </div>
                     </div>
-                    
                     {/* Progress Bar to Next Rank */}
                     {(() => {
                       const nextRankInfo = getNextRank(xp);
@@ -940,7 +922,6 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-
               {/* Rank Ladder Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
@@ -991,7 +972,6 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-
               {/* Trophies Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
@@ -1015,7 +995,6 @@ export default function Profile() {
                       {userTrophies.length}
                     </span>
                   </h3>
-
                   {loadingTrophies ? (
                     <div className="flex justify-center py-8">
                       <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
@@ -1055,7 +1034,6 @@ export default function Profile() {
                           </div>
                         </div>
                       </div>
-
                       {/* Trophy List */}
                       <div className="space-y-3 max-h-80 overflow-y-auto">
                         {userTrophies.map((trophy, index) => {
@@ -1136,7 +1114,6 @@ export default function Profile() {
                           );
                         })}
                       </div>
-
                       {/* Next Milestone */}
                       {(() => {
                         const nextMilestone = TrophyService.getNextMilestone(xp);
@@ -1172,7 +1149,6 @@ export default function Profile() {
                   )}
                 </div>
               </div>
-
               {/* Referral Program Card */}
               <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
@@ -1196,12 +1172,11 @@ export default function Profile() {
                       {referredUsers.length}
                     </span>
                   </h3>
-
                   <div className="mb-6 bg-gradient-to-r from-lime-50 to-green-50 p-4 rounded-lg border border-lime-200">
                     <h4 className="text-lg font-semibold text-lime-800 mb-2">Referral Progress</h4>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-lime-700">
-                        Referrals: {getReferralProgress().effectiveCount}
+                        Effective Referrals: {getReferralProgress().effectiveCount}
                       </span>
                       <span className="text-sm text-lime-700">
                         Next Milestone: {getReferralProgress().nextMilestone} referrals
@@ -1213,11 +1188,15 @@ export default function Profile() {
                         style={{ width: `${getReferralProgress().progress}%` }}
                       ></div>
                     </div>
+                    <div className="mt-4 bg-green-100 p-3 rounded-lg">
+                      <p className="text-sm font-medium text-green-700">Competition Credits</p>
+                      <p className="text-2xl font-bold text-green-800">{competitionCredits} Credits</p>
+                      <p className="text-xs text-green-600 mt-1">Non-withdrawable, used for competition entries only.</p>
+                    </div>
                     <p className="text-xs text-lime-600 mt-2">
-                      Invite friends to earn XP and wallet credits! Wallet credits are non-withdrawable and for entry only.
+                      Invite friends to earn XP and competition credits! Earn +50 XP for each confirmed email and +100 XP for each first competition joined.
                     </p>
                   </div>
-
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Your Referral Link</label>
                     <div className="flex">
@@ -1248,7 +1227,6 @@ export default function Profile() {
                       Scan this QR code to share your referral link!
                     </p>
                   </div>
-
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-gray-700 mb-2">Share Your Referral Link</h4>
                     <div className="flex space-x-3">
@@ -1274,7 +1252,6 @@ export default function Profile() {
                       </button>
                     </div>
                   </div>
-
                   <h4 className="text-lg font-semibold text-gray-700 mb-2">Referred Users</h4>
                   {referredUsers.length === 0 ? (
                     <p className="text-gray-500">No referred users yet.</p>
@@ -1290,7 +1267,6 @@ export default function Profile() {
                       ))}
                     </ul>
                   )}
-
                   <h4 className="text-lg font-semibold text-gray-700 mt-6 mb-2">Referral Rewards</h4>
                   {referralRewards.length === 0 ? (
                     <p className="text-gray-500">No rewards earned yet.</p>
@@ -1305,7 +1281,7 @@ export default function Profile() {
                             <p className="text-sm"><span className="font-medium text-gray-700">Created At:</span> {new Date(reward.created_at).toLocaleString()}</p>
                           </div>
                           <button
-                            onClick={() => claimIndividualReward(reward.id)}
+                            onClick={() => claimIndividualReward(reward.id, reward.reward_type)}
                             disabled={reward.credited}
                             className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
                               reward.credited
@@ -1319,7 +1295,6 @@ export default function Profile() {
                       ))}
                     </ul>
                   )}
-
                   <button
                     onClick={async () => {
                       const { data: { user } } = await supabase.auth.getUser();
@@ -1332,7 +1307,6 @@ export default function Profile() {
                 </div>
               </div>
             </div>
-
             {/* Right Column - Password Security */}
             <div className="bg-white h-fit p-4 sm:p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 w-full max-w-md lg:max-w-[calc(50%-1rem)]">
               <div className="flex items-center mb-6 sm:mb-8">
@@ -1354,7 +1328,6 @@ export default function Profile() {
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Password Security</h2>
               </div>
-
               <div className="space-y-4 sm:space-y-6">
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">Current Password</label>
@@ -1366,7 +1339,6 @@ export default function Profile() {
                     placeholder="••••••••"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">New Password</label>
                   <input
@@ -1377,7 +1349,6 @@ export default function Profile() {
                     placeholder="At least 6 characters"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold mb-1 sm:mb-2 text-gray-600 uppercase">Confirm Password</label>
                   <input
@@ -1388,7 +1359,6 @@ export default function Profile() {
                     placeholder="••••••••"
                   />
                 </div>
-
                 <button
                   onClick={handlePasswordChange}
                   className="w-full py-2 sm:py-3 px-4 sm:px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-sm sm:text-base"
@@ -1412,7 +1382,6 @@ export default function Profile() {
               </div>
             </div>
           </div>
-
         )}
       </div>
     </div>

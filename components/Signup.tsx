@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
@@ -19,11 +19,42 @@ export default function Signup() {
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("referrerId", ref);
+    }
+  }, []);
+  interface SupabaseUser {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    created_at: string;
+    email_confirmed: boolean;
+    date_of_birth: string;
+    age: number;
+    gender: string;
+    accepted_terms: boolean;
+    terms_accepted_at: string;
+    email_opt_in: boolean;
+    email_opt_in_at: string | null;
+    is_sso_user: boolean;
+    is_anonymous: boolean;
+  
+    // ✅ new optional column
+    parent_id?: string | null;
+  }
+  
+  
+
   const validateForm = useCallback(() => {
     if (!name.trim()) {
       toast.error('Full name is required');
       return false;
     }
+    
     if (!email.trim()) {
       toast.error('Email is required');
       return false;
@@ -133,83 +164,88 @@ export default function Signup() {
     }
   };
 
- const handleSignup = async (e: React.FormEvent) => {
+   // In handleSignup, before insert
+
+// At top of component
+let referrerId = localStorage.getItem("referrerId");
+
+// fallback if still missing
+if (!referrerId) {
+  const params = new URLSearchParams(window.location.search);
+  referrerId = params.get("ref");
+}
+
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
-    const toastId = toast.loading('Creating your account...');
+    const toastId = toast.loading("Creating your account...");
 
     try {
-      // Get referral code from URL if exists
-      const searchParams = new URLSearchParams(window.location.search);
-      const referralCode = searchParams.get('ref');
-
-      // First check if user exists in public.users table
+      // ✅ Step 1: Check if user already exists
       const { data: existingUser, error: lookupError } = await supabase
-        .from('users')
-        .select('id, email_confirmed')
-        .eq('email', email)
+        .from("users")
+        .select("id, email_confirmed")
+        .eq("email", email)
         .maybeSingle();
 
       if (lookupError) throw lookupError;
 
-      // If user exists but email isn't confirmed, resend confirmation
       if (existingUser) {
         if (existingUser.email_confirmed) {
-          throw { code: 'user_already_exists' };
+          throw { code: "user_already_exists" };
         } else {
-          // Resend confirmation email without creating new user
+          // Resend confirmation email
           const { error: resendError } = await supabase.auth.resend({
-            type: 'signup',
+            type: "signup",
             email: email,
             options: {
               emailRedirectTo: `${window.location.origin}/auth/callback`,
-            }
+            },
           });
 
           if (resendError) throw resendError;
 
-          toast.success('Confirmation email resent! Please check your inbox.', { id: toastId });
+          toast.success("Confirmation email resent! Please check your inbox.", {
+            id: toastId,
+          });
           return;
         }
       }
 
-      // Proceed with new signup if user doesn't exist
+      // ✅ Step 2: Create auth account
       const { data: { user }, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name: name,
-            referral_code: referralCode // Pass referral code to auth.users
-          },
+          data: { name },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
-        }
+        },
       });
 
       if (authError) throw authError;
-      if (!user) throw new Error('User creation failed');
+      if (!user) throw new Error("User creation failed");
 
-      // Calculate age from date of birth
+      // ✅ Step 3: Calculate age
       const birthDate = new Date(dateOfBirth);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
-      
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
 
-      // Save user data to users table
+      // ✅ Step 4: Get referrerId from localStorage
+      const referrerId = localStorage.getItem("referrerId");
+
+      // ✅ Step 5: Insert into users table
       const userData: SupabaseUser = {
         id: user.id,
         email: user.email || email,
         name,
-        role: 'user',
+        role: "user",
         created_at: new Date().toISOString(),
         email_confirmed: false,
         date_of_birth: dateOfBirth,
@@ -220,55 +256,52 @@ export default function Signup() {
         email_opt_in: emailOptIn,
         email_opt_in_at: emailOptIn ? new Date().toISOString() : null,
         is_sso_user: false,
-        is_anonymous: false
+        is_anonymous: false,
+        parent_id: referrerId || null, // ✅ Save referral
       };
 
-      const { error: dbError } = await supabase
-        .from('users')
-        .insert([userData]);
+      console.log("Saving referral ID:", referrerId);
+
+      const { error: dbError } = await supabase.from("users").insert([userData]);
 
       if (dbError) throw dbError;
 
-      // Record user consents in the user_consents table
-      await recordUserConsents(user.id);
+      // ✅ Step 6: Create profile (optional)
+      const { error: profileError } = await supabase.from("profiles").insert({
+        user_id: user.id,
+        username: name,
+        date_of_birth: dateOfBirth,
+        age,
+        gender,
+        email_opt_in: emailOptIn,
+        updated_at: new Date().toISOString(),
+      });
+      if (profileError) console.error("Profile creation error:", profileError);
 
-      // Create profile entry (if you have a profiles table)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: user.id,
-          username: name,
-          date_of_birth: dateOfBirth,
-          age,
-          gender,
-          email_opt_in: emailOptIn,
-          updated_at: new Date().toISOString()
-        });
+      toast.success("Check your email for the confirmation link!", { id: toastId });
 
-      if (profileError) console.error('Profile creation error:', profileError);
+      // ✅ Step 7: Clear referral (prevent reuse)
+      localStorage.removeItem("referrerId");
 
-      toast.success('Check your email for the confirmation link!', { id: toastId });
-      
-      // Redirect to verification screen
+      // ✅ Step 8: Redirect
       setTimeout(() => {
         router.push(`/login?verify=true&email=${encodeURIComponent(email)}`);
       }, 2000);
-
     } catch (error: any) {
       console.error("Signup Error:", error.code, error.message);
-      let errorMessage = 'Signup failed. Please try again.';
+      let errorMessage = "Signup failed. Please try again.";
       switch (error.code) {
-        case 'user_already_exists':
-          errorMessage = 'This email is already registered. Please log in.';
+        case "user_already_exists":
+          errorMessage = "This email is already registered. Please log in.";
           break;
-        case 'invalid_email':
-          errorMessage = 'Invalid email address.';
+        case "invalid_email":
+          errorMessage = "Invalid email address.";
           break;
-        case 'weak_password':
-          errorMessage = 'Password is too weak.';
+        case "weak_password":
+          errorMessage = "Password is too weak.";
           break;
-        case 'too_many_requests':
-          errorMessage = 'Too many attempts. Please try again later.';
+        case "too_many_requests":
+          errorMessage = "Too many attempts. Please try again later.";
           break;
         default:
           errorMessage = error.message || errorMessage;
@@ -278,7 +311,6 @@ export default function Signup() {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-lime-50 to-gray-100">
       <Toaster

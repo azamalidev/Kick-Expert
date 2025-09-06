@@ -5,20 +5,93 @@ import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import toast, { Toaster } from 'react-hot-toast';
+import ReactCountryFlag from "react-country-flag";
 
 const countries = [
-  "Afghanistan", "Albania", "Algeria", "Argentina", "Armenia", "Australia", "Austria",
-  "Azerbaijan", "Bahrain", "Bangladesh", "Belarus", "Belgium", "Brazil", "Bulgaria",
-  "Cambodia", "Canada", "Chile", "China", "Colombia", "Croatia", "Cyprus", "Czech Republic",
-  "Denmark", "Ecuador", "Egypt", "Estonia", "Finland", "France", "Georgia", "Germany",
-  "Ghana", "Greece", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland",
-  "Israel", "Italy", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kuwait", "Latvia",
-  "Lebanon", "Lithuania", "Luxembourg", "Malaysia", "Mexico", "Morocco", "Netherlands",
-  "New Zealand", "Nigeria", "Norway", "Pakistan", "Peru", "Philippines", "Poland",
-  "Portugal", "Qatar", "Romania", "Russia", "Saudi Arabia", "Singapore", "Slovakia",
-  "Slovenia", "South Africa", "South Korea", "Spain", "Sri Lanka", "Sweden", "Switzerland",
-  "Thailand", "Turkey", "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
-  "Uruguay", "Venezuela", "Vietnam"
+  { code: "AF", name: "Afghanistan" },
+  { code: "AL", name: "Albania" },
+  { code: "DZ", name: "Algeria" },
+  { code: "AR", name: "Argentina" },
+  { code: "AM", name: "Armenia" },
+  { code: "AU", name: "Australia" },
+  { code: "AT", name: "Austria" },
+  { code: "AZ", name: "Azerbaijan" },
+  { code: "BH", name: "Bahrain" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "BY", name: "Belarus" },
+  { code: "BE", name: "Belgium" },
+  { code: "BR", name: "Brazil" },
+  { code: "BG", name: "Bulgaria" },
+  { code: "KH", name: "Cambodia" },
+  { code: "CA", name: "Canada" },
+  { code: "CL", name: "Chile" },
+  { code: "CN", name: "China" },
+  { code: "CO", name: "Colombia" },
+  { code: "HR", name: "Croatia" },
+  { code: "CY", name: "Cyprus" },
+  { code: "CZ", name: "Czech Republic" },
+  { code: "DK", name: "Denmark" },
+  { code: "EC", name: "Ecuador" },
+  { code: "EG", name: "Egypt" },
+  { code: "EE", name: "Estonia" },
+  { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" },
+  { code: "GE", name: "Georgia" },
+  { code: "DE", name: "Germany" },
+  { code: "GH", name: "Ghana" },
+  { code: "GR", name: "Greece" },
+  { code: "HU", name: "Hungary" },
+  { code: "IS", name: "Iceland" },
+  { code: "IN", name: "India" },
+  { code: "ID", name: "Indonesia" },
+  { code: "IR", name: "Iran" },
+  { code: "IQ", name: "Iraq" },
+  { code: "IE", name: "Ireland" },
+  { code: "IL", name: "Israel" },
+  { code: "IT", name: "Italy" },
+  { code: "JP", name: "Japan" },
+  { code: "JO", name: "Jordan" },
+  { code: "KZ", name: "Kazakhstan" },
+  { code: "KE", name: "Kenya" },
+  { code: "KW", name: "Kuwait" },
+  { code: "LV", name: "Latvia" },
+  { code: "LB", name: "Lebanon" },
+  { code: "LT", name: "Lithuania" },
+  { code: "LU", name: "Luxembourg" },
+  { code: "MY", name: "Malaysia" },
+  { code: "MX", name: "Mexico" },
+  { code: "MA", name: "Morocco" },
+  { code: "NL", name: "Netherlands" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "NG", name: "Nigeria" },
+  { code: "NO", name: "Norway" },
+  { code: "PK", name: "Pakistan" },
+  { code: "PE", name: "Peru" },
+  { code: "PH", name: "Philippines" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "QA", name: "Qatar" },
+  { code: "RO", name: "Romania" },
+  { code: "RU", name: "Russia" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "SG", name: "Singapore" },
+  { code: "SK", name: "Slovakia" },
+  { code: "SI", name: "Slovenia" },
+  { code: "ZA", name: "South Africa" },
+  { code: "KR", name: "South Korea" },
+  { code: "ES", name: "Spain" },
+  { code: "LK", name: "Sri Lanka" },
+  { code: "SE", name: "Sweden" },
+  { code: "CH", name: "Switzerland" },
+  { code: "TH", name: "Thailand" },
+  { code: "TR", name: "Turkey" },
+  { code: "UA", name: "Ukraine" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "US", name: "United States" },
+  { code: "UY", name: "Uruguay" },
+  { code: "VE", name: "Venezuela" },
+  { code: "VN", name: "Vietnam" }
 ];
 
 export default function CompleteProfile() {
@@ -129,7 +202,6 @@ export default function CompleteProfile() {
         upsert: true,
       });
 
-
     if (uploadError) throw uploadError;
 
     // Get public URL
@@ -206,6 +278,12 @@ export default function CompleteProfile() {
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  // Get country code from country name
+  const getCountryCode = (countryName: string): string => {
+    const country = countries.find(c => c.name === countryName);
+    return country ? country.code : "";
   };
 
   return (
@@ -364,7 +442,7 @@ export default function CompleteProfile() {
                 />
               </div>
 
-              {/* Nationality Dropdown */}
+              {/* Nationality Dropdown with Flags */}
               <div>
                 <label htmlFor="nationality" className="block text-sm font-semibold mb-2 text-gray-600 uppercase">
                   Nationality
@@ -379,11 +457,29 @@ export default function CompleteProfile() {
                 >
                   <option value="">Select your country</option>
                   {countries.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
+                    <option key={country.code} value={country.name}>
+                      {country.name}
                     </option>
                   ))}
                 </select>
+                
+                {/* Selected Country Flag Preview */}
+                {nationality && (
+                  <div className="mt-2 flex items-center">
+                    <ReactCountryFlag
+                      countryCode={getCountryCode(nationality)}
+                      svg
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        marginRight: '8px',
+                        borderRadius: '2px'
+                      }}
+                      title={nationality}
+                    />
+                    <span className="text-sm text-gray-600">Selected: {nationality}</span>
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
