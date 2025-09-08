@@ -63,24 +63,29 @@ export default function Navbar() {
         .order('created_at', { ascending: false });
 
       // Format trophies data
-      const formattedTrophies = trophiesData?.map(trophy => ({
-        ...trophy,
+      // trophiesData items can be returned with loose typings from Supabase client so
+      // cast each item to `any` and explicitly map expected fields to avoid
+      // "Spread types may only be created from object types" TypeScript error.
+      const formattedTrophies = (trophiesData as any[] | undefined)?.map((trophy: any) => ({
+        id: trophy?.id,
+        title: trophy?.title ?? trophy?.name,
+        created_at: trophy?.created_at ?? trophy?.earned_at ?? new Date().toISOString(),
         message: 'You earned a new trophy!',
         type: 'trophy',
-        is_read: false
+        is_read: false,
       })) || [];
 
       // 3. Quiz results table
       const { data: quizData } = await supabase
         .from('quiz_results')
-        .select('id, quiz_name as title, score, created_at')
+        .select('id, quiz_name, score, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       // Format quiz data
-      const formattedQuiz = quizData?.map(quiz => ({
+      const formattedQuiz = (quizData as any[] | undefined)?.map((quiz: any) => ({
         id: quiz.id,
-        title: quiz.title,
+        title: quiz.quiz_name,
         message: `You scored ${quiz.score} points`,
         created_at: quiz.created_at,
         type: 'quiz',
@@ -90,16 +95,16 @@ export default function Navbar() {
       // 4. Live competitions
       const { data: liveCompData } = await supabase
         .from('livecompetitions')
-        .select('id, competition_name as title, start_time, created_at')
+        .select('id, competition_name, start_time, created_at')
         .lte('start_time', new Date().toISOString())
         .order('created_at', { ascending: false });
 
       // Format competitions data
-      const formattedCompetitions = liveCompData?.map(comp => ({
-        id: comp.id,
-        title: comp.title,
+      const formattedCompetitions = (liveCompData as any[] | undefined)?.map((comp: any) => ({
+        id: comp?.id,
+        title: comp?.competition_name,
         message: 'Competition is starting soon!',
-        created_at: comp.created_at,
+        created_at: comp?.created_at ?? comp?.start_time ?? new Date().toISOString(),
         type: 'competition',
         is_read: false
       })) || [];

@@ -75,7 +75,6 @@ export default function Profile() {
   const [referralLink, setReferralLink] = useState<string>("");
   const [referredUsers, setReferredUsers] = useState<any[]>([]);
   const [referralRewards, setReferralRewards] = useState<any[]>([]);
-  const [competitionCredits, setCompetitionCredits] = useState<number>(0);
   const router = useRouter();
 
   // Trophy image generation
@@ -163,7 +162,7 @@ export default function Profile() {
         setCreatedAt(userData.created_at || "");
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label, competition_credits')
+          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label')
           .eq('user_id', user.id)
           .single();
         if (profileError) {
@@ -175,14 +174,12 @@ export default function Profile() {
           setTotalGames(0);
           setXp(0);
           setRankLabel("");
-          setCompetitionCredits(0);
           setUserProfile({
             user_id: user.id,
             username: userData.name || "",
             avatar_url: "",
             nationality: "",
             created_at: userData.created_at || "",
-            competition_credits: 0
           });
         } else {
           const profile = profileData as any;
@@ -193,7 +190,6 @@ export default function Profile() {
           setTotalGames(profile.total_games || 0);
           setXp(profile.xp || 0);
           setRankLabel(profile.rank_label || "Beginner");
-          setCompetitionCredits(profile.competition_credits || 0);
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
         }
         await fetchUserTrophies(user.id);
@@ -312,13 +308,7 @@ export default function Profile() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      const { error: creditError } = await supabase
-        .from('profiles')
-        .update({ competition_credits: supabase.raw('competition_credits + ?', [amount]) })
-        .eq('user_id', user.id);
-      if (creditError) throw creditError;
 
-      setCompetitionCredits(prev => prev + amount);
       toast.success(`Reward claimed successfully! Added ${amount} competition credits.`, { style: { background: '#363636', color: '#fff' } });
       await fetchReferralRewards(user.id);
     } catch (error: any) {
@@ -1188,11 +1178,7 @@ export default function Profile() {
                         style={{ width: `${getReferralProgress().progress}%` }}
                       ></div>
                     </div>
-                    <div className="mt-4 bg-green-100 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-green-700">Competition Credits</p>
-                      <p className="text-2xl font-bold text-green-800">{competitionCredits} Credits</p>
-                      <p className="text-xs text-green-600 mt-1">Non-withdrawable, used for competition entries only.</p>
-                    </div>
+                
                     <p className="text-xs text-lime-600 mt-2">
                       Invite friends to earn XP and competition credits! Earn +50 XP for each confirmed email and +100 XP for each first competition joined.
                     </p>

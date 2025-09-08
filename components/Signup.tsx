@@ -18,6 +18,14 @@ export default function Signup() {
   const [emailOptIn, setEmailOptIn] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
+  // Effect to clear referrerId after successful signup
+  useEffect(() => {
+    if (signupSuccess) {
+      localStorage.removeItem("referrerId");
+    }
+  }, [signupSuccess]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -166,14 +174,17 @@ export default function Signup() {
 
    // In handleSignup, before insert
 
-// At top of component
-let referrerId = localStorage.getItem("referrerId");
+// Create a state for referrerId
+const [referrerId, setReferrerId] = useState<string | null>(null);
 
-// fallback if still missing
-if (!referrerId) {
+// Handle referrerId in useEffect
+useEffect(() => {
+  const storedReferrerId = localStorage.getItem("referrerId");
   const params = new URLSearchParams(window.location.search);
-  referrerId = params.get("ref");
-}
+  const urlRef = params.get("ref");
+  
+  setReferrerId(storedReferrerId || urlRef || null);
+}, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,8 +248,8 @@ if (!referrerId) {
         age--;
       }
 
-      // ✅ Step 4: Get referrerId from localStorage
-      const referrerId = localStorage.getItem("referrerId");
+      // ✅ Step 4: Use referrerId from state
+      // referrerId is already available from state
 
       // ✅ Step 5: Insert into users table
       const userData: SupabaseUser = {
@@ -279,10 +290,10 @@ if (!referrerId) {
       if (profileError) console.error("Profile creation error:", profileError);
 
       toast.success("Check your email for the confirmation link!", { id: toastId });
-
-      // ✅ Step 7: Clear referral (prevent reuse)
-      localStorage.removeItem("referrerId");
-
+      
+      // Set signup success to trigger cleanup effect
+      setSignupSuccess(true);
+      
       // ✅ Step 8: Redirect
       setTimeout(() => {
         router.push(`/login?verify=true&email=${encodeURIComponent(email)}`);
