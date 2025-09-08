@@ -26,4 +26,5 @@ export interface UserProfile {
   total_games?: number;
   xp?: number;
   rank_label?: string;
+  credits?: number;
 }

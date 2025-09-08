@@ -9,34 +9,47 @@ import Footer from "@/components/Footer";
 export default function LeaderboardPage() {
     const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
+    const [timeframe, setTimeframe] = useState<'weekly' | 'monthly' | 'all_time'>('all_time');
 
-  const fetchLeaderboardData = async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
+    const fetchLeaderboardData = async (period: 'weekly' | 'monthly' | 'all_time' = 'all_time') => {
+    setLoading(true);
 
     try {
-        const { data, error } = await supabase
-            .rpc("get_top_users_leaderboard"); // remove .select("*")
+        // Pass period to the RPC; backend should handle period (weekly/monthly/all_time)
+        const { data, error } = await supabase.rpc("get_top_users_leaderboard", { period });
 
         if (error) {
-            console.error("Error fetching leaderboard:", error);
-            setLeaderboardData([]);
-        } else if (data) {
-            setLeaderboardData(data); // this is already an array
-        }
+            console.error("Error fetching leaderboard with period:", error);
+            // Retry without period in case the RPC doesn't accept the argument
+            try {
+                const { data: retryData, error: retryError } = await supabase.rpc("get_top_users_leaderboard");
+                if (retryError) {
+                    console.error("Retry without period failed:", retryError);
+                    setLeaderboardData([]);
+                } else {
+                    console.info("Fetched leaderboard (no period):", retryData);
+                    setLeaderboardData(retryData || []);
+                }
+            } catch (retryErr) {
+                console.error("Unexpected retry error:", retryErr);
+                setLeaderboardData([]);
+            }
+            } else {
+                console.info("Fetched leaderboard:", data);
+                setLeaderboardData(data || []); // this is already an array
+            }
     } catch (error) {
         console.error("Unexpected error:", error);
         setLeaderboardData([]);
     } finally {
         setLoading(false);
-        setRefreshing(false);
     }
 };
 
     useEffect(() => {
-        fetchLeaderboardData();
-    }, []);
+        // Fetch when component mounts and whenever timeframe changes
+        fetchLeaderboardData(timeframe);
+    }, [timeframe]);
 
     const getRankIcon = (position: number) => {
         switch (position) {
@@ -83,7 +96,7 @@ export default function LeaderboardPage() {
             <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-lime-50 py-8 px-4">
                 <div className="max-w-6xl mx-auto mt-16">
                     {/* Header Section */}
-                    <div className="text-center mb-12">
+                    <div className="text-center mb-8">
                         <div className="relative inline-block mb-6">
                             <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-lime-600 via-green-600 to-teal-600 bg-clip-text text-transparent drop-shadow-sm">
                                 Global Leaderboard
@@ -95,6 +108,33 @@ export default function LeaderboardPage() {
                         <p className="text-lg md:text-xl text-gray-600 font-medium mb-6">
                             Compete with the world's best players
                         </p>
+
+                        {/* Timeframe selector + refresh */}
+                        <div className="flex items-center justify-center space-x-3">
+                            <div className="inline-flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden">
+                                <button
+                                    onClick={() => { console.info('timeframe -> weekly'); setTimeframe('weekly'); }}
+                                    aria-pressed={timeframe === 'weekly'}
+                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'weekly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-l-full`}
+                                >
+                                    Weekly
+                                </button>
+                                <button
+                                    onClick={() => { console.info('timeframe -> monthly'); setTimeframe('monthly'); }}
+                                    aria-pressed={timeframe === 'monthly'}
+                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'monthly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
+                                >
+                                    Monthly
+                                </button>
+                                <button
+                                    onClick={() => { console.info('timeframe -> all_time'); setTimeframe('all_time'); }}
+                                    aria-pressed={timeframe === 'all_time'}
+                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'all_time' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-r-full`}
+                                >
+                                    All-time
+                                </button>
+                            </div>
+                        </div>
 
                     </div>
 
@@ -236,6 +276,7 @@ export default function LeaderboardPage() {
                                             </div>
                                             Complete Rankings
                                         </h3>
+                                        <div className="text-sm text-gray-500">Showing: <span className="font-semibold text-gray-700 capitalize">{timeframe.replace('_', ' ')}</span></div>
                                     </div>
 
                                     <div className="space-y-3">

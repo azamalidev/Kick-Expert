@@ -23,6 +23,7 @@ declare global {
 }
 
 interface Competition {
+  end_time: string | number | Date;
   id: string;
   name: string;
   start_time: string;

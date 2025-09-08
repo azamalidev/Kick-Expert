@@ -70,6 +70,7 @@ export default function Profile() {
   const [totalGames, setTotalGames] = useState<number>(0);
   const [xp, setXp] = useState<number>(0);
   const [rankLabel, setRankLabel] = useState<string>("");
+  const [credits, setCredits] = useState<number>(0);
   const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
   const [loadingTrophies, setLoadingTrophies] = useState<boolean>(false);
   const [referralLink, setReferralLink] = useState<string>("");
@@ -81,58 +82,228 @@ export default function Profile() {
   const generateTrophyImage = async (trophy: Trophy) => {
     const element = document.getElementById(`trophy-${trophy.id}`);
     if (!element) return null;
-    const canvas = await html2canvas(element, { scale: 2 });
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.font = 'bold 20px Arial';
-      ctx.fillStyle = '#333';
-      ctx.fillText(`Rank: ${rankLabel} (${xp} XP)`, 20, canvas.height - 40);
-      ctx.font = '16px Arial';
-      ctx.fillText('Join me on the platform!', 20, canvas.height - 20);
+    try {
+      // Try html2canvas first (best visual fidelity)
+      const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#333';
+        ctx.fillText(`Rank: ${rankLabel} (${xp} XP)`, 20, canvas.height - 40);
+        ctx.font = '16px Arial';
+        ctx.fillText('Join me on the platform!', 20, canvas.height - 20);
+      }
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      console.warn('html2canvas failed, falling back to programmatic canvas:', err);
+      // Fallback: create a simple programmatic image (avoids parsing CSS)
+      const scale = 2;
+      const width = 800 * scale;
+      const height = 420 * scale;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, width, height);
+      grad.addColorStop(0, '#fff7ed');
+      grad.addColorStop(1, '#fef3c7');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Trophy icon circle
+      ctx.fillStyle = '#f59e0b';
+      const circleX = 120 * scale;
+      const circleY = height / 2;
+      const circleR = 90 * scale;
+      ctx.beginPath();
+      ctx.arc(circleX, circleY, circleR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Trophy emoji
+      ctx.font = `${80 * scale}px serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(TrophyService.getTrophyIcon(trophy.trophy_type) || '🏆', circleX, circleY + 6 * scale);
+
+      // Title and description
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#111827';
+      ctx.font = `${28 * scale}px Arial`;
+      ctx.fillText(trophy.title, 240 * scale, 120 * scale);
+      ctx.font = `${18 * scale}px Arial`;
+      // wrap description
+      const desc = trophy.description || '';
+      const maxW = 520 * scale;
+      let y = 160 * scale;
+      const lineHeight = 26 * scale;
+      const words = desc.split(' ');
+      let line = '';
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxW && n > 0) {
+          ctx.fillText(line.trim(), 240 * scale, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      if (line) ctx.fillText(line.trim(), 240 * scale, y);
+
+      // Rank and XP
+      ctx.font = `${18 * scale}px Arial`;
+      ctx.fillStyle = '#065f46';
+      ctx.fillText(`Rank: ${rankLabel} (${xp} XP)`, 240 * scale, height - 80 * scale);
+      ctx.fillStyle = '#374151';
+      ctx.font = `${14 * scale}px Arial`;
+      ctx.fillText(`Join me: ${referralLink || window.location.origin}`, 240 * scale, height - 44 * scale);
+
+      return canvas.toDataURL('image/png');
     }
-    return canvas.toDataURL('image/png');
+  };
+
+  // helper: convert dataURL to Blob
+  const dataURLToBlob = (dataUrl: string) => {
+    const parts = dataUrl.split(',');
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  };
+
+  const [sharing, setSharing] = useState<boolean>(false);
+
+  // upload image dataURL to Supabase storage and return public url
+  const uploadImageToStorage = async (dataUrl: string, fileName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      const blob = dataURLToBlob(dataUrl);
+      const filePath = `shared-trophies/${user.id}/${fileName}`;
+      // supabase storage upload
+      const { error: uploadError } = await supabase.storage
+        .from('profileimages')
+        .upload(filePath, blob, { upsert: true, contentType: 'image/png' });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage
+        .from('profileimages')
+        .getPublicUrl(filePath);
+      return publicData.publicUrl as string;
+    } catch (err) {
+      console.error('Upload failed', err);
+      return null;
+    }
   };
 
   // Trophy sharing functions
-  const shareTrophyToFacebook = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy on this platform! 🏆\n\n"${trophy.title}" - ${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete for trophies!`);
-    const url = `https://www.facebook.com/sharer/sharer.php?quote=${text}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const shareTrophyToFacebook = async (trophy: Trophy) => {
+    setSharing(true);
+    try {
+      const imageData = await generateTrophyImage(trophy);
+      let imageUrl: string | null = null;
+      if (imageData) {
+        imageUrl = await uploadImageToStorage(imageData, `trophy-${trophy.id}.png`);
+      }
+      const text = `I earned a ${trophy.trophy_type} trophy on Kick Expert! 🏆 "${trophy.title}" - ${trophy.description} \nCurrent Rank: ${rankLabel} (${xp} XP)\nJoin me: ${referralLink || window.location.origin}`;
+      const quote = encodeURIComponent(text + (imageUrl ? `\n${imageUrl}` : ''));
+      const u = encodeURIComponent(referralLink || window.location.origin);
+      const url = `https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${quote}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success('Opened Facebook share dialog');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to prepare Facebook share');
+    } finally {
+      setSharing(false);
+    }
   };
 
-  const shareTrophyToX = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆 "${trophy.title}"\nCurrent Rank: ${rankLabel} (${xp} XP)\nJoin me and compete!`);
-    const url = `https://twitter.com/intent/tweet?text=${text}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const shareTrophyToX = async (trophy: Trophy) => {
+    setSharing(true);
+    try {
+      const imageData = await generateTrophyImage(trophy);
+      let imageUrl: string | null = null;
+      if (imageData) imageUrl = await uploadImageToStorage(imageData, `trophy-${trophy.id}.png`);
+      const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆 "${trophy.title}" - ${trophy.description} \nRank: ${rankLabel} (${xp} XP)\n${referralLink || window.location.origin}${imageUrl ? `\n${imageUrl}` : ''}`);
+      const url = `https://twitter.com/intent/tweet?text=${text}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success('Opened X share dialog');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to prepare X share');
+    } finally {
+      setSharing(false);
+    }
   };
 
-  const shareTrophyToWhatsApp = (trophy: Trophy) => {
-    const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete!`);
-    const url = `https://api.whatsapp.com/send?text=${text}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const shareTrophyToWhatsApp = async (trophy: Trophy) => {
+    setSharing(true);
+    try {
+      const imageData = await generateTrophyImage(trophy);
+      let imageUrl: string | null = null;
+      if (imageData) imageUrl = await uploadImageToStorage(imageData, `trophy-${trophy.id}.png`);
+      const text = encodeURIComponent(`I earned a ${trophy.trophy_type} trophy! 🏆 \n"${trophy.title}" - ${trophy.description} \nRank: ${rankLabel} (${xp} XP)\nJoin: ${referralLink || window.location.origin}${imageUrl ? `\n${imageUrl}` : ''}`);
+      const url = `https://api.whatsapp.com/send?text=${text}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success('Opened WhatsApp share');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to prepare WhatsApp share');
+    } finally {
+      setSharing(false);
+    }
   };
 
   const shareTrophyToInstagram = async (trophy: Trophy) => {
-    const text = `I earned a ${trophy.trophy_type} trophy! 🏆\n\n"${trophy.title}"\n${trophy.description}\n\nCurrent Rank: ${rankLabel} (${xp} XP)\n\nJoin me and compete!`;
-    const image = await generateTrophyImage(trophy);
+    setSharing(true);
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.', {
-        style: { background: '#363636', color: '#fff' }
-      });
-      if (image) {
-        const link = document.createElement('a');
-        link.href = image;
-        link.download = `trophy-${trophy.title}.png`;
-        link.click();
-        toast.success('Trophy image downloaded for sharing!', {
-          style: { background: '#363636', color: '#fff' }
-        });
+      const imageData = await generateTrophyImage(trophy);
+      const text = `I earned a ${trophy.trophy_type} trophy on Kick Expert! 🏆 "${trophy.title}" - ${trophy.description} \nRank: ${rankLabel} (${xp} XP)\nJoin: ${referralLink || window.location.origin}`;
+      if (!imageData) {
+        // fallback: copy text
+        await navigator.clipboard.writeText(text);
+        toast.success('Trophy details copied to clipboard! Paste it in Instagram to share.');
+        return;
       }
-    } catch (error) {
-      toast.error('Failed to copy trophy details or generate image', {
-        style: { background: '#363636', color: '#fff' }
-      });
+
+      // Try Web Share API with files (mobile browsers)
+      const blob = dataURLToBlob(imageData);
+      const file = new File([blob], `trophy-${trophy.id}.png`, { type: 'image/png' });
+      // If Web Share API supports files, use it (best UX on mobile)
+      // @ts-ignore navigator.canShare may exist
+      if (navigator && (navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+        try {
+          await (navigator as any).share({ files: [file], text, title: 'My Trophy' });
+          toast.success('Shared to Instagram (or system share)');
+          return;
+        } catch (err) {
+          // fallthrough to download+copy
+          console.warn('Web Share failed', err);
+        }
+      }
+
+      // Otherwise upload and provide download + clipboard copy for manual posting
+      const uploadedUrl = await uploadImageToStorage(imageData, `trophy-${trophy.id}.png`);
+      await navigator.clipboard.writeText(text + (uploadedUrl ? `\n${uploadedUrl}` : ''));
+      // trigger download of image
+      const link = document.createElement('a');
+      link.href = imageData;
+      link.download = `trophy-${trophy.title}.png`;
+      link.click();
+      toast.success('Trophy image downloaded and details copied — paste into Instagram to post.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to prepare Instagram share');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -162,7 +333,7 @@ export default function Profile() {
         setCreatedAt(userData.created_at || "");
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label')
+          .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label, credits')
           .eq('user_id', user.id)
           .single();
         if (profileError) {
@@ -174,12 +345,14 @@ export default function Profile() {
           setTotalGames(0);
           setXp(0);
           setRankLabel("");
+          setCredits(0);
           setUserProfile({
             user_id: user.id,
             username: userData.name || "",
             avatar_url: "",
             nationality: "",
             created_at: userData.created_at || "",
+            credits: 0,
           });
         } else {
           const profile = profileData as any;
@@ -190,6 +363,7 @@ export default function Profile() {
           setTotalGames(profile.total_games || 0);
           setXp(profile.xp || 0);
           setRankLabel(profile.rank_label || "Beginner");
+          setCredits(profile.credits || 0);
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
         }
         await fetchUserTrophies(user.id);
@@ -232,6 +406,28 @@ export default function Profile() {
     }
   };
 
+  // If referrals table is empty, try to estimate effective referrals from referral_rewards as a fallback
+  const computeEffectiveReferrals = () => {
+    // Prefer referrals table when any referred users exist.
+    if (referredUsers && referredUsers.length > 0) {
+      // Show total referred users when they exist. If you prefer only confirmed/joined
+      // referrals, we can switch this to count(r => r.email_confirmed || r.competition_joined).
+      return { count: referredUsers.length, source: 'referrals' };
+    }
+
+    // fallback: estimate from referral_rewards when no referredUsers rows are present
+    if (referralRewards && referralRewards.length > 0) {
+      const creditedMilestonesTotal = referralRewards
+        .filter(r => r.credited)
+        .reduce((sum, r) => sum + (r.milestone || 0), 0);
+      if (creditedMilestonesTotal > 0) return { count: creditedMilestonesTotal, source: 'referral_rewards' };
+      // or use number of pending rewards as an estimate
+      return { count: referralRewards.length, source: 'referral_rewards_pending' };
+    }
+
+    return { count: 0, source: 'none' };
+  };
+
   const fetchReferralRewards = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -239,6 +435,7 @@ export default function Profile() {
         .select('*')
         .eq('user_id', userId);
       if (error) throw error;
+      console.info('fetched referral_rewards for user', userId, Array.isArray(data) ? data.length : 0, data);
       setReferralRewards(data || []);
     } catch (error) {
       console.error("Error fetching referral rewards:", error);
@@ -290,30 +487,53 @@ export default function Profile() {
     }
   };
 
-  const claimIndividualReward = async (rewardId: string, rewardType: string) => {
-    const rewardAmounts: { [key: string]: number } = {
-      'Starter Wallet Credit': 10,
-      'Pro Wallet Credit': 25,
-      'Elite Wallet Credit': 50,
-    };
-    const amount = rewardAmounts[rewardType] || 0;
+  const claimIndividualReward = async (rewardId: string, rewardType: string, creditValue?: number) => {
+    // Determine amount to credit
+    const amount = typeof creditValue === 'number' ? creditValue : 0;
 
     try {
+      // Mark the reward as credited
       const { error: updateError } = await supabase
         .from('referral_rewards')
         .update({ credited: true, updated_at: new Date().toISOString() })
         .eq('id', rewardId);
       if (updateError) throw updateError;
 
+      // Get authenticated user
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
+      if (!user) throw new Error('User not authenticated');
 
+      // If this reward grants credits, add them to the user's profile credits
+      if (rewardType === 'credits' && amount > 0) {
+        try {
+          // read current credits (if any)
+          const { data: profileData, error: profileErr } = await supabase
+            .from('profiles')
+            .select('credits')
+            .eq('user_id', user.id)
+            .single();
 
-      toast.success(`Reward claimed successfully! Added ${amount} competition credits.`, { style: { background: '#363636', color: '#fff' } });
+          const currentCredits = (profileData && typeof profileData.credits === 'number') ? profileData.credits : 0;
+          const newCredits = currentCredits + amount;
+
+          // upsert the credits value into profiles
+          const { error: upsertErr } = await supabase
+            .from('profiles')
+            .upsert({ user_id: user.id, credits: newCredits, updated_at: new Date().toISOString() });
+          if (upsertErr) throw upsertErr;
+
+          setCredits(newCredits);
+        } catch (err) {
+          console.error('Error updating profile credits:', err);
+          // continue — reward marked credited even if credits update failed
+        }
+      }
+
+      toast.success(`Reward claimed successfully! Added ${amount} credits.`, { style: { background: '#363636', color: '#fff' } });
       await fetchReferralRewards(user.id);
     } catch (error: any) {
-      console.error("Error claiming reward:", error);
-      toast.error(error.message || "Failed to claim reward", { style: { background: '#363636', color: '#fff' } });
+      console.error('Error claiming reward:', error);
+      toast.error(error.message || 'Failed to claim reward', { style: { background: '#363636', color: '#fff' } });
     }
   };
 
@@ -466,11 +686,12 @@ export default function Profile() {
   };
 
   const getReferralProgress = () => {
-    const effectiveCount = referredUsers.filter(r => r.email_confirmed && r.competition_joined).length;
+    const estimated = computeEffectiveReferrals();
+    const effectiveCount = estimated.count;
     const milestones = [3, 5, 10];
     const nextMilestone = milestones.find(m => effectiveCount < m) || 10;
     const progress = (effectiveCount / nextMilestone) * 100;
-    return { effectiveCount, nextMilestone, progress };
+    return { effectiveCount, nextMilestone, progress, source: estimated.source };
   };
 
   const getCountryCode = (countryName: string) => {
@@ -530,6 +751,7 @@ export default function Profile() {
                               alt={name || "User"}
                               width={96}
                               height={96}
+                              priority
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -856,6 +1078,30 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
+                    <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-indigo-700">Credits</p>
+                          <p className="text-2xl font-bold text-indigo-800">{credits}</p>
+                        </div>
+                        <div className="p-2 bg-indigo-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-indigo-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 8c-1.657 0-3 1.79-3 4s1.343 4 3 4 3-1.79 3-4-1.343-4-3-4zM12 4v4"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   {/* Rank Display */}
                   <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
@@ -1081,22 +1327,22 @@ export default function Profile() {
                               <div className="mt-4 flex space-x-3">
                                 <button onClick={() => shareTrophyToFacebook(trophy)} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
                                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
+                                    <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
                                   </svg>
                                 </button>
                                 <button onClick={() => shareTrophyToX(trophy)} title="Share on X" className="p-2 bg-black rounded-full hover:bg-gray-800 transition-colors">
                                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                                   </svg>
                                 </button>
                                 <button onClick={() => shareTrophyToWhatsApp(trophy)} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
                                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
+                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z" />
                                   </svg>
                                 </button>
                                 <button onClick={() => shareTrophyToInstagram(trophy)} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
                                   <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
                                   </svg>
                                 </button>
                               </div>
@@ -1163,7 +1409,21 @@ export default function Profile() {
                     </span>
                   </h3>
                   <div className="mb-6 bg-gradient-to-r from-lime-50 to-green-50 p-4 rounded-lg border border-lime-200">
-                    <h4 className="text-lg font-semibold text-lime-800 mb-2">Referral Progress</h4>
+                    {/* <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-lime-800 mb-2">Referral Progress</h4>
+                      <button
+                        onClick={async () => {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (user) {
+                            await fetchReferrals(user.id);
+                            await fetchReferralRewards(user.id);
+                          }
+                        }}
+                        className="text-xs text-lime-700 underline ml-2"
+                      >
+                        Refresh
+                      </button>
+                    </div> */}
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-lime-700">
                         Effective Referrals: {getReferralProgress().effectiveCount}
@@ -1172,15 +1432,18 @@ export default function Profile() {
                         Next Milestone: {getReferralProgress().nextMilestone} referrals
                       </span>
                     </div>
+                    {getReferralProgress().source !== 'referrals' && (
+                      <p className="text-xs text-gray-500 mt-1">Showing estimated referrals from rewards data (fall-back).</p>
+                    )}
                     <div className="w-full bg-lime-200 rounded-full h-2">
                       <div
                         className="bg-lime-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${getReferralProgress().progress}%` }}
                       ></div>
                     </div>
-                
+
                     <p className="text-xs text-lime-600 mt-2">
-                      Invite friends to earn XP and competition credits! Earn +50 XP for each confirmed email and +100 XP for each first competition joined.
+                      Invite friends to earn competition credits! Get +10 credits for every friend who registers.
                     </p>
                   </div>
                   <div className="mb-6">
@@ -1218,27 +1481,27 @@ export default function Profile() {
                     <div className="flex space-x-3">
                       <button onClick={shareReferralToFacebook} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
+                          <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
                         </svg>
                       </button>
                       <button onClick={shareReferralToX} title="Share on X" className="p-2 bg-black rounded-full hover:bg-gray-800 transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                         </svg>
                       </button>
                       <button onClick={shareReferralToWhatsApp} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z"/>
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z" />
                         </svg>
                       </button>
                       <button onClick={shareReferralToInstagram} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
                         </svg>
                       </button>
                     </div>
                   </div>
-                  <h4 className="text-lg font-semibold text-gray-700 mb-2">Referred Users</h4>
+                  {/* <h4 className="text-lg font-semibold text-gray-700 mb-2">Referred Users</h4>
                   {referredUsers.length === 0 ? (
                     <p className="text-gray-500">No referred users yet.</p>
                   ) : (
@@ -1252,8 +1515,8 @@ export default function Profile() {
                         </li>
                       ))}
                     </ul>
-                  )}
-                  <h4 className="text-lg font-semibold text-gray-700 mt-6 mb-2">Referral Rewards</h4>
+                  )} */}
+                  <h4 className="text-lg font-semibold text-gray-700 mt-6 mb-2">Referral Rewards <span className="ml-2 bg-gray-100 text-gray-700 text-xs font-medium px-2 py-0.5 rounded-full">{referralRewards.length}</span></h4>
                   {referralRewards.length === 0 ? (
                     <p className="text-gray-500">No rewards earned yet.</p>
                   ) : (
@@ -1263,20 +1526,9 @@ export default function Profile() {
                           <div>
                             <p className="text-sm"><span className="font-medium text-gray-700">Milestone:</span> {reward.milestone} referrals</p>
                             <p className="text-sm"><span className="font-medium text-gray-700">Reward Type:</span> {reward.reward_type}</p>
-                            <p className="text-sm"><span className="font-medium text-gray-700">Status:</span> {reward.credited ? 'Claimed' : 'Pending'}</p>
-                            <p className="text-sm"><span className="font-medium text-gray-700">Created At:</span> {new Date(reward.created_at).toLocaleString()}</p>
+                            <p className="text-sm"><span className="font-medium text-gray-700">Value:</span> {reward.credit_value ?? '-'}</p>
                           </div>
-                          <button
-                            onClick={() => claimIndividualReward(reward.id, reward.reward_type)}
-                            disabled={reward.credited}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                              reward.credited
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-lime-500 hover:bg-lime-600 text-white'
-                            }`}
-                          >
-                            {reward.credited ? 'Claimed' : 'Claim'}
-                          </button>
+                       
                         </li>
                       ))}
                     </ul>
