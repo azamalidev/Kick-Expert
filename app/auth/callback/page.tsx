@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import Image from 'next/image';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import Image from 'next/image';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -14,7 +13,11 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) throw error;
 
         if (session?.user) {
@@ -27,6 +30,11 @@ export default function AuthCallback() {
           if (updateError) console.error(updateError);
 
           setStatus('success');
+
+          // Redirect after short delay (optional)
+          setTimeout(() => {
+            router.push('/');
+          }, 2500);
         } else {
           throw new Error('No user session found');
         }
@@ -37,7 +45,7 @@ export default function AuthCallback() {
     };
 
     handleAuth();
-  }, []);
+  }, [router]);
 
   if (status === 'loading') {
     return (
@@ -68,57 +76,28 @@ export default function AuthCallback() {
   }
 
   // ✅ Success Screen
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-lime-50 to-gray-100">
-      <div className="max-w-md w-full text-center p-8 bg-white rounded-2xl shadow-xl border border-gray-100">
-        {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <Link href="/" className="flex items-center">
-            <Image src="/logo.png" alt="KickExpert Logo" width={60} height={60} />
-            <span className="ml-2 text-lime-500 font-bold text-2xl">
-              Kick<span className="text-gray-800">Expert</span>
+  if (status === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-lime-50 to-gray-100">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-xl border border-gray-100">
+          <Link href="/" className="flex items-center justify-center mb-6">
+            <Image
+              src="/logo.png"
+              alt="KickExpert Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 md:w-12 md:h-12"
+            />
+            <span className="ml-2 text-lime-400 font-bold text-xl md:text-2xl">
+              Kick<span className="text-black">Expert</span>
             </span>
           </Link>
-        </div>
-
-        {/* Success Icon */}
-        <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 flex items-center justify-center rounded-full bg-lime-100">
-            <svg
-              className="w-10 h-10 text-lime-500"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={3}
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Message */}
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Email Confirmed!</h1>
-        <p className="text-gray-600 mb-6">
-          Welcome to <span className="font-semibold text-lime-500">KickExpert</span> 🎉  
-          Your account is ready to use.
-        </p>
-
-        {/* CTA Buttons */}
-        <div className="flex flex-col space-y-3">
-          <Link
-            href="/complete-profile"
-            className="px-6 py-3 bg-lime-500 text-white rounded-lg shadow hover:bg-lime-600 transition"
-          >
-            Complete Profile
-          </Link>
-          <Link
-            href="/competitions"
-            className="px-6 py-3 bg-gray-800 text-white rounded-lg shadow hover:bg-gray-900 transition"
-          >
-            Join Competitions
-          </Link>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Email Confirmed!</h1>
+          <p className="text-gray-600">Your email has been successfully verified. Redirecting...</p>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
