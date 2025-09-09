@@ -19,13 +19,53 @@ export async function POST(req: Request) {
 
     // Check if already registered
     const { data: existing, error: checkError } = await supabase
-      .from("competition_registrations")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("competition_id", competitionId)
+      .from('competition_registrations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('competition_id', competitionId)
       .maybeSingle();
+
+    if (checkError) {
+      return NextResponse.json({ success: false, error: checkError.message }, { status: 500 });
+    }
+
     if (existing) {
-      return NextResponse.json({ success: false, error: "Already registered." }, { status: 409 });
+      // If status differs, update the existing registration (e.g., pending -> confirmed)
+      if (existing.status !== status) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('competition_registrations')
+          .update({ status, paid_amount, paid_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .select()
+          .maybeSingle();
+
+        if (updateErr) {
+          return NextResponse.json({ success: false, error: updateErr.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, data: updated });
+      }
+
+      // Same status — return existing registration instead of error to avoid duplicate failures
+      return NextResponse.json({ success: true, data: existing });
+    }
+
+    // No existing registration — check competition start time and prevent late registrations (<=5 minutes)
+    const { data: competition, error: compErr } = await supabase
+      .from('competitions')
+      .select('start_time')
+      .eq('id', competitionId)
+      .maybeSingle();
+
+    if (compErr || !competition) {
+      return NextResponse.json({ success: false, error: 'Competition not found.' }, { status: 404 });
+    }
+
+    const start = new Date(competition.start_time).getTime();
+    const now = Date.now();
+    const secondsUntilStart = Math.floor((start - now) / 1000);
+    if (secondsUntilStart <= 300) {
+      return NextResponse.json({ success: false, error: 'Registration closed for this competition.' }, { status: 400 });
     }
 
     // Insert registration

@@ -81,6 +81,7 @@ interface AlreadyRegisteredModalProps {
   onClose: () => void;
   competitionName: string;
   paidAmount: number;
+  startTime?: string | Date | null;
 }
 
 const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
@@ -291,7 +292,8 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
   isOpen,
   onClose,
   competitionName,
-  paidAmount
+  paidAmount,
+  startTime
 }) => {
   return (
     <AnimatePresence>
@@ -322,10 +324,31 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 You've already registered for {competitionName}
               </h3>
-              <p className="text-gray-600 mb-4">
-                You have already paid ${paidAmount} for this competition. 
-                We'll notify you when it's time to play!
+              <p className="text-gray-600 mb-2">
+                You have already paid ${paidAmount} for this competition.
               </p>
+              {startTime && (
+                <div className="mb-4">
+                  <div className="text-sm text-gray-500 mb-1 flex items-center justify-center">
+                    <Calendar className="mr-2 text-lime-600" size={16} />
+                    <span className="font-semibold">Starts on</span>
+                  </div>
+                  <div className="text-gray-800 font-semibold text-base text-center">
+                    {new Date(startTime).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div className="text-gray-600 text-sm text-center">
+                    {new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              )}
+              {!startTime && (
+                <p className="text-gray-600 mb-4">We'll notify you when it's time to play!</p>
+              )}
             </div>
 
             {/* Footer */}
@@ -545,7 +568,8 @@ const LiveCompetition = () => {
   const [alreadyRegisteredData, setAlreadyRegisteredData] = useState<{
     competitionName: string;
     paidAmount: number;
-  }>({ competitionName: '', paidAmount: 0 });
+    startTime: Date | null;
+  }>({ competitionName: '', paidAmount: 0, startTime: null });
 
   // Stripe price IDs from .env.local
   const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1RybzcRkV53d3IKfXrOebfrd";
@@ -645,6 +669,34 @@ const LiveCompetition = () => {
     };
   }, []);
 
+  // Poll competitions and registrations periodically to update button states
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('competitions')
+          .select('*')
+          .eq('status', 'upcoming')
+          .order('start_time', { ascending: true });
+
+        if (!error && data) setCompetitions(data);
+
+        if (user) {
+          const { data: regs, error: regErr } = await supabase
+            .from('competition_registrations')
+            .select('*')
+            .eq('user_id', user.id);
+          if (!regErr && regs) setRegistrations(regs);
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    };
+
+    const interval = setInterval(poll, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const handleOpenModal = async (competition: any) => {
     if (!isLoggedIn || !user) {
       toast.error('Please sign up or log in to join the competition.');
@@ -662,6 +714,8 @@ const LiveCompetition = () => {
       setAlreadyRegisteredData({
         competitionName: competition.name,
         paidAmount: registration.paid_amount
+  ,
+  startTime: competition.startTime || null
       });
       setAlreadyRegisteredModalOpen(true);
       return;
@@ -699,11 +753,23 @@ const LiveCompetition = () => {
       // Show modal instead of toast
       setAlreadyRegisteredData({
         competitionName: selectedCompetition.name,
-        paidAmount: registration.paid_amount
+        paidAmount: registration.paid_amount,
+        startTime: selectedCompetition.startTime || null
       });
       setModalOpen(false);
       setAlreadyRegisteredModalOpen(true);
       return;
+    }
+
+    try {
+      // create a pending registration to reserve spot
+      await fetch('/api/register-competition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, competitionId, status: 'pending', paid_amount: 0 }),
+      });
+    } catch (err) {
+      console.error('Failed to create pending registration', err);
     }
 
     if (method === 'stripe') {
@@ -866,9 +932,24 @@ const LiveCompetition = () => {
     priceId: getPriceId(comp.name),
     status: 'Min reached', // You can calculate this based on registrations if needed
     startTime: new Date(comp.start_time),
+    endTime: comp.end_time ? new Date(comp.end_time) : null,
     entry_fee: comp.entry_fee,
     isRegistered: isUserRegistered(comp.id)
   }));
+
+  // Time helpers
+  const secondsUntil = (date: Date) => Math.max(0, Math.floor((date.getTime() - new Date().getTime()) / 1000));
+
+  const isRegistrationClosed = (comp: any) => {
+    if (!comp.startTime) return false;
+    // registration closes 5 minutes (300s) before start
+    return secondsUntil(comp.startTime) <= 300;
+  };
+
+  const isCompetitionStarted = (comp: any) => {
+    if (!comp.startTime) return false;
+    return new Date().getTime() >= comp.startTime.getTime();
+  };
 
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
@@ -907,6 +988,7 @@ const LiveCompetition = () => {
         onClose={() => setAlreadyRegisteredModalOpen(false)}
         competitionName={alreadyRegisteredData.competitionName}
         paidAmount={alreadyRegisteredData.paidAmount}
+        startTime={alreadyRegisteredData.startTime}
       />
 
       {/* Header section */}
@@ -982,17 +1064,85 @@ const LiveCompetition = () => {
               </div>
 
               <div className="mt-4">
-                <p className="text-center text-base font-extrabold text-lime-600">Competition is LIVE!</p>
-                <button
-                  onClick={() => handleOpenModal(comp)}
-                  className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
-                  style={{ 
-                    backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {comp.isRegistered ? 'Already Registered' : (isLoggedIn ? 'Register & Pay' : 'Sign Up to Join')}
-                </button>
+                {/* Determine button state based on time and registration */}
+                {!isCompetitionStarted(comp) && isRegistrationClosed(comp) ? (
+                  // If registration is closed but the current user is registered, allow opening the Already Registered modal
+                  comp.isRegistered ? (
+                    <button
+                      onClick={() => {
+                        if (!isLoggedIn || !user) {
+                          toast.error('Please sign up or log in to view your registration.');
+                          router.push(`/signup?competition=${comp.name.toLowerCase().replace(' ', '-')}`);
+                          return;
+                        }
+
+                        const reg = registrations.find(r => r.competition_id === comp.id && r.status === 'confirmed');
+                        setAlreadyRegisteredData({
+                          competitionName: comp.name,
+                          paidAmount: reg ? reg.paid_amount : 0,
+                          startTime: comp.startTime || null
+                        });
+                        setAlreadyRegisteredModalOpen(true);
+                      }
+                      }
+                      className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold"
+                    >
+                      Registration Closed
+                    </button>
+                  ) : (
+                    <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
+                      Registration Closed
+                    </button>
+                  )
+                ) : isCompetitionStarted(comp) ? (
+                  // Competition started
+                  comp.isRegistered ? (
+                    <button
+                      onClick={async () => {
+                        // Start competition on server and redirect to league page
+                        try {
+                          const res = await fetch('/api/start-competition', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ competitionId: comp.id }),
+                          });
+                          const data = await res.json();
+                          // Redirect to league with competition id
+                          router.push(`/league?competitionId=${comp.id}`);
+                        } catch (err) {
+                          console.error('Failed to start or join competition', err);
+                          toast.error('Unable to join competition. Please try again.');
+                        }
+                      }}
+                      className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
+                      style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                    >
+                      Join Competition
+                    </button>
+                  ) : (
+                    <button className="w-full mt-2 py-2 bg-gray-500 text-white rounded-lg font-semibold cursor-not-allowed">
+                      Not Registered
+                    </button>
+                  )
+                ) : (
+                  // Before start and registration open
+                  comp.isRegistered ? (
+                    <button
+                      onClick={() => handleOpenModal(comp)}
+                      className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold"
+                    >
+                      Already Registered
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleOpenModal(comp)}
+                      className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
+                      style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                    >
+                      {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
+                    </button>
+                  )
+                )}
               </div>
             </div>
           ))

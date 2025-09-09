@@ -75,34 +75,43 @@ export default function Navbar() {
         is_read: false,
       })) || [];
 
-      // 3. Quiz results table
-      const { data: quizData } = await supabase
-        .from('quiz_results')
-        .select('id, quiz_name, score, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+      // 3. Quiz results table (guarded in case the table/view doesn't exist)
+      let formattedQuiz: any[] = [];
+      try {
+        const { data: quizData, error: quizError } = await supabase
+          .from('quiz_results')
+          .select('id, quiz_name, score, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
-      // Format quiz data
-      const formattedQuiz = (quizData as any[] | undefined)?.map((quiz: any) => ({
-        id: quiz.id,
-        title: quiz.quiz_name,
-        message: `You scored ${quiz.score} points`,
-        created_at: quiz.created_at,
-        type: 'quiz',
-        is_read: false
-      })) || [];
+        if (quizError) {
+          // Table may not exist or permission error; log and continue
+          console.warn('quiz_results fetch error (table may be missing):', quizError);
+        } else {
+          formattedQuiz = (quizData as any[] | undefined)?.map((quiz: any) => ({
+            id: quiz.id,
+            title: quiz.quiz_name,
+            message: `You scored ${quiz.score} points`,
+            created_at: quiz.created_at,
+            type: 'quiz',
+            is_read: false
+          })) || [];
+        }
+      } catch (err) {
+        console.warn('Unexpected error fetching quiz_results:', err);
+      }
 
-      // 4. Live competitions
+      // 4. Live competitions (use `competitions` table and alias `name` to `competition_name`)
       const { data: liveCompData } = await supabase
-        .from('livecompetitions')
-        .select('id, competition_name, start_time, created_at')
+        .from('competitions')
+        .select('id, name, start_time, created_at')
         .lte('start_time', new Date().toISOString())
         .order('created_at', { ascending: false });
 
       // Format competitions data
       const formattedCompetitions = (liveCompData as any[] | undefined)?.map((comp: any) => ({
         id: comp?.id,
-        title: comp?.competition_name,
+        title: comp?.name,
         message: 'Competition is starting soon!',
         created_at: comp?.created_at ?? comp?.start_time ?? new Date().toISOString(),
         type: 'competition',
@@ -238,43 +247,72 @@ export default function Navbar() {
   useEffect(() => {
     if (!user) return;
 
-    const notificationsSubscription = supabase
-      .channel('notifications-changes')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
-        (payload) => {
-          // Show alert for new notification
-          setNewNotificationAlert(true);
-          
-          // Fetch updated notifications
-          fetchNotifications(user.id);
-          
-          // Show toast alert
-          toast.success(`New notification: ${payload.new.title || 'New update'}`, {
-            icon: '🔔',
-          });
+    // Helper: check whether a table exists in public schema
+    const tableExists = async (tableName: string) => {
+      try {
+        const { data, error } = await supabase.rpc('pg_table_exists', { tbl: tableName });
+        // If RPC doesn't exist (pg_table_exists), fallback to a safe true so we don't block
+        if (error) {
+          // Supabase may not have the RPC; fallback to attempting a simple select and catching errors later
+          return false;
         }
-      )
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'trophies', filter: `user_id=eq.${user.id}` },
-        () => {
-          setNewNotificationAlert(true);
-          fetchNotifications(user.id);
-          toast.success('You earned a new trophy! 🏆');
-        }
-      )
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'quiz_results', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          setNewNotificationAlert(true);
-          fetchNotifications(user.id);
-          toast.success(`Quiz completed! Score: ${payload.new.score} 📝`);
-        }
-      )
-      .subscribe();
+        return !!(data as any)?.exists;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    // Build base channel
+    const channel = supabase.channel('notifications-changes');
+
+    channel.on('postgres_changes', 
+      { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
+      (payload) => {
+        setNewNotificationAlert(true);
+        fetchNotifications(user.id);
+        toast.success(`New notification: ${payload.new.title || 'New update'}`, { icon: '🔔' });
+      }
+    );
+
+    channel.on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'trophies', filter: `user_id=eq.${user.id}` },
+      () => {
+        setNewNotificationAlert(true);
+        fetchNotifications(user.id);
+        toast.success('You earned a new trophy! 🏆');
+      }
+    );
+
+    // Only subscribe to quiz_results events if the table exists
+    (async () => {
+      let quizTableExists = false;
+      try {
+        // Try a lightweight call to check if the table exists by selecting 1 row and catching errors
+        const { error } = await supabase
+          .from('quiz_results')
+          .select('id')
+          .limit(1);
+        quizTableExists = !error;
+      } catch (err) {
+        quizTableExists = false;
+      }
+
+      if (quizTableExists) {
+        channel.on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'quiz_results', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            setNewNotificationAlert(true);
+            fetchNotifications(user.id);
+            toast.success(`Quiz completed! Score: ${payload.new.score} 📝`);
+          }
+        );
+      }
+
+      channel.subscribe();
+    })();
 
     return () => {
-      notificationsSubscription.unsubscribe();
+      try { channel.unsubscribe(); } catch (e) { /* ignore */ }
     };
   }, [user]);
 

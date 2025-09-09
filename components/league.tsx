@@ -16,6 +16,7 @@ const supabase = createClient(
 
 interface Question {
   id: number;
+  sourceQuestionId?: number | string;
   question_text: string;
   category: string;
   difficulty: string;
@@ -49,6 +50,7 @@ interface CompetitionDetails {
   entry_fee: number;
   prize_structure: any;
   status: string;
+  start_time?: string; // Added to match usage in code
 }
 
 export default function LeaguePage() {
@@ -90,6 +92,16 @@ export default function LeaguePage() {
         
         if (!error && data) {
           setCompetitionDetails(data);
+          // initialize countdown based on start_time if available
+          if (data.start_time) {
+            const start = new Date(data.start_time).getTime();
+            const seconds = Math.max(0, Math.floor((start - new Date().getTime()) / 1000));
+            setCountdown(seconds > 0 ? Math.min(seconds, 600) : 0);
+            if (seconds <= 0) {
+              // if competition already started, move to quiz phase
+              setPhase('quiz');
+            }
+          }
         }
       } catch (err) {
         console.error('Error fetching competition details:', err);
@@ -104,7 +116,7 @@ export default function LeaguePage() {
     if (phase === 'waiting' && competitionId) {
       const countdownInterval = setInterval(() => {
         setCountdown((prev) => {
-          if (prev <= 1) {
+            if (prev <= 1) {
             clearInterval(countdownInterval);
             setPhase('quiz');
             return 0;
@@ -113,19 +125,37 @@ export default function LeaguePage() {
         });
       }, 1000);
       
-      // Fetch registered players from Supabase
+      // Fetch registered players from Supabase (two-step to avoid relying on DB foreign key relationship)
       const fetchPlayers = async () => {
-        const { data, error } = await supabase
-          .from('competition_registrations')
-          .select('user_id, profiles(username)')
-          .eq('competition_id', competitionId)
-          .eq('status', 'confirmed');
-        
-        if (!error && data) {
-          setPlayers(data.map((p: any, idx: number) => ({ 
-            id: idx + 1, 
-            name: p.profiles?.username || `User ${p.user_id.substring(0, 8)}` 
+        try {
+          const { data: regs, error: regsErr } = await supabase
+            .from('competition_registrations')
+            .select('user_id')
+            .eq('competition_id', competitionId)
+            .eq('status', 'confirmed');
+
+          if (regsErr || !regs) return;
+
+          const userIds = Array.from(new Set(regs.map((r: any) => r.user_id).filter(Boolean)));
+
+          let profilesMap: Record<string, any> = {};
+          if (userIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('user_id, username')
+              .in('user_id', userIds as any[]);
+
+            (profilesData || []).forEach((p: any) => {
+              profilesMap[p.user_id] = p;
+            });
+          }
+
+          setPlayers(regs.map((p: any, idx: number) => ({
+            id: idx + 1,
+            name: (profilesMap[p.user_id] && profilesMap[p.user_id].username) || `User ${p.user_id.substring(0, 8)}`
           })));
+        } catch (err) {
+          console.error('Error fetching players or profiles:', err);
         }
       };
       
@@ -143,21 +173,67 @@ export default function LeaguePage() {
         setLoading(true);
         
         // Fetch questions for this competition from Supabase
+        // Note: `competition_questions` stores the question fields directly in this schema
         const { data: compQuestions, error: cqError } = await supabase
           .from('competition_questions')
-          .select('question_id, questions(*)')
+          .select('*')
           .eq('competition_id', competitionId)
-          .order('order_index', { ascending: true });
+          .order('created_at', { ascending: true });
+
+        if (cqError) throw cqError;
+
+        console.log('competition_questions fetched for', competitionId, 'count=', compQuestions?.length);
+
+        if (!compQuestions || compQuestions.length === 0) {
+          // No questions configured for this competition
+          setError('No questions are configured for this competition.');
+          setLoading(false);
+          return;
+        }
+
+        // Map competition_questions rows to the expected Question shape
+        // keep the original source question id (question_id) when available so we can insert answers
+        setQuestions(compQuestions.map((q: any) => ({
+          id: q.id,
+          // sourceQuestionId is the reference to the canonical questions table when present
+          sourceQuestionId: q.question_id ?? q.id,
+          question_text: q.question_text,
+          category: q.category,
+          difficulty: q.difficulty,
+          choices: q.choices,
+          correct_answer: q.correct_answer,
+          explanation: q.explanation,
+        })));
+
+        // Compute difficulty breakdown from the fetched questions
+        const difficulty_breakdown: { easy: number; medium: number; hard: number } = { easy: 0, medium: 0, hard: 0 };
+        compQuestions.forEach((q: any) => {
+          const d = (q.difficulty || '').toString().toLowerCase();
+          if (d.includes('easy')) difficulty_breakdown.easy += 1;
+          else if (d.includes('medium')) difficulty_breakdown.medium += 1;
+          else if (d.includes('hard')) difficulty_breakdown.hard += 1;
+        });
         
-        if (cqError || !compQuestions) throw cqError || new Error('No questions found');
-        
-        setQuestions(compQuestions.map((q: any) => q.questions));
-        
-        // Create a session for this user/competition
+        // Ensure user is authenticated and registered
         const { data: { user } } = await supabase.auth.getUser();
-        
         if (!user) {
           throw new Error('User not authenticated');
+        }
+
+        // Check registration
+        const { data: reg, error: regErr } = await supabase
+          .from('competition_registrations')
+          .select('*')
+          .eq('competition_id', competitionId)
+          .eq('user_id', user.id)
+          .eq('status', 'confirmed')
+          .maybeSingle();
+
+        if (regErr || !reg) {
+          // user is not registered or registration not confirmed
+          setError('You are not registered for this competition or your registration is not confirmed.');
+          setLoading(false);
+          return;
         }
         
         const { data: session, error: sessionError } = await supabase
@@ -169,6 +245,10 @@ export default function LeaguePage() {
             correct_answers: 0,
             score_percentage: 0,
             start_time: new Date().toISOString(),
+            // quiz_type is required by DB (NOT NULL). Use 'competition' for league sessions.
+            quiz_type: 'competition',
+            // use computed difficulty breakdown
+            difficulty_breakdown,
           })
           .select()
           .single();
@@ -242,32 +322,50 @@ export default function LeaguePage() {
       const fetchLeaderboard = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const { data, error } = await supabase
-          .from('competition_results')
-          .select('user_id, rank, score, profiles(username)')
-          .eq('competition_id', competitionId)
-          .order('rank', { ascending: true })
-          .limit(20);
-        
-        if (!error && data) {
-          const leaderboardData = data.map((entry: any) => ({
+        try {
+          const { data: results, error: resultsErr } = await supabase
+            .from('competition_results')
+            .select('user_id, rank, score')
+            .eq('competition_id', competitionId)
+            .order('rank', { ascending: true })
+            .limit(20);
+
+          if (resultsErr || !results) {
+            setLeaderboard([]);
+            return;
+          }
+
+          const userIds = Array.from(new Set(results.map((r: any) => r.user_id).filter(Boolean)));
+
+          let profilesMap: Record<string, any> = {};
+          if (userIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('user_id, username')
+              .in('user_id', userIds as any[]);
+
+            (profilesData || []).forEach((p: any) => {
+              profilesMap[p.user_id] = p;
+            });
+          }
+
+          const leaderboardData = results.map((entry: any) => ({
             id: entry.user_id,
-            name: entry.profiles?.username || `User ${entry.user_id.substring(0, 8)}`,
+            name: (profilesMap[entry.user_id] && profilesMap[entry.user_id].username) || `User ${entry.user_id.substring(0, 8)}`,
             score: entry.score,
             isUser: user?.id === entry.user_id,
             rank: entry.rank
           }));
-          
+
           setLeaderboard(leaderboardData);
-          
+
           // Find user's rank
           if (user) {
             const userEntry = leaderboardData.find((entry: any) => entry.id === user.id);
-            if (userEntry) {
-              setUserRank(userEntry.rank);
-            }
+            if (userEntry) setUserRank(userEntry.rank);
           }
-        } else {
+        } catch (err) {
+          console.error('Error fetching leaderboard or profiles:', err);
           setLeaderboard([]);
         }
       };
@@ -278,9 +376,8 @@ export default function LeaguePage() {
   }, [phase, competitionId]);
 
   const handleChoiceSelect = (choice: string) => {
-    if (!showResult) {
-      setSelectedChoice(choice);
-    }
+  // store selection for the currently visible question index
+  setSelectedChoice(choice);
   };
 
   const handleNextQuestion = async () => {
@@ -306,7 +403,7 @@ export default function LeaguePage() {
     
     
     // Save answer record
-    if (currentQuestion) {
+  if (currentQuestion) {
       const answerRecord = {
         question_id: currentQuestion.id,
         is_correct: isCorrect,
@@ -318,12 +415,19 @@ export default function LeaguePage() {
       
       // Submit answer to Supabase
       const { data: { user } } = await supabase.auth.getUser();
-      
+
+      // Use the sourceQuestionId if present (this should map to questions.id which is an integer).
+      // If we don't have an integer question id, set null to avoid FK/type mismatches.
+      let fkQuestionId: number | null = null;
+      const srcId = (currentQuestion as any).sourceQuestionId;
+      if (typeof srcId === 'number' && Number.isInteger(srcId)) fkQuestionId = srcId;
+      else if (typeof srcId === 'string' && /^\d+$/.test(srcId)) fkQuestionId = parseInt(srcId, 10);
+
       await supabase.from('competition_answers').insert({
         competition_id: competitionId,
         session_id: sessionId,
         user_id: user?.id,
-        question_id: currentQuestion.id,
+        question_id: fkQuestionId,
         selected_answer: selectedChoice,
         is_correct: isCorrect,
         submitted_at: new Date().toISOString(),
@@ -334,8 +438,7 @@ export default function LeaguePage() {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
       setSelectedChoice(null);
-      setShowResult(false);
-      setTimer(10);
+      setTimer(30);
       setTimerKey((prev) => prev + 1);
     } else {
       setTimeout(async () => {
@@ -451,13 +554,12 @@ export default function LeaguePage() {
     setCurrentQuestionIndex(0);
     setSelectedChoice(null);
     setScore(0);
-    setShowResult(false);
     setQuizCompleted(false);
     setAnswers([]);
     setLoading(true);
     setError(null);
     setSessionId(null);
-    setTimer(10);
+  setTimer(30);
     setTimerKey(0);
     setLeaderboard([]);
     setUserRank(null);
@@ -495,7 +597,7 @@ export default function LeaguePage() {
       return {
         message: "Keep Practicing!",
         description: "You're getting there! Try again to improve your score!",
-        leagueLink: "/competitions",
+        leagueLink: "/livecompetition",
         leagueText: "Try Again",
         emoji: "💪",
         bgColor: "from-yellow-100 to-yellow-200"
@@ -582,7 +684,7 @@ export default function LeaguePage() {
                   stroke="url(#countdown-gradient)"
                   strokeWidth="8"
                   strokeLinecap="round"
-                  strokeDasharray={`${(countdown / 10) * 283} 283`}
+                  strokeDasharray={`${(countdown / 300) * 283} 283`}
                   transform="rotate(-90 50 50)"
                 />
                 <defs>
@@ -655,7 +757,7 @@ export default function LeaguePage() {
                 <div className="w-full ml-3 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-lime-800 transition-all duration-100"
-                    style={{ width: `${(timer / 10) * 100}%` }}
+                    style={{ width: `${(timer / 30) * 100}%` }}
                   />
                 </div>
               </div>
@@ -714,70 +816,27 @@ export default function LeaguePage() {
                   {questions[currentQuestionIndex]?.choices.map((choice, index) => (
                     <motion.button
                       key={index}
-                      whileHover={!showResult ? { scale: 1.02 } : {}}
-                      whileTap={!showResult ? { scale: 0.98 } : {}}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => handleChoiceSelect(choice)}
                       className={`p-3 sm:p-4 rounded-lg border-2 text-left transition-all ${
-                        showResult && choice === questions[currentQuestionIndex]?.correct_answer
-                          ? 'border-green-500 bg-green-50'
-                          : showResult && selectedChoice === choice
-                            ? 'border-red-500 bg-red-50'
-                            : selectedChoice === choice
-                              ? 'border-lime-400 bg-lime-50'
-                              : 'border-gray-200 hover:border-lime-300 bg-white'
+                        selectedChoice && selectedChoice[currentQuestionIndex] === choice
+                          ? 'border-lime-400 bg-lime-50'
+                          : 'border-gray-200 hover:border-lime-300 bg-white'
                       }`}
-                      disabled={showResult}
+                      disabled={quizCompleted}
                     >
                       <div className="flex items-center">
                         <span className="font-medium text-sm sm:text-base">{choice}</span>
-                        {showResult && choice === questions[currentQuestionIndex]?.correct_answer && (
-                          <span className="ml-2 text-green-500">✓</span>
-                        )}
-                        {showResult && selectedChoice === choice &&
-                          selectedChoice !== questions[currentQuestionIndex]?.correct_answer && (
-                            <span className="ml-2 text-red-500">✗</span>
-                          )}
                       </div>
                     </motion.button>
                   ))}
                 </div>
 
                 <div className="flex flex-col space-y-3">
-                  {selectedChoice && !showResult && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowResult(true)}
-                      className="w-full py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-bold rounded-lg shadow-md transition-all"
-                    >
-                      Submit Answer
-                    </motion.button>
-                  )}
-
-                  {showResult && (
-                    <>
-                      {questions[currentQuestionIndex]?.explanation && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4"
-                        >
-                          <p className="text-lime-600 font-semibold mb-1">Explanation:</p>
-                          <p className="text-gray-600 text-sm sm:text-base">
-                            {questions[currentQuestionIndex]?.explanation}
-                          </p>
-                        </motion.div>
-                      )}
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleNextQuestion}
-                        className="w-full py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-bold rounded-lg shadow-md transition-all"
-                      >
-                        {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'View Results'}
-                      </motion.button>
-                    </>
-                  )}
+                  <div className="text-sm text-gray-600">
+                    <p>Answer the question while the timer counts down ({timer}s remaining).</p>
+                  </div>
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -937,15 +996,16 @@ export default function LeaguePage() {
               </table>
             </div>
             <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleRestartQuiz}
-                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
-              >
-                <RotateCcw size={16} className="mr-2" />
-                Try Again
-              </motion.button>
+              <Link href="/livecompetitions">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
+                >
+                  <RotateCcw size={16} className="mr-2" />
+                  View Competitions
+                </motion.button>
+              </Link>
               <Link href="/competitions">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
