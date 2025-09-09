@@ -15,7 +15,7 @@ export default function Signup() {
   const [dateOfBirth, setDateOfBirth] = useState<string>("");
   const [gender, setGender] = useState<string>("");
   const [acceptTerms, setAcceptTerms] = useState<boolean>(false);
-  const [emailOptIn, setEmailOptIn] = useState<boolean>(true);
+  const [emailOptIn, setEmailOptIn] = useState<boolean>(false); // Changed to false by default as per specification
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
   const [signupSuccess, setSignupSuccess] = useState(false);
@@ -163,6 +163,31 @@ export default function Signup() {
         ]);
 
       if (privacyError) throw privacyError;
+      
+      if (emailOptIn) {
+        console.log('Attempting to insert email consent for user:', userId, 'email:', email, 'optIn:', emailOptIn); // Debug log
+        const { data, error: emailConsentError } = await supabase
+          .from('email_consents')
+          .insert([
+            {
+              user_id: userId,
+              email: email,
+              consent_source: 'signup',
+              consent_date: currentDate,
+              unsubscribe_date: null,
+              status: 'active',
+              ip_address: userIP
+            }
+          ])
+
+        if (emailConsentError) {
+          console.error('Email consent insert failed:', emailConsentError);
+          toast.error(`Email consent failed: ${emailConsentError.message || 'Unknown error'}`); // User-visible error
+          throw emailConsentError;  
+        } 
+      } else {
+        console.log('Email opt-in not checked, skipping email_consents insert');
+      }
 
       console.log('User consents recorded successfully');
     } catch (error) {
@@ -288,6 +313,9 @@ useEffect(() => {
         updated_at: new Date().toISOString(),
       });
       if (profileError) console.error("Profile creation error:", profileError);
+
+      // Record consents after user insertion
+      await recordUserConsents(user.id);
 
       toast.success("Check your email for the confirmation link!", { id: toastId });
       
