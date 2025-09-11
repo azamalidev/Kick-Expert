@@ -172,42 +172,31 @@ export default function LeaguePage() {
       try {
         setLoading(true);
         
-        // Fetch questions for this competition from Supabase
-        // Note: `competition_questions` stores the question fields directly in this schema
-        const { data: compQuestions, error: cqError } = await supabase
-          .from('competition_questions')
-          .select('*')
-          .eq('competition_id', competitionId)
-          .order('created_at', { ascending: true });
+        // Request merged competition questions from our server endpoint.
+        // This prevents the browser from directly calling `competition_questions` (which may be blocked by RLS)
+        const resp = await fetch('/api/competition-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ competitionId }),
+        });
 
-        if (cqError) throw cqError;
+        const json = await resp.json();
+        const mergedQuestions = Array.isArray(json.questions) ? json.questions : [];
 
-        console.log('competition_questions fetched for', competitionId, 'count=', compQuestions?.length);
+        console.log('mergedQuestions fetched for', competitionId, 'count=', mergedQuestions.length);
 
-        if (!compQuestions || compQuestions.length === 0) {
-          // No questions configured for this competition
+        if (!mergedQuestions || mergedQuestions.length === 0) {
           setError('No questions are configured for this competition.');
           setLoading(false);
           return;
         }
 
-        // Map competition_questions rows to the expected Question shape
-        // keep the original source question id (question_id) when available so we can insert answers
-        setQuestions(compQuestions.map((q: any) => ({
-          id: q.id,
-          // sourceQuestionId is the reference to the canonical questions table when present
-          sourceQuestionId: q.question_id ?? q.id,
-          question_text: q.question_text,
-          category: q.category,
-          difficulty: q.difficulty,
-          choices: q.choices,
-          correct_answer: q.correct_answer,
-          explanation: q.explanation,
-        })));
+        // Use mergedQuestions as the quiz questions
+        setQuestions(mergedQuestions);
 
-        // Compute difficulty breakdown from the fetched questions
+        // Compute difficulty breakdown from the merged questions
         const difficulty_breakdown: { easy: number; medium: number; hard: number } = { easy: 0, medium: 0, hard: 0 };
-        compQuestions.forEach((q: any) => {
+        mergedQuestions.forEach((q: any) => {
           const d = (q.difficulty || '').toString().toLowerCase();
           if (d.includes('easy')) difficulty_breakdown.easy += 1;
           else if (d.includes('medium')) difficulty_breakdown.medium += 1;
@@ -241,7 +230,7 @@ export default function LeaguePage() {
           .insert({
             competition_id: competitionId,
             user_id: user.id,
-            questions_played: compQuestions.length,
+            questions_played: mergedQuestions.length,
             correct_answers: 0,
             score_percentage: 0,
             start_time: new Date().toISOString(),
