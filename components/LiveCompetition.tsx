@@ -27,9 +27,10 @@ interface Competition {
   id: string;
   name: string;
   start_time: string;
-  entry_fee: number;
+  credit_cost: number;
   status: string;
   created_at: string;
+  prize_pool: number;
 }
 
 interface CompetitionRegistration {
@@ -38,6 +39,7 @@ interface CompetitionRegistration {
   user_id: string;
   status: string;
   paid_amount: number;
+  payment_type: 'credits' | 'stripe' | 'paypal';
   created_at: string;
 }
 
@@ -47,15 +49,16 @@ interface CompetitionModalProps {
   competition: {
     id: string;
     name: string;
-    price: string;
+    credit_cost: number;
     difficulty: string;
     questions: number;
     minPlayers: number;
     prizes: string[];
-    priceId: string;
-    entry_fee: number;
     isRegistered?: boolean;
+    entry_fee?: number;
+    priceId?: string;
   };
+  onJoinCompetition?: (competitionId: string) => void;
   onProceedToPayment: (priceId: string, competitionId: string, method: 'stripe' | 'paypal') => void;
   startTime: Date;
 }
@@ -101,9 +104,9 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          competitionId: competition.id, 
           userId: user.id,
-          entryFee: competition.entry_fee
+          amount: competition.entry_fee,
+          credits: competition.credit_cost
         }),
       });
 
@@ -423,9 +426,17 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
   };
 
   const handlePaymentMethodSelect = (method: 'stripe' | 'paypal') => {
-    onProceedToPayment(competition.priceId, competition.id, method);
+    if (competition.priceId) {
+      onProceedToPayment(competition.priceId, competition.id, method);
+    } else {
+      toast.error('Payment option is not available for this competition.');
+    }
     setShowPaymentMethods(false);
   };
+
+  function onJoinCompetition(id: string): void {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <>
@@ -475,8 +486,8 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
 
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Entry Fee:</span>
-                    <span className="font-semibold">{competition.price}</span>
+                    <span className="text-gray-600">Entry Cost:</span>
+                    <span className="font-semibold">{competition.credit_cost} Credits</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Difficulty:</span>
@@ -528,10 +539,10 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   </button>
                 ) : (
                   <button
-                    onClick={handleProceedToPayment}
+                    onClick={() => onJoinCompetition(competition.id)}
                     className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
                   >
-                    <span>Proceed to Payment</span>
+                    <span>Join Competition ({competition.credit_cost} Credits)</span>
                     <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
@@ -548,7 +559,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
         onClose={() => setShowPaymentMethods(false)}
         onSelectMethod={handlePaymentMethodSelect}
         competitionName={competition.name}
-        entryFee={competition.entry_fee}
+        entryFee={competition.entry_fee ?? 0}
       />
     </>
   );
@@ -704,53 +715,65 @@ const LiveCompetition = () => {
       return;
     }
 
-    // Check if user is already registered for this competition
-    const registration = registrations.find(reg => 
-      reg.competition_id === competition.id && reg.status === 'confirmed'
-    );
+    try {
+      // Fetch user's credit balance
+      const response = await fetch('/api/credits');
+      const creditBalance = await response.json();
 
-    if (registration) {
-      // Show modal instead of toast
-      setAlreadyRegisteredData({
-        competitionName: competition.name,
-        paidAmount: registration.paid_amount
-  ,
-  startTime: competition.startTime || null
-      });
-      setAlreadyRegisteredModalOpen(true);
-      return;
-    }
+      if (!creditBalance) {
+        toast.error('Unable to verify credit balance');
+        return;
+      }
 
-    // Check if user has a pending registration
-    const pendingRegistration = registrations.find(reg => 
-      reg.competition_id === competition.id && reg.status === 'pending'
-    );
+      // Calculate total available credits
+      const totalCredits = (creditBalance.purchased_credits || 0) + 
+                         (creditBalance.winnings_credits || 0) + 
+                         (creditBalance.referral_credits || 0);
 
-    if (pendingRegistration) {
-      // Allow to proceed with payment if status is pending
+      // Check if user has enough credits
+      if (totalCredits < competition.credit_cost) {
+        toast.error(`Insufficient credits. You need ${competition.credit_cost} credits to join.`);
+        router.push('/credits/manage');
+        return;
+      }
+
+      // Check if user is already registered for this competition
+      const registration = registrations.find(reg => 
+        reg.competition_id === competition.id && reg.status === 'confirmed'
+      );
+
+      if (registration) {
+        setAlreadyRegisteredData({
+          competitionName: competition.name,
+          paidAmount: registration.paid_amount,
+          startTime: competition.startTime || null
+        });
+        setAlreadyRegisteredModalOpen(true);
+        return;
+      }
+
+      // User has enough credits and is not registered, show competition modal
       setSelectedCompetition(competition);
       setModalOpen(true);
-      return;
-    }
 
-    // User is not registered, allow registration
-    setSelectedCompetition(competition);
-    setModalOpen(true);
+    } catch (error) {
+      console.error('Error checking credit balance:', error);
+      toast.error('Unable to verify credit balance');
+    }
   };
 
-  const handlePayment = async (priceId: string, competitionId: string, method: 'stripe' | 'paypal') => {
+  const handleCompetitionEntry = async (competitionId: string) => {
     if (!user) {
       toast.error('User not authenticated');
       return;
     }
 
-    // Double-check registration status before proceeding to payment
+    // Double-check registration status before proceeding
     const registration = registrations.find(reg => 
       reg.competition_id === competitionId && reg.status === 'confirmed'
     );
 
     if (registration) {
-      // Show modal instead of toast
       setAlreadyRegisteredData({
         competitionName: selectedCompetition.name,
         paidAmount: registration.paid_amount,
@@ -762,20 +785,40 @@ const LiveCompetition = () => {
     }
 
     try {
-      // create a pending registration to reserve spot
-      await fetch('/api/register-competition', {
+      const response = await fetch('/api/competition-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, competitionId, status: 'pending', paid_amount: 0 }),
+        body: JSON.stringify({ 
+          competitionId,
+          credits: selectedCompetition.credit_cost
+        }),
       });
-    } catch (err) {
-      console.error('Failed to create pending registration', err);
-    }
 
-    if (method === 'stripe') {
-      await handleStripeRegister(priceId, competitionId);
-    } else {
-      setPaypalModalOpen(true);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to join competition');
+      }
+
+      toast.success('Successfully joined competition!');
+      setModalOpen(false);
+      
+      // Refresh registrations
+      const { data: regs } = await supabase
+        .from('competition_registrations')
+        .select('*')
+        .eq('user_id', user.id);
+        
+      if (regs) setRegistrations(regs);
+
+    } catch (error: any) {
+      console.error('Error joining competition:', error);
+      if (error.message.includes('Insufficient credits')) {
+        toast.error('Insufficient credits. Please purchase more credits to join.');
+        router.push('/credits/manage');
+      } else {
+        toast.error(error.message || 'Failed to join competition');
+      }
     }
   };
 
@@ -857,6 +900,20 @@ const LiveCompetition = () => {
     }
   };
 
+  // Helper function to get credit cost based on competition name
+  const getCreditCost = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return 10;
+      case 'Pro League':
+        return 20;
+      case 'Elite League':
+        return 30;
+      default:
+        return 10;
+    }
+  };
+
   // Helper function to get difficulty based on competition name
   const getDifficulty = (name: string) => {
     switch (name) {
@@ -924,16 +981,18 @@ const LiveCompetition = () => {
   const competitionData = competitions.map((comp, index) => ({
     id: comp.id,
     name: comp.name,
-    price: `$${comp.entry_fee}.00`,
+    credit_cost: getCreditCost(comp.name),
     difficulty: getDifficulty(comp.name),
     questions: getQuestionsCount(comp.name),
     minPlayers: getMinPlayers(comp.name),
-    prizes: getPrizes(comp.name, comp.entry_fee),
-    priceId: getPriceId(comp.name),
+    prizes: [
+      `1st: ${Math.floor(comp.prize_pool * 0.5)} Credits`,
+      `2nd: ${Math.floor(comp.prize_pool * 0.3)} Credits`,
+      `3rd: ${Math.floor(comp.prize_pool * 0.2)} Credits`
+    ],
     status: 'Min reached', // You can calculate this based on registrations if needed
     startTime: new Date(comp.start_time),
     endTime: comp.end_time ? new Date(comp.end_time) : null,
-    entry_fee: comp.entry_fee,
     isRegistered: isUserRegistered(comp.id)
   }));
 
@@ -951,6 +1010,14 @@ const LiveCompetition = () => {
     return new Date().getTime() >= comp.startTime.getTime();
   };
 
+  function handlePayment(priceId: string, competitionId: string, method: 'stripe' | 'paypal'): void {
+    if (method === 'stripe') {
+      handleStripeRegister(priceId, competitionId);
+    } else if (method === 'paypal') {
+      setModalOpen(false);
+      setPaypalModalOpen(true);
+    }
+  }
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
       <Toaster
@@ -1023,8 +1090,8 @@ const LiveCompetition = () => {
 
               <div className="mt-4 space-y-2 text-sm font-semibold">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Entry Fee:</span>
-                  <span className="font-bold">{comp.price}</span>
+                  <span className="text-gray-600">Entry Cost:</span>
+                  <span className="font-bold text-blue-600">{comp.credit_cost} Credits</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Questions:</span>
@@ -1139,7 +1206,7 @@ const LiveCompetition = () => {
                       className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
                       style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
                     >
-                      {isLoggedIn ? 'Register & Pay' : 'Sign Up to Join'}
+                      {isLoggedIn ? `Join for ${comp.credit_cost} Credits` : 'Sign Up to Join'}
                     </button>
                   )
                 )}
