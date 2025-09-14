@@ -519,7 +519,15 @@ export default function Profile() {
           // upsert the credits value into profiles
           const { error: upsertErr } = await supabase
             .from('profiles')
-            .upsert({ user_id: user.id, credits: newCredits, updated_at: new Date().toISOString() });
+            .upsert(
+              {
+                user_id: user.id,
+                credits: newCredits,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id' } // ✅ ensures Postgres knows which unique key to check
+            );
+
           if (upsertErr) throw upsertErr;
 
           setCredits(newCredits);
@@ -561,7 +569,8 @@ export default function Profile() {
       const filePath = `avatars/${fileName}`;
       const { error: uploadError } = await supabase.storage
         .from('profileimages')
-        .upload(filePath, avatarFile);
+        .upload(filePath, avatarFile, { upsert: true });
+
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage
         .from('profileimages')
@@ -595,9 +604,19 @@ export default function Profile() {
     }
     try {
       const { error: userError } = await supabase
-        .from('users')
-        .update({ name: newName.trim() })
-        .eq('id', user.id);
+        .from("users")
+        .upsert(
+          {
+            id: user.id, // required because it's PK + FK to auth.users
+            email: user.email,
+            name: newName.trim(),
+            // age, // Removed because 'age' is not defined
+            accepted_terms: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+
       if (userError) throw userError;
       const { error: profileError } = await supabase
         .from('profiles')
@@ -1078,7 +1097,7 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg">
+                    {/* <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-indigo-700">Credits</p>
@@ -1101,7 +1120,7 @@ export default function Profile() {
                           </svg>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                   {/* Rank Display */}
                   <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
@@ -1528,7 +1547,7 @@ export default function Profile() {
                             <p className="text-sm"><span className="font-medium text-gray-700">Reward Type:</span> {reward.reward_type}</p>
                             <p className="text-sm"><span className="font-medium text-gray-700">Value:</span> {reward.credit_value ?? '-'}</p>
                           </div>
-                       
+
                         </li>
                       ))}
                     </ul>

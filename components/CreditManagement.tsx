@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
-import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins } from 'lucide-react';
+import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles } from 'lucide-react';
 
 interface CreditBalance {
   purchased_credits: number;
@@ -100,19 +100,19 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-200"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white relative">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-5 text-white relative">
               <h2 className="text-xl font-bold text-center">Pay with PayPal</h2>
               <button
                 onClick={onClose}
-                className="absolute top-3 right-3 text-white hover:text-blue-200 transition-colors"
+                className="absolute top-4 right-4 text-white hover:text-blue-200 transition-colors"
                 disabled={isProcessing}
               >
                 <X size={20} />
@@ -123,7 +123,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{credits} Credits</span></p>
-                <p className="text-2xl font-bold text-blue-600">${amount}</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">${amount}</p>
               </div>
 
               {isProcessing ? (
@@ -142,7 +142,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
                   <div className="flex space-x-4">
                     <button
                       onClick={onClose}
-                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded-lg transition-colors"
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
@@ -181,14 +181,14 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative">
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
               <h2 className="text-xl font-bold text-center">Select Payment Method</h2>
               <button
                 onClick={onClose}
-                className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
+                className="absolute top-4 right-4 text-white hover:text-lime-200 transition-colors"
               >
                 <X size={20} />
               </button>
@@ -198,7 +198,7 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{packageName}</span></p>
-                <p className="text-2xl font-bold text-lime-600">${amount}</p>
+                <p className="text-2xl font-bold text-lime-600 mt-1">${amount}</p>
               </div>
 
               <div className="space-y-4">
@@ -206,7 +206,7 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => onSelectMethod('stripe')}
-                  className="w-full flex items-center justify-between p-4 border border-gray-300 rounded-lg hover:border-lime-500 hover:bg-lime-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-lime-400 hover:bg-lime-50 transition-all duration-200 shadow-sm"
                 >
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
@@ -224,11 +224,11 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => onSelectMethod('paypal')}
-                  className="w-full flex items-center justify-between p-4 border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 shadow-sm"
                 >
                   <div className="flex items-center">
-                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white">
                         <path d="M7.2 18c-.3 0-.6-.1-.8-.4L3 14.5c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l2.9 2.9L18.7 5.3c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1L8 17.6c-.2.2-.5.4-.8.4z"/>
                       </svg>
                     </div>
@@ -243,10 +243,10 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-300">
+            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
               <button
                 onClick={onClose}
-                className="w-full text-gray-600 hover:text-gray-800 font-semibold py-2 rounded-lg transition-colors"
+                className="w-full text-gray-600 hover:text-gray-800 font-medium py-2 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -270,49 +270,48 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
     price: number;
     description: string;
   } | null>(null);
-  
+  const [customAmount, setCustomAmount] = useState<number | ''>('');
+
+  // Preset packages — 1 credit = $1 (platform does not mark up fees)
   const creditPackages = [
-    { id: 'starter', credits: 50, price: 50, popular: false, description: 'Perfect for beginners' },
-    { id: 'popular', credits: 100, price: 100, popular: true, description: 'Most popular choice' },
-    { id: 'premium', credits: 200, price: 200, popular: false, description: 'Best value for pros' },
+    { id: 'starter', credits: 10, price: 10, popular: false, description: 'Small starter pack' },
+    { id: 'popular', credits: 20, price: 20, popular: true, description: 'Most popular choice' },
+    { id: 'premium', credits: 50, price: 50, popular: false, description: 'Best value pack' },
   ];
 
   return (
     <>
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto scrollbar-hide"
+              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto scrollbar-hide"
             >
               {/* Header Section */}
               <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-6 text-white relative">
                 <button
                   onClick={onClose}
-                  className="absolute right-4 top-4 text-white hover:text-lime-200 transition-colors"
+                  className="absolute right-5 top-5 text-white hover:text-lime-200 transition-colors"
                 >
                   <X size={24} />
                 </button>
                 <h2 className="text-2xl font-bold mb-2">Buy Credits</h2>
-                <p className="text-lime-50">
-                  Select a credit package to get started - 1 Credit = $1
-                </p>
+                <p className="text-lime-100">Select a credit package to get started - 1 Credit = $1</p>
               </div>
 
               {/* Body Section */}
               <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   {creditPackages.map((pkg) => (
                     <motion.div
                       key={pkg.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      whileHover={{ y: -5 }}
                       className={`relative bg-white rounded-xl border-2 ${
-                        pkg.popular ? 'border-lime-500' : 'border-gray-200'
-                      } p-6 shadow-lg cursor-pointer transition-all duration-200 hover:border-lime-500`}
+                        pkg.popular ? 'border-lime-500 shadow-lg' : 'border-gray-200'
+                      } p-6 cursor-pointer transition-all duration-200 hover:shadow-md group`}
                       onClick={() => {
                         setSelectedPackage(pkg);
                         setShowPaymentMethods(true);
@@ -320,27 +319,25 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                     >
                       {pkg.popular && (
                         <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                          <span className="bg-lime-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">
-                            MOST POPULAR
-                          </span>
+                          <span className="bg-lime-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">MOST POPULAR</span>
                         </div>
                       )}
 
                       <div className="flex flex-col items-center text-center">
-                        <div className="text-5xl font-bold text-lime-600 mb-2">
-                          {pkg.credits}
-                        </div>
+                        <div className="text-4xl font-bold text-lime-600 mb-2">{pkg.credits}</div>
                         <div className="text-gray-600 font-medium mb-2">Credits</div>
                         <div className="text-sm text-gray-500 mb-4">{pkg.description}</div>
-                        <div className="text-3xl font-bold text-gray-900 mb-4">
-                          ${pkg.price}
-                        </div>
+                        <div className="text-2xl font-bold text-gray-900 mb-4">${pkg.price}</div>
                         <button
-                          className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
-                            pkg.popular
-                              ? 'bg-lime-500 text-white hover:bg-lime-600'
+                          onClick={() => {
+                            setSelectedPackage(pkg);
+                            setShowPaymentMethods(true);
+                          }}
+                          className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors ${
+                            pkg.popular 
+                              ? 'bg-lime-500 text-white hover:bg-lime-600' 
                               : 'bg-lime-100 text-lime-700 hover:bg-lime-200'
-                          }`}
+                          } group-hover:shadow-md`}
                         >
                           Purchase Now
                         </button>
@@ -349,28 +346,65 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                   ))}
                 </div>
 
+                {/* Custom amount */}
+                <div className="mb-8">
+                  <label className="block text-sm font-semibold mb-2 text-gray-600">Or enter a custom amount</label>
+                  <div className="flex space-x-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-3 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={customAmount}
+                        onChange={(e) => setCustomAmount(e.target.value === '' ? '' : Math.max(1, Math.floor(Number(e.target.value))))}
+                        placeholder="Amount in USD"
+                        className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 outline-none"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!customAmount || Number(customAmount) < 1) {
+                          toast.error('Enter an amount of at least $1');
+                          return;
+                        }
+                        const pkg = { id: 'custom', credits: Number(customAmount), price: Number(customAmount), description: 'Custom amount' };
+                        setSelectedPackage(pkg as any);
+                        setShowPaymentMethods(true);
+                      }}
+                      className="px-4 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors flex items-center"
+                    >
+                      <Plus size={16} className="mr-1" />
+                      Buy
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Displayed price is the face value. Payment processor fees apply and are handled by Stripe/PayPal — the platform does not mark them up or absorb them.</p>
+                </div>
+
                 {/* Info Section */}
-                <div className="mt-8 bg-lime-50 rounded-lg p-6 border border-lime-200">
-                  <h3 className="font-semibold text-lime-800 mb-3">Important Information</h3>
+                <div className="bg-lime-50 rounded-xl p-5 border border-lime-200">
+                  <h3 className="font-semibold text-lime-800 mb-3 flex items-center">
+                    <Sparkles size={16} className="mr-2" />
+                    Important Information
+                  </h3>
                   <ul className="text-sm text-lime-700 space-y-2">
-                    <li className="flex items-center">
-                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2"></span>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
                       Each credit is worth $1 USD
                     </li>
-                    <li className="flex items-center">
-                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2"></span>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
                       Credits never expire and can be used anytime
                     </li>
-                    <li className="flex items-center">
-                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2"></span>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
                       Purchased credits can be refunded to original payment method
                     </li>
-                    <li className="flex items-center">
-                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2"></span>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
                       All prices include payment processing fees
                     </li>
-                    <li className="flex items-center">
-                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2"></span>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
                       Credits are non-transferable between accounts
                     </li>
                   </ul>
@@ -490,6 +524,11 @@ const CreditManagement: React.FC = () => {
     }
   };
 
+  // Calculate total credits
+  const totalCredits = (balance?.purchased_credits || 0) + 
+                      (balance?.winnings_credits || 0) + 
+                      (balance?.referral_credits || 0);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -499,22 +538,41 @@ const CreditManagement: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-10">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Credit Balance</h1>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-24">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Credit Balance</h1>
+          <p className="text-gray-600 mt-1">Manage your credits and purchase more</p>
+        </div>
         <button
           onClick={() => setBuyModalOpen(true)}
-          className="bg-lime-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-lime-700 transition-colors flex items-center"
+          className="bg-lime-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-lime-700 transition-colors flex items-center shadow-md hover:shadow-lg"
         >
           <CreditCard className="mr-2" size={20} />
           Buy Credits
         </button>
       </div>
 
+      {/* Total Credits Summary */}
+      <div className="bg-gradient-to-r from-lime-500 to-lime-600 rounded-2xl p-6 text-white shadow-lg mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-lime-100">Total Credits</p>
+            <h2 className="text-4xl font-bold mt-1">{totalCredits}</h2>
+            <p className="text-lime-100 text-sm mt-2">Available across all credit types</p>
+          </div>
+          <div className="bg-lime-400 bg-opacity-30 p-4 rounded-xl">
+            <Zap size={32} className="text-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* Credit Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-green-100 rounded-lg">
+            <div className="p-3 bg-green-100 rounded-xl">
               <DollarSign className="h-6 w-6 text-green-600" />
             </div>
             <button
@@ -532,9 +590,9 @@ const CreditManagement: React.FC = () => {
           <p className="text-sm text-gray-500 mt-2">Refundable to payment method</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-lime-100 rounded-lg">
+            <div className="p-3 bg-lime-100 rounded-xl">
               <Coins className="h-6 w-6 text-lime-600" />
             </div>
           </div>
@@ -545,9 +603,9 @@ const CreditManagement: React.FC = () => {
           <p className="text-sm text-gray-500 mt-2">Withdrawable to your account</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-lime-100 rounded-lg">
+            <div className="p-3 bg-lime-100 rounded-xl">
               <Gift className="h-6 w-6 text-lime-600" />
             </div>
           </div>
@@ -559,46 +617,64 @@ const CreditManagement: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Credit System Guide</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-2">Using Your Credits</h3>
-            <ul className="space-y-2 text-gray-600">
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Enter competitions using any type of credits
-              </li>
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Credits are deducted in order: Referral → Purchased → Winnings
-              </li>
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Win competitions to earn more credits
-              </li>
-            </ul>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-2">Credit Types</h3>
-            <ul className="space-y-2 text-gray-600">
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Purchased Credits: Refundable to original payment method
-              </li>
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Winnings Credits: Can be withdrawn to your account
-              </li>
-              <li className="flex items-start">
-                <span className="text-lime-500 mr-2">•</span>
-                Referral Credits: Use for competition entry only
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      {/* Credit System Guide */}
+    <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 border border-gray-200 transition hover:shadow-xl">
+  {/* Header */}
+  <h2 className="text-2xl font-extrabold text-gray-900 mb-6 flex items-center">
+    <Sparkles className="mr-3 text-lime-600 animate-pulse" size={22} />
+    Credit System Guide
+  </h2>
+
+  {/* Grid */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    
+    {/* Using Credits */}
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
+      <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
+        <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
+        Using Your Credits
+      </h3>
+      <ul className="space-y-4 text-gray-700">
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">✅</span>
+          Enter competitions using any type of credits
+        </li>
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">✅</span>
+          Credits are deducted in order: Referral → Winnings → Purchased
+        </li>
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">✅</span>
+          Win competitions to earn more credits
+        </li>
+      </ul>
+    </div>
+
+    {/* Credit Types */}
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
+      <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
+        <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
+        Credit Types
+      </h3>
+      <ul className="space-y-4 text-gray-700">
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">💳</span>
+          <span><strong>Purchased Credits:</strong> Refundable to original payment method</span>
+        </li>
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">🏆</span>
+          <span><strong>Winnings Credits:</strong> Can be withdrawn to your account</span>
+        </li>
+        <li className="flex items-start">
+          <span className="text-lime-600 mr-3">🎁</span>
+          <span><strong>Referral Credits:</strong> Use for competition entry only</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
 
       <BuyCreditModal
         isOpen={isBuyModalOpen}

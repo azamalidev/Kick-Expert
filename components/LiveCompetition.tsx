@@ -22,6 +22,22 @@ declare global {
   }
 }
 
+interface PayPalPaymentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  competition: {
+    id: string;
+    name: string;
+    entry_fee: number;
+    credit_cost: number;
+  };
+  user: {
+    id: string;
+    [key: string]: any;
+  };
+  onPaymentSuccess: () => void;
+}
+
 interface Competition {
   end_time: string | number | Date;
   id: string;
@@ -55,28 +71,10 @@ interface CompetitionModalProps {
     minPlayers: number;
     prizes: string[];
     isRegistered?: boolean;
-    entry_fee?: number;
-    priceId?: string;
   };
-  onJoinCompetition?: (competitionId: string) => void;
-  onProceedToPayment: (priceId: string, competitionId: string, method: 'stripe' | 'paypal') => void;
+  onJoinCompetition: (competitionId: string) => void;
   startTime: Date;
-}
-
-interface PaymentMethodModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectMethod: (method: 'stripe' | 'paypal') => void;
-  competitionName: string;
-  entryFee: number;
-}
-
-interface PayPalPaymentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  competition: any;
-  user: any;
-  onPaymentSuccess: () => void;
+  isRegistering?: boolean;
 }
 
 interface AlreadyRegisteredModalProps {
@@ -198,6 +196,14 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
     </AnimatePresence>
   );
 };
+
+interface PaymentMethodModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectMethod: (method: 'stripe' | 'paypal') => void;
+  competitionName: string;
+  entryFee: number;
+}
 
 const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   isOpen,
@@ -374,8 +380,9 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
   isOpen,
   onClose,
   competition,
-  onProceedToPayment,
+  onJoinCompetition,
   startTime
+  , isRegistering = false
 }) => {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -383,13 +390,9 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
     minutes: number;
     seconds: number;
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) {
-      setShowPaymentMethods(false);
-      return;
-    }
+    if (!isOpen) return;
 
     const calculateTimeLeft = () => {
       const now = new Date();
@@ -421,147 +424,130 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
     );
   };
 
-  const handleProceedToPayment = () => {
-    setShowPaymentMethods(true);
-  };
-
-  const handlePaymentMethodSelect = (method: 'stripe' | 'paypal') => {
-    if (competition.priceId) {
-      onProceedToPayment(competition.priceId, competition.id, method);
-    } else {
-      toast.error('Payment option is not available for this competition.');
-    }
-    setShowPaymentMethods(false);
-  };
-
-  function onJoinCompetition(id: string): void {
-    throw new Error('Function not implemented.');
-  }
-
   return (
-    <>
-      <AnimatePresence>
-        {isOpen && !showPaymentMethods && (
-          <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh] "
-            >
-              {/* Header */}
-              <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative flex-shrink-0">
-                <h2 className="text-xl font-bold text-center">Join {competition.name}</h2>
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 text-white relative flex-shrink-0">
+              <h2 className="text-xl font-bold text-center">Join {competition.name}</h2>
+              <button
+                onClick={onClose}
+                className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-6 overflow-y-auto scrollbar-hide flex-1">
+              <div className="flex items-center justify-center mb-4">
+                <Calendar className="text-lime-600 mr-2" size={18} />
+                <span className="font-semibold">
+                  {startTime.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </span>
+              </div>
+
+              <div className="bg-lime-50 rounded-lg p-4 mb-4">
+                <h3 className="font-semibold text-lime-800 mb-2">Countdown to Start</h3>
+                <div className="flex justify-center space-x-2">
+                  {formatTimeUnit(timeLeft.days, 'Days')}
+                  {formatTimeUnit(timeLeft.hours, 'Hours')}
+                  {formatTimeUnit(timeLeft.minutes, 'Mins')}
+                  {formatTimeUnit(timeLeft.seconds, 'Secs')}
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Entry Cost:</span>
+                  <span className="font-semibold">{competition.credit_cost} Credits</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Difficulty:</span>
+                  <span className="font-semibold text-lime-600">{competition.difficulty}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Questions:</span>
+                  <span className="font-semibold">{competition.questions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Min Players:</span>
+                  <span className="font-semibold">{competition.minPlayers}</span>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                  <Award size={16} className="mr-1" /> Prize Pool
+                </h4>
+                <ul className="text-sm text-yellow-700">
+                  {competition.prizes.map((prize, index) => (
+                    <li key={index} className="flex items-center">
+                      <Trophy size={14} className="mr-2 text-yellow-600" />
+                      {prize}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <h4 className="font-semibold text-blue-800 mb-1">Rules</h4>
+                <ul className="text-sm text-blue-700TREE space-y-1">
+                  <li>• 30 seconds per question</li>
+                  <li>• No external help allowed</li>
+                  <li>• One attempt per player</li>
+                  <li>• Prizes distributed to top 3</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer - Sticky Payment Button */}
+            <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
+              {competition.isRegistered ? (
                 <button
-                  onClick={onClose}
-                  className="absolute top-3 right-3 text-white hover:text-lime-200 transition-colors"
+                  className="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg cursor-not-allowed"
+                  disabled
                 >
-                  <X size={20} />
+                  Already Registered
                 </button>
-              </div>
-
-              {/* Scrollable Content */}
-              <div className="p-6 overflow-y-auto scrollbar-hide flex-1">
-                <div className="flex items-center justify-center mb-4">
-                  <Calendar className="text-lime-600 mr-2" size={18} />
-                  <span className="font-semibold">
-                    {startTime.toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </span>
-                </div>
-
-                <div className="bg-lime-50 rounded-lg p-4 mb-4">
-                  <h3 className="font-semibold text-lime-800 mb-2">Countdown to Start</h3>
-                  <div className="flex justify-center space-x-2">
-                    {formatTimeUnit(timeLeft.days, 'Days')}
-                    {formatTimeUnit(timeLeft.hours, 'Hours')}
-                    {formatTimeUnit(timeLeft.minutes, 'Mins')}
-                    {formatTimeUnit(timeLeft.seconds, 'Secs')}
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Entry Cost:</span>
-                    <span className="font-semibold">{competition.credit_cost} Credits</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Difficulty:</span>
-                    <span className="font-semibold text-lime-600">{competition.difficulty}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Questions:</span>
-                    <span className="font-semibold">{competition.questions}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Min Players:</span>
-                    <span className="font-semibold">{competition.minPlayers}</span>
-                  </div>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                  <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
-                    <Award size={16} className="mr-1" /> Prize Pool
-                  </h4>
-                  <ul className="text-sm text-yellow-700">
-                    {competition.prizes.map((prize, index) => (
-                      <li key={index} className="flex items-center">
-                        <Trophy size={14} className="mr-2 text-yellow-600" />
-                        {prize}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                  <h4 className="font-semibold text-blue-800 mb-1">Rules</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• 30 seconds per question</li>
-                    <li>• No external help allowed</li>
-                    <li>• One attempt per player</li>
-                    <li>• Prizes distributed to top 3</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Footer - Sticky Payment Button */}
-              <div className="p-4 border-t border-gray-300 bg-white flex-shrink-0">
-                {competition.isRegistered ? (
-                  <button
-                    className="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg cursor-not-allowed"
-                    disabled
-                  >
-                    Already Registered
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onJoinCompetition(competition.id)}
-                    className="w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
-                  >
-                    <span>Join Competition ({competition.credit_cost} Credits)</span>
-                    <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <PaymentMethodModal
-        isOpen={showPaymentMethods}
-        onClose={() => setShowPaymentMethods(false)}
-        onSelectMethod={handlePaymentMethodSelect}
-        competitionName={competition.name}
-        entryFee={competition.entry_fee ?? 0}
-      />
-    </>
+              ) : (
+                <button
+                  onClick={() => onJoinCompetition(competition.id)}
+                  disabled={isRegistering}
+                  className={`w-full bg-lime-500 hover:bg-lime-600 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center ${isRegistering ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {isRegistering ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      <span>Joining...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Join Competition ({competition.credit_cost} Credits)</span>
+                      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -574,6 +560,7 @@ const LiveCompetition = () => {
   const [paypalModalOpen, setPaypalModalOpen] = useState(false);
   const [alreadyRegisteredModalOpen, setAlreadyRegisteredModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<any>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [registrations, setRegistrations] = useState<CompetitionRegistration[]>([]);
   const [alreadyRegisteredData, setAlreadyRegisteredData] = useState<{
@@ -582,10 +569,7 @@ const LiveCompetition = () => {
     startTime: Date | null;
   }>({ competitionName: '', paidAmount: 0, startTime: null });
 
-  // Stripe price IDs from .env.local
-  const STARTER_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_STARTER_PRICE_ID || "price_1RybzcRkV53d3IKfXrOebfrd";
-  const PRO_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_PRO_PRICE_ID || "price_1RybzdRkV53d3IKfGO5XLYZi";
-  const ELITE_LEAGUE_PRICE_ID = process.env.NEXT_PUBLIC_ELITE_PRICE_ID || "price_1RybzeRkV53d3IKf4w0ccE7j";
+  // Competition configuration
 
   useEffect(() => {
     const checkUser = async () => {
@@ -709,121 +693,154 @@ const LiveCompetition = () => {
   }, [user]);
 
   const handleOpenModal = async (competition: any) => {
+    // Ensure user is logged in before showing modal
     if (!isLoggedIn || !user) {
       toast.error('Please sign up or log in to join the competition.');
       router.push(`/signup?competition=${competition.name.toLowerCase().replace(' ', '-')}`);
       return;
     }
 
-    try {
-      // Fetch user's credit balance
-      const response = await fetch('/api/credits');
-      const creditBalance = await response.json();
+    // Set the selected competition and open the modal. Registration will occur when
+    // the user clicks the "Join Competition" button inside the modal.
+    setSelectedCompetition(competition);
+    setModalOpen(true);
+  };
 
-      if (!creditBalance) {
-        toast.error('Unable to verify credit balance');
+const handleCompetitionEntry = async (competitionId: string) => {
+  if (!user) {
+    toast.error('Please sign up or log in to join the competition.');
+    router.push(`/signup?competition=${competitionId}`);
+    return;
+  }
+
+  const competition = competitions.find(c => c.id === competitionId);
+  if (!competition) {
+    toast.error('Competition not found');
+    return;
+  }
+
+  // Determine the correct credit cost to charge. `selectedCompetition` (set when
+  // opening the modal) carries the display `credit_cost`. The DB row in
+  // `competitions` may not include that computed field, so prefer the selected
+  // competition's value when available.
+  const creditCost = selectedCompetition && selectedCompetition.id === competitionId
+    ? selectedCompetition.credit_cost
+    : getCreditCost(competition.name);
+
+  // Prevent registration if it's already closed (competition here is raw DB row with start_time)
+  if (isRegistrationClosed({ startTime: new Date(competition.start_time) })) {
+    toast.error('Registration is closed for this competition');
+    return;
+  }
+
+  // Check if already registered
+  const registration = registrations.find(reg => 
+    reg.competition_id === competitionId && reg.status === 'confirmed'
+  );
+
+  if (registration) {
+    setAlreadyRegisteredData({
+      competitionName: competition.name,
+      paidAmount: registration.paid_amount,
+      startTime: new Date(competition.start_time)
+    });
+    setModalOpen(false);
+    setAlreadyRegisteredModalOpen(true);
+    return;
+  }
+
+  try {
+    console.log('Attempting to register for competition:', competitionId);
+    setIsRegistering(true);
+    // Optional quick client-side check (helps give immediate feedback)
+    const { data: userCredits, error: creditError } = await supabase
+      .from('user_credits')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (creditError || !userCredits) {
+      // proceed to server which will perform authoritative checks
+    } else {
+      const totalCredits = (userCredits.referral_credits || 0) +
+                           (userCredits.winnings_credits || 0) +
+                           (userCredits.purchased_credits || 0);
+      if (totalCredits < creditCost) {
+        toast.error(`Insufficient credits. You need ${creditCost} credits to join.`);
         return;
       }
+    }
 
-      // Calculate total available credits
-      const totalCredits = (creditBalance.purchased_credits || 0) + 
-                         (creditBalance.winnings_credits || 0) + 
-                         (creditBalance.referral_credits || 0);
+    // Call server to register and perform credit deduction there
+    const payload = {
+      userId: user.id,
+      competitionId,
+      status: 'confirmed',
+      paid_amount: creditCost,
+      payment_method: 'none',
+      payment_type: 'credits'
+    };
 
-      // Check if user has enough credits
-      if (totalCredits < competition.credit_cost) {
+    console.log('Registering competition with payload:', payload);
+
+    const response = await fetch('/api/register-competition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      if (data.error === 'Insufficient credits') {
         toast.error(`Insufficient credits. You need ${competition.credit_cost} credits to join.`);
-        router.push('/credits/manage');
         return;
       }
-
-      // Check if user is already registered for this competition
-      const registration = registrations.find(reg => 
-        reg.competition_id === competition.id && reg.status === 'confirmed'
-      );
-
-      if (registration) {
-        setAlreadyRegisteredData({
-          competitionName: competition.name,
-          paidAmount: registration.paid_amount,
-          startTime: competition.startTime || null
-        });
-        setAlreadyRegisteredModalOpen(true);
-        return;
-      }
-
-      // User has enough credits and is not registered, show competition modal
-      setSelectedCompetition(competition);
-      setModalOpen(true);
-
-    } catch (error) {
-      console.error('Error checking credit balance:', error);
-      toast.error('Unable to verify credit balance');
-    }
-  };
-
-  const handleCompetitionEntry = async (competitionId: string) => {
-    if (!user) {
-      toast.error('User not authenticated');
-      return;
+      throw new Error(data.error || 'Failed to join competition');
     }
 
-    // Double-check registration status before proceeding
-    const registration = registrations.find(reg => 
-      reg.competition_id === competitionId && reg.status === 'confirmed'
-    );
-
-    if (registration) {
-      setAlreadyRegisteredData({
-        competitionName: selectedCompetition.name,
-        paidAmount: registration.paid_amount,
-        startTime: selectedCompetition.startTime || null
-      });
-      setModalOpen(false);
-      setAlreadyRegisteredModalOpen(true);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/competition-entry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          competitionId,
-          credits: selectedCompetition.credit_cost
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to join competition');
-      }
-
+    // Use server-provided deduction breakdown when available
+    if (data.deductedFrom) {
+      let message = 'Successfully joined competition! Credits used: ';
+      const parts: string[] = [];
+      if (data.deductedFrom.referral > 0) parts.push(`${data.deductedFrom.referral} referral`);
+      if (data.deductedFrom.winnings > 0) parts.push(`${data.deductedFrom.winnings} winnings`);
+      if (data.deductedFrom.purchased > 0) parts.push(`${data.deductedFrom.purchased} purchased`);
+      message += parts.join(', ');
+      toast.success(message);
+    } else {
       toast.success('Successfully joined competition!');
-      setModalOpen(false);
-      
-      // Refresh registrations
-      const { data: regs } = await supabase
-        .from('competition_registrations')
-        .select('*')
-        .eq('user_id', user.id);
-        
-      if (regs) setRegistrations(regs);
-
-    } catch (error: any) {
-      console.error('Error joining competition:', error);
-      if (error.message.includes('Insufficient credits')) {
-        toast.error('Insufficient credits. Please purchase more credits to join.');
-        router.push('/credits/manage');
-      } else {
-        toast.error(error.message || 'Failed to join competition');
-      }
     }
-  };
+
+  setModalOpen(false);
+  setIsRegistering(false);
+
+    // Refresh registrations
+    const { data: regs } = await supabase
+      .from('competition_registrations')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (regs) setRegistrations(regs);
+
+  } catch (error: any) {
+    console.error('Error joining competition:', error);
+    if (error.message && error.message.includes('Registration closed')) {
+      toast.error('Registration is closed for this competition');
+    } else {
+      toast.error(error.message || 'Failed to join competition');
+    }
+    setIsRegistering(false);
+  }
+};
 
   const handleStripeRegister = async (priceId: string, competitionId: string) => {
     const toastId = toast.loading('Redirecting to payment...');
+
+    // Ensure user is defined before proceeding
+    if (!user) {
+      toast.error('Please sign up or log in to proceed with payment.', { id: toastId });
+      return;
+    }
     
     try {
       const res = await fetch('/api/checkout', {
@@ -886,17 +903,17 @@ const LiveCompetition = () => {
     );
   }
 
-  // Helper function to get price ID based on competition name
-  const getPriceId = (name: string) => {
+  // Helper function to get entry fee based on competition name
+  const getEntryFee = (name: string) => {
     switch (name) {
       case 'Starter League':
-        return STARTER_LEAGUE_PRICE_ID;
+        return 10;
       case 'Pro League':
-        return PRO_LEAGUE_PRICE_ID;
+        return 20;
       case 'Elite League':
-        return ELITE_LEAGUE_PRICE_ID;
+        return 30;
       default:
-        return STARTER_LEAGUE_PRICE_ID;
+        return 10;
     }
   };
 
@@ -985,12 +1002,18 @@ const LiveCompetition = () => {
     difficulty: getDifficulty(comp.name),
     questions: getQuestionsCount(comp.name),
     minPlayers: getMinPlayers(comp.name),
-    prizes: [
-      `1st: ${Math.floor(comp.prize_pool * 0.5)} Credits`,
-      `2nd: ${Math.floor(comp.prize_pool * 0.3)} Credits`,
-      `3rd: ${Math.floor(comp.prize_pool * 0.2)} Credits`
-    ],
-    status: 'Min reached', // You can calculate this based on registrations if needed
+    // Compute prize pool safely. If DB value missing/invalid, fallback to a simple
+    // heuristic: credit_cost * 10 (so Starter:1*10=10, Pro:20*10=200, Elite:30*10=300).
+    prizes: (() => {
+      const prizePoolRaw = Number(comp.prize_pool || 0);
+      const fallbackPool = getCreditCost(comp.name) * 10;
+      const pool = prizePoolRaw > 0 ? prizePoolRaw : fallbackPool;
+      return [
+        `1st: ${Math.floor(pool * 0.5)} Credits`,
+        `2nd: ${Math.floor(pool * 0.3)} Credits`,
+        `3rd: ${Math.floor(pool * 0.2)} Credits`
+      ];
+    })(),
     startTime: new Date(comp.start_time),
     endTime: comp.end_time ? new Date(comp.end_time) : null,
     isRegistered: isUserRegistered(comp.id)
@@ -1018,6 +1041,7 @@ const LiveCompetition = () => {
       setPaypalModalOpen(true);
     }
   }
+
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
       <Toaster
@@ -1035,7 +1059,8 @@ const LiveCompetition = () => {
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           competition={selectedCompetition}
-          onProceedToPayment={handlePayment}
+          onJoinCompetition={handleCompetitionEntry}
+          isRegistering={isRegistering}
           startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
         />
       )}
@@ -1075,7 +1100,7 @@ const LiveCompetition = () => {
           competitionData.map((comp, index) => (
             <div
               key={comp.id}
-              className="relative border-2 border-lime-300 w-full max-h-[80vh] rounded-xl p-5 shadow-lg bg-gradient-to-br from-lime-50 to-white transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-xl opacity-0 animate-fadeIn"
+              className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col justify-between min-h-[380px]"
               style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
             >
               <span className="absolute top-3 left-3 bg-lime-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 hover:bg-lime-600">Live</span>
@@ -1112,19 +1137,19 @@ const LiveCompetition = () => {
               </div>
 
               <div className="mt-4">
-                <div className="flex items-center">
-                  <CheckCircle className="h-4 w-4 text-lime-600 mr-1.5" />
-                  <span className="text-gray-700 font-semibold">{comp.status}</span>
-                </div>
-                <div className="flex items-center mt-1.5">
-                  <span className="text-gray-600 mr-1.5">Prizes:</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+
+
+                <div className="">
+                  <span className="text-gray-600">Prizes:</span>
+                  <div className="mt-2 flex flex-col gap-2">
                     {comp.prizes.map((prize, i) => (
-                      <React.Fragment key={i}>
-                        <Trophy className="h-4 w-4 text-yellow-400" />
-                        <span className="text-lime-600 font-bold">{prize.split(': ')[1]}</span>
-                        {i < comp.prizes.length - 1 && <span className="mx-1 text-gray-400">▪</span>}
-                      </React.Fragment>
+                      <div key={i} className="w-full flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="h-4 w-4 text-yellow-500" />
+                          <span className="text-sm font-semibold text-gray-700">{`Prize ${i + 1}`}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-lime-600">{prize.split(': ')[1]}</span>
+                      </div>
                     ))}
                   </div>
                 </div>

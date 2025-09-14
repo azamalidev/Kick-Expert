@@ -7,7 +7,7 @@ import { CheckCircle } from 'lucide-react';
 
 function SuccessDisplay() {
   return (
-    <div className="flex items-center justify-center px-4 py-24">
+    <div className="flex items-center justify-center px-4 py-32">
       <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
         <div className="flex justify-center mb-6">
           <CheckCircle className="h-16 w-16 text-lime-500" />

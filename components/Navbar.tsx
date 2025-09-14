@@ -659,6 +659,21 @@ export default function Navbar() {
                         <span>Profile</span>
                       </Link>
                       <Link
+                        href="/credits/manage"
+                        className={`px-4 py-3 flex items-center transition-colors ${isActive("/credits/manage")
+                            ? 'bg-lime-100 text-lime-700'
+                            : 'text-gray-700 hover:bg-lime-50'
+                          }`}
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <div className="text-lg overflow-hidden mr-3">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Trophy className="text-lime-500 size-5" />
+                          </div>
+                        </div>
+                        <span>Credit Balance</span>
+                      </Link>
+                      <Link
                         href="/dashboard"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/dashboard")
                             ? 'bg-lime-100 text-lime-700'
@@ -853,6 +868,19 @@ export default function Navbar() {
                       )}
                     </div>
                     <span>Profile</span>
+                  </div>
+                </Link>
+                <Link
+                  href="/credits/manage"
+                  className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/credits/manage")
+                      ? "bg-lime-100 text-lime-700"
+                      : "text-gray-700 hover:bg-lime-50"
+                    }`}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Trophy className="w-5 h-5" />
+                    <span>Credit Balance</span>
                   </div>
                 </Link>
                 <Link

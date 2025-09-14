@@ -1,26 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseClient';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-07-30.basil'
-});
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   try {
     const { competitionId, credits } = await req.json();
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data: { session } } = await supabase.auth.getSession();
+    // Initialize Supabase client with auth context
+    const supabase = createServerComponentClient({ cookies });
     
+    // Get current session (single call)
+    const { data: { session } } = await supabase.auth.getSession();
+
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-    );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Check if user has enough credits
@@ -65,29 +59,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Deduct credits in the following order: referral > purchased > winnings
+    // Deduct credits in the following order: referral > winnings > purchased
     let remainingCost = requiredCredits;
     let updatedCredits = { ...userCredits };
+    let creditsUsed = {
+      referral: 0,
+      winnings: 0,
+      purchased: 0
+    };
 
     // Use referral credits first
     if (remainingCost > 0 && userCredits.referral_credits > 0) {
       const referralUsed = Math.min(userCredits.referral_credits, remainingCost);
       updatedCredits.referral_credits -= referralUsed;
       remainingCost -= referralUsed;
+      creditsUsed.referral = referralUsed;
     }
 
-    // Use purchased credits next
-    if (remainingCost > 0 && userCredits.purchased_credits > 0) {
-      const purchasedUsed = Math.min(userCredits.purchased_credits, remainingCost);
-      updatedCredits.purchased_credits -= purchasedUsed;
-      remainingCost -= purchasedUsed;
-    }
-
-    // Use winnings credits last
+    // Use winnings credits second
     if (remainingCost > 0 && userCredits.winnings_credits > 0) {
       const winningsUsed = Math.min(userCredits.winnings_credits, remainingCost);
       updatedCredits.winnings_credits -= winningsUsed;
       remainingCost -= winningsUsed;
+      creditsUsed.winnings = winningsUsed;
+    }
+
+    // Use purchased credits last
+    if (remainingCost > 0 && userCredits.purchased_credits > 0) {
+      const purchasedUsed = Math.min(userCredits.purchased_credits, remainingCost);
+      updatedCredits.purchased_credits -= purchasedUsed;
+      remainingCost -= purchasedUsed;
+      creditsUsed.purchased = purchasedUsed;
     }
 
     // Update user's credit balance
@@ -144,6 +146,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: true,
       message: 'Successfully registered for competition',
+      deductedFrom: creditsUsed,
       remainingCredits: {
         purchased: updatedCredits.purchased_credits,
         winnings: updatedCredits.winnings_credits,

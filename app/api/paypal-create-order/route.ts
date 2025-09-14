@@ -3,17 +3,40 @@ import { NextResponse } from 'next/server';
 import paypal from '@paypal/checkout-server-sdk';
 import { headers } from 'next/headers';
 
-// Initialize Supabase client (use empty string fallback to avoid throwing during module init)
+// Validate environment variables
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+}
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+}
+if (!process.env.PAYPAL_CLIENT_ID) {
+  throw new Error('Missing PAYPAL_CLIENT_ID');
+}
+if (!process.env.PAYPAL_CLIENT_SECRET) {
+  throw new Error('Missing PAYPAL_CLIENT_SECRET');
+}
+
+// Initialize Supabase client with service role key
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
   {
     auth: {
       autoRefreshToken: false,
-      persistSession: false,
-    },
+      persistSession: false
+    }
   }
 );
+
+function environment() {
+  return new paypal.core.SandboxEnvironment(
+    process.env.PAYPAL_CLIENT_ID!,
+    process.env.PAYPAL_CLIENT_SECRET!
+  );
+}
+
+const client = new paypal.core.PayPalHttpClient(environment());
 
 export async function POST(req: Request) {
   try {
@@ -37,7 +60,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Valid credits amount is required' }, { status: 400 });
     }
 
-  console.log('Starting database operations for user:', userId);
+    console.log('Starting database operations for user:', userId);
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -103,24 +126,8 @@ export async function POST(req: Request) {
 
     console.log('Created purchase record:', purchaseData.id);
 
-    // Ensure PayPal environment variables exist; fail gracefully with a clear message
-    const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-    const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-    if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-      console.error('Missing PayPal configuration. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.');
-      return NextResponse.json({
-        error: 'Missing PayPal configuration (PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET)'
-      }, { status: 500 });
-    }
-
     // Use NEXT_PUBLIC_SITE_URL or fallback to localhost
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-
-    // Create PayPal client lazily (sandbox in non-production)
-    const env = process.env.NODE_ENV === 'production'
-      ? new paypal.core.LiveEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET)
-      : new paypal.core.SandboxEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET);
-    const client = new paypal.core.PayPalHttpClient(env);
 
     // Create PayPal order using SDK
     const paypalRequest = new paypal.orders.OrdersCreateRequest();
@@ -131,7 +138,6 @@ export async function POST(req: Request) {
         {
           reference_id: purchaseData.id,
           description: `${credits} Credits Purchase`,
-          custom_id: String(purchaseData.user_id ?? userId),
           amount: {
             currency_code: 'USD',
             value: Number(amount).toFixed(2),
@@ -152,8 +158,8 @@ export async function POST(req: Request) {
       order = await client.execute(paypalRequest);
     } catch (paypalError: any) {
       console.error('PayPal SDK error:', paypalError);
-      return NextResponse.json({
-        error: paypalError?.message ?? JSON.stringify(paypalError),
+      return NextResponse.json({ 
+        error: paypalError?.message ?? JSON.stringify(paypalError) 
       }, { status: 500 });
     }
 
@@ -163,23 +169,23 @@ export async function POST(req: Request) {
     const approvalLink = paypalData.links?.find((link: any) => link.rel === 'approve');
     if (!approvalLink) {
       console.error('PayPal approval link not found:', paypalData);
-      return NextResponse.json({
-        error: 'PayPal approval link not found.'
+      return NextResponse.json({ 
+        error: 'PayPal approval link not found.' 
       }, { status: 500 });
     }
 
     // Update the purchase record with the PayPal order ID
     await supabase
       .from('credit_purchases')
-      .update({
+      .update({ 
         payment_id: paypalData.id,
-        payment_data: paypalData,
+        payment_data: paypalData 
       })
       .eq('id', purchaseData.id);
 
     return NextResponse.json({
       approvalUrl: approvalLink.href,
-      orderId: paypalData.id,
+      orderId: paypalData.id
     });
 
   } catch (error) {

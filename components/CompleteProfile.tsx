@@ -147,8 +147,9 @@ export default function CompleteProfile() {
           .single();
 
         if (existingProfile) {
-          // User already has profile, redirect to dashboard
-          router.push('/');
+          // User already has profile, redirect to dashboard (replace so back doesn't return here)
+          router.replace('/');
+          return;
         }
 
       } catch (error: any) {
@@ -254,10 +255,8 @@ export default function CompleteProfile() {
 
       toast.success('Profile setup complete!', { id: toastId });
 
-      // Redirect to dashboard
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
+      // Redirect to dashboard and replace history so user cannot go back to onboarding
+      router.replace('/');
 
     } catch (error: any) {
       console.error('Profile setup error:', error);

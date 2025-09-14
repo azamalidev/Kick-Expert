@@ -13,31 +13,46 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
+        // supabase may still be initializing and parsing the URL fragment/code.
+        // Poll briefly for a session before redirecting so downstream pages
+        // (like /complete-profile) don't immediately redirect to /login.
+        const maxAttempts = 12; // ~2.4s total with 200ms interval
+        let attempt = 0;
+        let foundSession: any = null;
 
-        if (error) throw error;
+        while (attempt < maxAttempts) {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) {
+            console.warn('getSession attempt error:', error);
+          }
 
-        if (session?.user) {
-          // Update email_confirmed in users table
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({ email_confirmed: true })
-            .eq('id', session.user.id);
+          if (session?.user) {
+            foundSession = session;
+            break;
+          }
 
-          if (updateError) console.error(updateError);
-
-          setStatus('success');
-
-          // Redirect after short delay (optional)
-          setTimeout(() => {
-            router.push('/');
-          }, 2500);
-        } else {
-          throw new Error('No user session found');
+          // wait a short bit and try again
+          await new Promise((res) => setTimeout(res, 200));
+          attempt += 1;
         }
+
+        if (!foundSession) {
+          throw new Error('No user session found after waiting for auth initialization');
+        }
+
+        // Mark email confirmed server-side (best-effort)
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ email_confirmed: true })
+          .eq('id', foundSession.user.id);
+
+        if (updateError) console.warn('Unable to update email_confirmed:', updateError);
+
+        // After email confirmation, always send the user to complete-profile so they
+        // can finish onboarding. The CompleteProfile component will redirect to
+        // '/' if the profile already exists.
+        setStatus('success');
+        router.replace('/complete-profile');
       } catch (err) {
         console.error('Auth callback error:', err);
         setStatus('error');

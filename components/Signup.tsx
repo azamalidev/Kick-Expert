@@ -298,21 +298,58 @@ useEffect(() => {
 
       console.log("Saving referral ID:", referrerId);
 
-      const { error: dbError } = await supabase.from("users").insert([userData]);
+      // Use upsert by id to update any existing row created by auth triggers
+      const { data: upsertedUser, error: dbError } = await supabase
+        .from('users')
+        .upsert([userData], { onConflict: 'id' })
+        .select();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        // If duplicate key (race) slipped through, log and continue; otherwise throw
+        if (dbError?.code === '23505' || dbError?.message?.includes('already exists')) {
+          console.warn('User row already exists (race) — continuing');
+        } else {
+          throw dbError;
+        }
+      }
 
-      // ✅ Step 6: Create profile (optional)
-      const { error: profileError } = await supabase.from("profiles").insert({
-        user_id: user.id,
-        username: name,
-        date_of_birth: dateOfBirth,
-        age,
-        gender,
-        email_opt_in: emailOptIn,
-        updated_at: new Date().toISOString(),
-      });
-      if (profileError) console.error("Profile creation error:", profileError);
+      // To be extra-safe (RLS/policy could prevent upsert from updating certain columns),
+      // explicitly update the user row fields we expect to be persisted.
+      const { error: userUpdateError } = await supabase
+        .from('users')
+        .update({
+          date_of_birth: dateOfBirth,
+          age,
+          gender,
+          accepted_terms: acceptTerms,
+          terms_accepted_at: new Date().toISOString(),
+          email_opt_in: emailOptIn,
+          email_opt_in_at: emailOptIn ? new Date().toISOString() : null,
+          parent_id: referrerId || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (userUpdateError) {
+        console.warn('Non-fatal: failed to update users table columns:', userUpdateError);
+      }
+
+      // ✅ Step 6: Create or update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert([
+          {
+            user_id: user.id,
+            username: name,
+            date_of_birth: dateOfBirth,
+            age,
+            gender,
+            email_opt_in: emailOptIn,
+            updated_at: new Date().toISOString(),
+          }
+        ], { onConflict: 'user_id' });
+
+      if (profileError) console.error('Profile upsert error:', profileError);
 
       // Record consents after user insertion
       await recordUserConsents(user.id);
