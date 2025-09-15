@@ -357,7 +357,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                         min={1}
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value === '' ? '' : Math.max(1, Math.floor(Number(e.target.value))))}
-                        placeholder="Amount in USD"
+                        placeholder="Enter Credits To Buy"
                         className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 outline-none"
                       />
                     </div>
