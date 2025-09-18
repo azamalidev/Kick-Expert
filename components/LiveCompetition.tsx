@@ -589,10 +589,15 @@ const LiveCompetition = () => {
     // Fetch competitions from database
     const fetchCompetitions = async () => {
       try {
+        const now = new Date();
+        // Get competitions that:
+        // 1. Have status 'upcoming'
+        // 2. Start time is in the future
         const { data, error } = await supabase
           .from('competitions')
           .select('*')
           .eq('status', 'upcoming')
+          .gt('start_time', now.toISOString())
           .order('start_time', { ascending: true });
 
         if (error) {

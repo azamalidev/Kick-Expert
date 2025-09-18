@@ -44,16 +44,38 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [newNotificationAlert, setNewNotificationAlert] = useState<boolean>(false);
   const [lastNotificationCheck, setLastNotificationCheck] = useState<Date>(new Date());
+  // We'll fetch notifications from the `public.notifications` table and
+  // subscribe to realtime updates. If RLS prevents DB writes, the component
+  // will gracefully fall back to local-state-only reads.
 
   // Fetch notifications from multiple sources
   const fetchNotifications = async (userId: string) => {
     try {
-      // 1. Notifications table
-      const { data: notifData } = await supabase
+      // 1) Query the notifications table for this user
+      const { data: notifData, error: notifError } = await supabase
         .from('notifications')
-        .select('id, title, message, created_at, is_read, type')
+        .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (notifError) {
+        // If we hit a permission error because of RLS, log and fall back
+        // to an empty list so other sources can still populate notifications.
+        console.warn('notifications fetch error (RLS or missing table):', notifError.message || notifError);
+      }
+
+      // Start with notifications from the DB (if any) and normalize shape.
+      // The DB uses an `is_read` boolean column. Ensure `is_read` exists
+      // and created_at is present for each notification.
+      const dbNotifsRaw: any[] = (notifData as any[] | undefined) || [];
+      const dbNotifs: any[] = dbNotifsRaw.map((n: any) => ({
+        ...n,
+        // Ensure created_at exists and is a string/Date compatible field
+        created_at: n.created_at || n.createdAt || new Date().toISOString(),
+        // DB now uses is_read boolean column
+        is_read: !!n.is_read,
+      }));
 
       // 2. Trophies table
       const { data: trophiesData } = await supabase
@@ -66,14 +88,14 @@ export default function Navbar() {
       // trophiesData items can be returned with loose typings from Supabase client so
       // cast each item to `any` and explicitly map expected fields to avoid
       // "Spread types may only be created from object types" TypeScript error.
-      const formattedTrophies = (trophiesData as any[] | undefined)?.map((trophy: any) => ({
-        id: trophy?.id,
-        title: trophy?.title ?? trophy?.name,
-        created_at: trophy?.created_at ?? trophy?.earned_at ?? new Date().toISOString(),
-        message: 'You earned a new trophy!',
-        type: 'trophy',
-        is_read: false,
-      })) || [];
+      // const formattedTrophies = (trophiesData as any[] | undefined)?.map((trophy: any) => ({
+      //   id: trophy?.id,
+      //   title: trophy?.title ?? trophy?.name,
+      //   created_at: trophy?.created_at ?? trophy?.earned_at ?? new Date().toISOString(),
+      //   message: 'You earned a new trophy!',
+      //   type: 'trophy',
+      //   is_read: false,
+      // })) || [];
 
       // 3. Quiz results table (guarded in case the table/view doesn't exist)
       let formattedQuiz: any[] = [];
@@ -118,10 +140,9 @@ export default function Navbar() {
         is_read: false
       })) || [];
 
-      // Merge all notifications
+      // Merge DB notifications first, then other sources
       const merged = [
-        ...(notifData || []),
-        ...formattedTrophies,
+        ...dbNotifs,
         ...formattedQuiz,
         ...formattedCompetitions,
       ];
@@ -132,16 +153,16 @@ export default function Navbar() {
       // Keep top 15 most recent
       const recentNotifications = merged.slice(0, 15);
       setNotifications(recentNotifications);
-      
-      // Calculate unread count
+
+      // Calculate unread count using `is_read` boolean
       const unread = recentNotifications.filter(notif => !notif.is_read).length;
       setUnreadCount(unread);
 
       // Check for new notifications since last check
-      const newNotifications = recentNotifications.filter(notif => 
+      const newNotifications = recentNotifications.filter(notif =>
         new Date(notif.created_at) > lastNotificationCheck
       );
-      
+
       if (newNotifications.length > 0 && !notificationOpen) {
         setNewNotificationAlert(true);
         // Show toast for new notifications
@@ -163,14 +184,27 @@ export default function Navbar() {
   // Mark notifications as read when dropdown is opened
   const markNotificationsAsRead = async (userId: string) => {
     try {
-      // Update notifications in the database
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
-      
-      // Update local state
+      // Try to mark unread notifications as 'read' in the DB. If the UPDATE
+      // fails due to RLS, fall back to updating local state only.
+      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id).filter(Boolean);
+      if (unreadIds.length > 0) {
+        const { error } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .in('id', unreadIds);
+
+        if (error) {
+          console.warn('Failed to mark notifications read in DB (RLS?), falling back to local state:', error.message || error);
+        } else {
+          // Update local cache to reflect DB change
+          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+          setUnreadCount(0);
+          setNewNotificationAlert(false);
+          return;
+        }
+      }
+
+      // Fallback: mark locally as read
       setNotifications(prev => prev.map(notif => ({ ...notif, is_read: true })));
       setUnreadCount(0);
       setNewNotificationAlert(false);
@@ -247,73 +281,66 @@ export default function Navbar() {
   useEffect(() => {
     if (!user) return;
 
-    // Helper: check whether a table exists in public schema
-    const tableExists = async (tableName: string) => {
-      try {
-        const { data, error } = await supabase.rpc('pg_table_exists', { tbl: tableName });
-        // If RPC doesn't exist (pg_table_exists), fallback to a safe true so we don't block
-        if (error) {
-          // Supabase may not have the RPC; fallback to attempting a simple select and catching errors later
-          return false;
-        }
-        return !!(data as any)?.exists;
-      } catch (err) {
-        return false;
-      }
-    };
+    const channel = supabase.channel(`notifications-user-${user.id}`);
 
-    // Build base channel
-    const channel = supabase.channel('notifications-changes');
+    // Subscribe to INSERT and UPDATE events on public.notifications for this user
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      setNewNotificationAlert(true);
+      const newNotif = {
+        ...payload.new,
+        created_at: payload.new.created_at || new Date().toISOString(),
+        is_read: !!payload.new.is_read,
+      };
+      setNotifications(prev => {
+        const next = [newNotif, ...prev].slice(0, 50);
+        setUnreadCount(next.filter((n: any) => !n.is_read).length);
+        return next;
+      });
+      toast.success(payload.new.title || 'New notification');
+    });
 
-    channel.on('postgres_changes', 
-      { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
-      (payload) => {
-        setNewNotificationAlert(true);
-        fetchNotifications(user.id);
-        toast.success(`New notification: ${payload.new.title || 'New update'}`, { icon: '🔔' });
-      }
-    );
+    channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      const updated = {
+        ...payload.new,
+        id: payload.new.id, // Ensure 'id' is present
+        is_read: !!payload.new.is_read,
+      };
+      setNotifications(prev => {
+        const next = (prev as any[]).map((item: any) => {
+          // Ensure item has an id property to avoid type errors
+          const itemId = item?.id ?? null;
+          if (itemId !== null && itemId === updated.id) return { ...item, ...updated, id: itemId };
+          return { ...item, id: itemId };
+        });
+        setUnreadCount(next.filter((n: any) => !n.is_read).length);
+        return next;
+      });
+    });
 
-    channel.on('postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'trophies', filter: `user_id=eq.${user.id}` },
-      () => {
-        setNewNotificationAlert(true);
-        fetchNotifications(user.id);
-        toast.success('You earned a new trophy! 🏆');
-      }
-    );
+    // Also subscribe to trophies/quiz events as secondary sources (optional)
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trophies', filter: `user_id=eq.${user.id}` }, () => {
+      setNewNotificationAlert(true);
+      fetchNotifications(user.id);
+      toast.success('You earned a new trophy! 🏆');
+    });
 
-    // Only subscribe to quiz_results events if the table exists
     (async () => {
-      let quizTableExists = false;
+      // Fetch initial notifications from DB + other sources
+      fetchNotifications(user.id);
+
+      // Subscribe and log subscription lifecycle for debugging
       try {
-        // Try a lightweight call to check if the table exists by selecting 1 row and catching errors
-        const { error } = await supabase
-          .from('quiz_results')
-          .select('id')
-          .limit(1);
-        quizTableExists = !error;
+        channel.subscribe((status) => {
+          console.debug('notifications channel subscription status:', status, 'channel:', `notifications-user-${user.id}`);
+        });
       } catch (err) {
-        quizTableExists = false;
+        console.error('Failed to subscribe to notifications channel:', err);
       }
 
-      if (quizTableExists) {
-        channel.on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'quiz_results', filter: `user_id=eq.${user.id}` },
-          (payload) => {
-            setNewNotificationAlert(true);
-            fetchNotifications(user.id);
-            toast.success(`Quiz completed! Score: ${payload.new.score} 📝`);
-          }
-        );
-      }
-
-      channel.subscribe();
+      console.debug('Subscribed to notifications channel:', `notifications-user-${user.id}`);
     })();
 
-    return () => {
-      try { channel.unsubscribe(); } catch (e) { /* ignore */ }
-    };
+    return () => { try { channel.unsubscribe(); } catch (e) { /* ignore */ } };
   }, [user]);
 
   // Poll for new notifications every 30 seconds
@@ -361,7 +388,7 @@ export default function Navbar() {
   const handleNotificationClick = () => {
     const wasClosed = !notificationOpen;
     setNotificationOpen(!notificationOpen);
-    
+
     if (user && wasClosed) {
       markNotificationsAsRead(user.id);
     }
@@ -410,11 +437,11 @@ export default function Navbar() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    
+
     return date.toLocaleDateString();
   };
 
@@ -443,8 +470,8 @@ export default function Navbar() {
             <button
               onClick={() => scrollToSection("chat-assistant")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/", "chat-assistant")
-                  ? "bg-lime-100 text-lime-700 shadow-inner"
-                  : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
+                ? "bg-lime-100 text-lime-700 shadow-inner"
+                : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
                 }`}
             >
               <Bot className="w-5 h-5 mb-[3px]" />
@@ -454,8 +481,8 @@ export default function Navbar() {
             <Link href="/quiz">
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/quiz")
-                    ? "bg-lime-100 text-lime-700 shadow-inner"
-                    : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
+                  ? "bg-lime-100 text-lime-700 shadow-inner"
+                  : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
                   }`}
               >
                 <Target className="w-5 h-5" />
@@ -466,8 +493,8 @@ export default function Navbar() {
             <Link href="/livecompetition">
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/livecompetition")
-                    ? "bg-lime-100 text-lime-700 shadow-inner"
-                    : "bg-lime-50 text-lime-600 hover:bg-lime-100"
+                  ? "bg-lime-100 text-lime-700 shadow-inner"
+                  : "bg-lime-50 text-lime-600 hover:bg-lime-100"
                   }`}
               >
                 <Trophy className="w-5 h-5" />
@@ -479,8 +506,8 @@ export default function Navbar() {
             <Link href="/leaderboard">
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/leaderboard")
-                    ? "bg-lime-100 text-lime-700 shadow-inner"
-                    : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
+                  ? "bg-lime-100 text-lime-700 shadow-inner"
+                  : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
                   }`}
               >
                 <Crown className="w-5 h-5" />
@@ -550,29 +577,60 @@ export default function Navbar() {
                       </span>
                     )}
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
+                  <div className="py-1">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-gray-500">
+                      <div className="px-3 py-4 text-center text-sm text-gray-500">
                         No notifications yet
                       </div>
                     ) : (
-                      notifications.map((notif) => (
-                        <div key={notif.id} className={`px-4 py-3 hover:bg-lime-50 transition-colors border-b border-gray-100 last:border-b-0 ${!notif.is_read ? 'bg-lime-50' : ''}`}>
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg mt-0.5">{getNotificationIcon(notif.type || 'default')}</span>
+                      // Show only the latest 3 notifications here
+                      notifications.slice(0, 3).map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`px-3 py-2 hover:bg-lime-50 transition-colors border-b border-gray-100 last:border-b-0 ${!notif.is_read ? 'bg-lime-50' : ''
+                            }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {/* Notification Icon */}
+                            <span className="text-base mt-0.5">
+                              {getNotificationIcon(notif.type || 'default')}
+                            </span>
+
+                            {/* Notification Content */}
                             <div className="flex-1">
-                              <p className="text-sm text-gray-700 font-medium">{notif.title}</p>
-                              <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                              <p className="text-xs text-gray-500 mt-2">{formatNotificationDate(notif.created_at)}</p>
+                              <p className="text-sm text-gray-700 font-medium leading-tight">
+                                {notif.title}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-0.5 break-words leading-snug">
+                                {notif.message}
+                              </p>
+                              <p className="text-[11px] text-gray-500 mt-1">
+                                {formatNotificationDate(notif.created_at)}
+                              </p>
                             </div>
+
+                            {/* Unread Dot */}
                             {!notif.is_read && (
-                              <FaCircle className="text-lime-500 text-xs mt-1 animate-pulse" />
+                              <FaCircle className="text-lime-500 text-[10px] mt-1 animate-pulse" />
                             )}
                           </div>
                         </div>
                       ))
                     )}
+
+                    {/* View more button */}
+                    <div className="px-3 py-2 border-t border-gray-100 bg-white">
+                      <Link
+                        href="/user_notifications"
+                        onClick={() => setNotificationOpen(false)}
+                        className="w-full text-center block px-3 py-1.5 bg-lime-50 hover:bg-lime-100 text-lime-700 rounded-md font-medium text-sm"
+                      >
+                        View more
+                      </Link>
+                    </div>
                   </div>
+
+
                 </div>
               )}
             </div>
@@ -623,8 +681,8 @@ export default function Navbar() {
                       <Link
                         href="/admindashboard"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/admindashboard")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -646,8 +704,8 @@ export default function Navbar() {
                       <Link
                         href="/profile"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/profile")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -661,8 +719,8 @@ export default function Navbar() {
                       <Link
                         href="/credits/manage"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/credits/manage")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -676,8 +734,8 @@ export default function Navbar() {
                       <Link
                         href="/dashboard"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/dashboard")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -687,8 +745,8 @@ export default function Navbar() {
                       <Link
                         href="/about"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/about")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -698,8 +756,8 @@ export default function Navbar() {
                       <Link
                         href="/policy"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/policy")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -709,8 +767,8 @@ export default function Navbar() {
                       <Link
                         href="/contact"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/contact")
-                            ? 'bg-lime-100 text-lime-700'
-                            : 'text-gray-700 hover:bg-lime-50'
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
                           }`}
                         onClick={() => setDropdownOpen(false)}
                       >
@@ -766,8 +824,8 @@ export default function Navbar() {
                 <button
                   onClick={() => scrollToSection("chat-assistant")}
                   className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/", "chat-assistant")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                 >
                   <div className="flex items-center gap-3">
@@ -779,8 +837,8 @@ export default function Navbar() {
                 <Link href="/quiz">
                   <button
                     className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/quiz")
-                        ? "bg-lime-100 text-lime-700"
-                        : "text-gray-700 hover:bg-lime-50"
+                      ? "bg-lime-100 text-lime-700"
+                      : "text-gray-700 hover:bg-lime-50"
                       }`}
                     onClick={() => setMenuOpen(false)}
                   >
@@ -794,8 +852,8 @@ export default function Navbar() {
                 <Link href="/livecompetition">
                   <button
                     className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/livecompetition")
-                        ? "bg-lime-100 text-lime-700"
-                        : "text-gray-700 hover:bg-lime-50"
+                      ? "bg-lime-100 text-lime-700"
+                      : "text-gray-700 hover:bg-lime-50"
                       }`}
                     onClick={() => setMenuOpen(false)}
                   >
@@ -812,8 +870,8 @@ export default function Navbar() {
                 <Link href="/leaderboard">
                   <button
                     className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/leaderboard")
-                        ? "bg-lime-100 text-lime-700"
-                        : "text-gray-700 hover:bg-lime-50"
+                      ? "bg-lime-100 text-lime-700"
+                      : "text-gray-700 hover:bg-lime-50"
                       }`}
                     onClick={() => setMenuOpen(false)}
                   >
@@ -827,8 +885,8 @@ export default function Navbar() {
                 <Link href="/stats">
                   <button
                     className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/stats")
-                        ? "bg-lime-100 text-lime-700"
-                        : "text-gray-700 hover:bg-lime-50"
+                      ? "bg-lime-100 text-lime-700"
+                      : "text-gray-700 hover:bg-lime-50"
                       }`}
                     onClick={() => setMenuOpen(false)}
                   >
@@ -846,8 +904,8 @@ export default function Navbar() {
                 <Link
                   href="/profile"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/profile")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -873,8 +931,8 @@ export default function Navbar() {
                 <Link
                   href="/credits/manage"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/credits/manage")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -886,8 +944,8 @@ export default function Navbar() {
                 <Link
                   href="/dashboard"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/dashboard")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -899,8 +957,8 @@ export default function Navbar() {
                 <Link
                   href="/about"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/about")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -912,8 +970,8 @@ export default function Navbar() {
                 <Link
                   href="/policy"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/policy")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -925,8 +983,8 @@ export default function Navbar() {
                 <Link
                   href="/contact"
                   className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/contact")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
+                    ? "bg-lime-100 text-lime-700"
+                    : "text-gray-700 hover:bg-lime-50"
                     }`}
                   onClick={() => setMenuOpen(false)}
                 >
@@ -941,8 +999,8 @@ export default function Navbar() {
               <Link
                 href="/admindashboard"
                 className={`block py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/admindashboard")
-                    ? "bg-lime-100 text-lime-700"
-                    : "text-gray-700 hover:bg-lime-50"
+                  ? "bg-lime-100 text-lime-700"
+                  : "text-gray-700 hover:bg-lime-50"
                   }`}
                 onClick={() => setMenuOpen(false)}
               >

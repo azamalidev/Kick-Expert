@@ -9,10 +9,26 @@ import Image from 'next/image';
 export default function AuthCallback() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [errorDetails, setErrorDetails] = useState<{ error?: string; error_code?: string; error_description?: string } | null>(null);
 
   useEffect(() => {
     const handleAuth = async () => {
       try {
+        // Parse potential error parameters from querystring or hash fragment so
+        // we can surface Supabase / OAuth errors that were returned to the redirect URL.
+        const params = new URLSearchParams(window.location.search);
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const error = params.get('error') || hash.get('error');
+        const error_code = params.get('error_code') || hash.get('error_code');
+        const error_description = params.get('error_description') || hash.get('error_description');
+        if (error || error_code || error_description) {
+          console.warn('Auth callback received error params:', { error, error_code, error_description });
+          setErrorDetails({ error: error || undefined, error_code: error_code || undefined, error_description: error_description || undefined });
+          // If Supabase returned an error, surface it immediately instead of waiting for session.
+          setStatus('error');
+          return;
+        }
+
         // supabase may still be initializing and parsing the URL fragment/code.
         // Poll briefly for a session before redirecting so downstream pages
         // (like /complete-profile) don't immediately redirect to /login.
@@ -37,7 +53,7 @@ export default function AuthCallback() {
         }
 
         if (!foundSession) {
-          throw new Error('No user session found after waiting for auth initialization');
+        throw new Error('No user session found after waiting for auth initialization');
         }
 
         // Mark email confirmed server-side (best-effort)
@@ -54,8 +70,10 @@ export default function AuthCallback() {
         setStatus('success');
         router.replace('/complete-profile');
       } catch (err) {
-        console.error('Auth callback error:', err);
-        setStatus('error');
+          console.error('Auth callback error:', err);
+          // If we already parsed error details above, keep them, otherwise set a generic message
+          if (!errorDetails) setErrorDetails({ error: 'server_error', error_description: (err as any)?.message || String(err) });
+          setStatus('error');
       }
     };
 

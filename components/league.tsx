@@ -172,49 +172,36 @@ export default function LeaguePage() {
       try {
         setLoading(true);
         
-        // Request merged competition questions from our server endpoint.
-        // This prevents the browser from directly calling `competition_questions` (which may be blocked by RLS)
-        const resp = await fetch('/api/competition-questions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ competitionId }),
-        });
+        // Get the authenticated user
+        const authResponse = await supabase.auth.getUser();
+        if (!authResponse.data.user) {
+          throw new Error('User not authenticated');
+        }
 
-        const json = await resp.json();
-        const mergedQuestions = Array.isArray(json.questions) ? json.questions : [];
+        // Call the get_competition_questions function
+        const { data: questionsData, error: questionsError } = await supabase
+          .rpc('get_competition_questions', {
+            p_competition_id: competitionId,
+            p_user_id: authResponse.data.user.id
+          });
 
-        console.log('mergedQuestions fetched for', competitionId, 'count=', mergedQuestions.length);
-
-        if (!mergedQuestions || mergedQuestions.length === 0) {
+        if (questionsError) throw questionsError;
+        if (!questionsData || questionsData.length === 0) {
           setError('No questions are configured for this competition.');
           setLoading(false);
           return;
         }
 
-        // Use mergedQuestions as the quiz questions
-        setQuestions(mergedQuestions);
+        setQuestions(questionsData);
 
-        // Compute difficulty breakdown from the merged questions
-        const difficulty_breakdown: { easy: number; medium: number; hard: number } = { easy: 0, medium: 0, hard: 0 };
-        mergedQuestions.forEach((q: any) => {
-          const d = (q.difficulty || '').toString().toLowerCase();
-          if (d.includes('easy')) difficulty_breakdown.easy += 1;
-          else if (d.includes('medium')) difficulty_breakdown.medium += 1;
-          else if (d.includes('hard')) difficulty_breakdown.hard += 1;
-        });
+
         
-        // Ensure user is authenticated and registered
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          throw new Error('User not authenticated');
-        }
-
         // Check registration
         const { data: reg, error: regErr } = await supabase
           .from('competition_registrations')
           .select('*')
           .eq('competition_id', competitionId)
-          .eq('user_id', user.id)
+          .eq('user_id', authResponse.data.user.id)
           .eq('status', 'confirmed')
           .maybeSingle();
 
@@ -229,15 +216,21 @@ export default function LeaguePage() {
           .from('competition_sessions')
           .insert({
             competition_id: competitionId,
-            user_id: user.id,
-            questions_played: mergedQuestions.length,
+            user_id: authResponse.data.user.id,
+            questions_played: questionsData.length,
             correct_answers: 0,
             score_percentage: 0,
             start_time: new Date().toISOString(),
             // quiz_type is required by DB (NOT NULL). Use 'competition' for league sessions.
             quiz_type: 'competition',
-            // use computed difficulty breakdown
-            difficulty_breakdown,
+            // compute difficulty breakdown from the questions
+            difficulty_breakdown: questionsData.reduce((acc: any, q: any) => {
+              const d = (q.difficulty || '').toString().toLowerCase();
+              if (d.includes('easy')) acc.easy = (acc.easy || 0) + 1;
+              else if (d.includes('medium')) acc.medium = (acc.medium || 0) + 1;
+              else if (d.includes('hard')) acc.hard = (acc.hard || 0) + 1;
+              return acc;
+            }, {}),
           })
           .select()
           .single();
@@ -309,23 +302,25 @@ export default function LeaguePage() {
     if (phase === 'leaderboard' && competitionId) {
       // Fetch leaderboard from Supabase
       const fetchLeaderboard = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
+        const authData = await supabase.auth.getUser();
+        const userId = authData.data.user?.id;
         
         try {
-          const { data: results, error: resultsErr } = await supabase
-            .from('competition_results')
-            .select('user_id, rank, score')
-            .eq('competition_id', competitionId)
-            .order('rank', { ascending: true })
-            .limit(20);
+          // Get the latest leaderboard using stored procedure
+          const { data: results, error: leaderboardError } = await supabase
+            .rpc('get_competition_leaderboard', {
+              p_competition_id: competitionId
+            });
 
-          if (resultsErr || !results) {
+          if (leaderboardError) throw leaderboardError;
+          if (!results || !Array.isArray(results)) {
             setLeaderboard([]);
             return;
           }
 
           const userIds = Array.from(new Set(results.map((r: any) => r.user_id).filter(Boolean)));
 
+          // Get usernames for the leaderboard entries
           let profilesMap: Record<string, any> = {};
           if (userIds.length > 0) {
             const { data: profilesData } = await supabase
@@ -342,24 +337,22 @@ export default function LeaguePage() {
             id: entry.user_id,
             name: (profilesMap[entry.user_id] && profilesMap[entry.user_id].username) || `User ${entry.user_id.substring(0, 8)}`,
             score: entry.score,
-            isUser: user?.id === entry.user_id,
+            isUser: userId === entry.user_id,
             rank: entry.rank
           }));
 
           setLeaderboard(leaderboardData);
 
           // Find user's rank
-          if (user) {
-            const userEntry = leaderboardData.find((entry: any) => entry.id === user.id);
+          if (userId) {
+            const userEntry = leaderboardData.find((entry: any) => entry.id === userId);
             if (userEntry) setUserRank(userEntry.rank);
           }
         } catch (err) {
-          console.error('Error fetching leaderboard or profiles:', err);
+          console.error('Error fetching leaderboard:', err);
           setLeaderboard([]);
         }
       };
-      
-      
       fetchLeaderboard();
     }
   }, [phase, competitionId]);
@@ -403,7 +396,8 @@ export default function LeaguePage() {
       
       
       // Submit answer to Supabase
-      const { data: { user } } = await supabase.auth.getUser();
+      const authData = await supabase.auth.getUser();
+      const userId = authData.data.user?.id;
 
       // Use the sourceQuestionId if present (this should map to questions.id which is an integer).
       // If we don't have an integer question id, set null to avoid FK/type mismatches.
@@ -415,7 +409,7 @@ export default function LeaguePage() {
       await supabase.from('competition_answers').insert({
         competition_id: competitionId,
         session_id: sessionId,
-        user_id: user?.id,
+        user_id: userId,
         question_id: fkQuestionId,
         selected_answer: selectedChoice,
         is_correct: isCorrect,
@@ -452,8 +446,9 @@ export default function LeaguePage() {
     
     // Aggregate answers, update session, calculate results
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const authData = await supabase.auth.getUser();
+      const userId = authData.data.user?.id;
+      if (!userId) throw new Error('User not authenticated');
       
       // Update session summary
       const correctAnswers = answers.filter(a => a.is_correct).length;
@@ -485,12 +480,12 @@ export default function LeaguePage() {
             return a.end_time - b.end_time;
           });
         
-        const userRank = sortedScores.findIndex(score => score.user_id === user.id) + 1;
+        const userRank = sortedScores.findIndex(score => score.user_id === userId) + 1;
         
         // Insert into competition_results
         await supabase.from('competition_results').insert({
           competition_id: competitionId,
-          user_id: user.id,
+          user_id: userId,
           rank: userRank,
           score: correctAnswers,
           xp_awarded: correctAnswers * 5,
@@ -507,7 +502,7 @@ export default function LeaguePage() {
           
           await supabase.from('competition_trophies').insert({
             competition_id: competitionId,
-            user_id: user.id,
+            user_id: userId,
             trophy_type: trophyType,
             title: title,
             description: description,
