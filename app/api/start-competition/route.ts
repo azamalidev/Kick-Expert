@@ -5,8 +5,20 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 export async function POST(req: NextRequest) {
   const { competitionId } = await req.json();
-  // Set competition status to 'live'
-  await supabase.from('competitions').update({ status: 'live' }).eq('id', competitionId);
+  // Set competition status to 'running' so triggers and checks treat it as active
+  await supabase.from('competitions').update({ status: 'running' }).eq('id', competitionId);
+
+  // Mark confirmed registrations as entered so participation tracking begins
+  try {
+    await supabase
+      .from('competition_registrations')
+      .update({ participation_status: 'entered', entered_at: new Date().toISOString() })
+      .eq('competition_id', competitionId)
+      .eq('status', 'confirmed')
+      .eq('participation_status', 'registered');
+  } catch (err) {
+    console.error('Failed to mark registrations as entered:', err);
+  }
 
   // Fetch competition_questions
   const { data: compQs, error: compError } = await supabase

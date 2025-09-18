@@ -6,65 +6,89 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-interface QuestionData {
-  id: number;
-  question_text: string;
-  choices: string[];
-  correct_answer: string;
-  explanation: string;
-  difficulty: string;
-  category: string;
-}
-
-interface RawCompetitionQuestion {
-  id: number;
-  competition_id: string;
-  question_order: number | null;
-  questions: QuestionData | null;
-}
-
-interface FormattedQuestion {
-  id: number;
-  competition_id: string;
-  question_text: string;
-  choices: string[];
-  correct_answer: string;
-  explanation: string;
-  difficulty: string;
-  category: string;
-  source_question_id: number | null;
-  question_order: number | null;
-}
+// This route returns competition-specific questions by merging rows from
+// `competition_questions` with canonical `questions` when a numeric
+// source_question_id (or question_id) is present. The returned shape is
+// safe for the client to use when recording answers: it includes both
+// `competition_question_id` (uuid) and `question_id` (integer|null).
 
 export async function POST(req: NextRequest) {
   try {
     const { competitionId } = await req.json();
     if (!competitionId) return NextResponse.json({ questions: [] });
 
-    // Call the get_competition_questions stored procedure
-    const { data: rawQuestions, error: questionsError } = await supabase
-      .rpc('get_competition_questions', { p_competition_id: competitionId });
+    // Fetch competition row to decide which questions to pull
+    const { data: compRow, error: compFetchErr } = await supabase
+      .from('competitions')
+      .select('name')
+      .eq('id', competitionId)
+      .maybeSingle();
 
-    if (questionsError) {
-      console.error('Error fetching competition questions:', questionsError);
-      return NextResponse.json({ error: questionsError.message }, { status: 500 });
-    }
-
-    if (!rawQuestions || !Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    if (compFetchErr) {
+      console.error('Error fetching competition row:', compFetchErr);
       return NextResponse.json({ questions: [] });
     }
 
-    // The stored procedure returns already formatted questions
-    const questions: FormattedQuestion[] = rawQuestions;
+    const compName: string = (compRow && compRow.name) || '';
 
-    // Return the formatted questions array
-    return NextResponse.json({ 
-      questions: questions.sort((a, b) => 
-        (a.question_order ?? 0) - (b.question_order ?? 0)
-      )
-    });
+    // Map competition name to difficulty — adjust these rules if your naming differs
+    const mapNameToDifficulty = (name: string) => {
+      const n = (name || '').toLowerCase();
+      if (n.includes('starter')) return 'Easy';
+      if (n.includes('pro')) return 'Medium';
+      if (n.includes('elite')) return 'Hard';
+      // fallback: medium
+      return 'Medium';
+    };
+
+    const difficulty = mapNameToDifficulty(compName);
+
+    // Default number of questions to return — change as needed or accept from client
+    const limit = 20;
+
+    // Fetch from `questions` table directly (as requested)
+    const { data: qsData, error: qsErr } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('difficulty', difficulty)
+      .limit(limit)
+      .order('id', { ascending: true });
+
+    if (qsErr) {
+      console.error('Error fetching questions table:', qsErr);
+      return NextResponse.json({ questions: [] });
+    }
+
+    let finalQs = (qsData || []) as any[];
+
+    // If not enough questions found for that difficulty, fetch more without difficulty filter
+    if (finalQs.length < limit) {
+      const { data: more, error: moreErr } = await supabase
+        .from('questions')
+        .select('*')
+        .limit(limit)
+        .order('id', { ascending: true });
+      if (!moreErr && more) finalQs = more;
+    }
+
+    const normalized = finalQs.map((q: any, idx: number) => ({
+      competition_question_id: null,
+      competition_id: competitionId,
+      question_id: q.id,
+      source_question_id: null,
+      question_text: q.question_text,
+      choices: q.choices,
+      correct_answer: q.correct_answer,
+      explanation: q.explanation,
+      difficulty: q.difficulty,
+      category: q.category,
+      question_order: idx + 1,
+      created_at: q.created_at ?? null,
+    }));
+
+    return NextResponse.json({ questions: normalized });
   } catch (err) {
-    console.error('Error processing competition questions:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Failed to build merged competition questions:', err);
+    return NextResponse.json({ questions: [] });
   }
 }
