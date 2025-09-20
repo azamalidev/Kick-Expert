@@ -13,6 +13,12 @@ export default function ForgotPassword() {
   const router = useRouter();
   const supabase = useSupabase(); // Correct: useSupabase returns SupabaseClient directly
 
+  const getChangePasswordUrl = () => {
+    if (process.env.NEXT_PUBLIC_SITE_URL) return `${process.env.NEXT_PUBLIC_SITE_URL}/change-password`;
+    if (typeof window !== 'undefined') return `${window.location.origin}/change-password`;
+    return '/change-password';
+  };
+
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!email.trim()) {
@@ -26,7 +32,7 @@ export default function ForgotPassword() {
     try {
       // Send password reset email using Supabase auth
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/change-password`,
+        redirectTo: getChangePasswordUrl(),
       });
 
       if (error) {

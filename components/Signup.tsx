@@ -8,6 +8,13 @@ import toast, { Toaster } from 'react-hot-toast';
 import Link from "next/link";
 import { SupabaseUser } from '@/types/user';
 
+// Resolve auth callback URL: prefer NEXT_PUBLIC_SITE_URL, fallback to window origin
+const getAuthCallbackUrl = () => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`;
+  if (typeof window !== 'undefined') return `${window.location.origin}/auth/callback`;
+  return '/auth/callback';
+};
+
 export default function Signup() {
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -238,7 +245,7 @@ useEffect(() => {
             type: "signup",
             email: email,
             options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              emailRedirectTo: getAuthCallbackUrl(),
             },
           });
 
@@ -257,7 +264,7 @@ useEffect(() => {
         password,
         options: {
           data: { name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: getAuthCallbackUrl(),
         },
       });
 

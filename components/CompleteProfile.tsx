@@ -100,6 +100,7 @@ export default function CompleteProfile() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  // saved state removed: we auto-redirect on successful completion
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [user, setUser] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,16 +141,33 @@ export default function CompleteProfile() {
         }
 
         // Check if user already has a profile
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('user_id', session.user.id)
-          .single();
+          .maybeSingle();
 
+        if (profileError) {
+          console.error('Error loading profile:', profileError);
+        }
+
+        // If profile exists and appears complete, send user to dashboard.
+        // Otherwise, prefill fields from any partial profile and allow completion here.
         if (existingProfile) {
-          // User already has profile, redirect to dashboard (replace so back doesn't return here)
-          router.replace('/');
-          return;
+          const hasUsername = !!existingProfile.username;
+          const hasAvatar = !!existingProfile.avatar_url;
+          const hasNationality = !!existingProfile.nationality;
+
+          if (hasUsername && hasAvatar && hasNationality) {
+            // Profile appears complete — redirect to dashboard
+            router.replace('/');
+            return;
+          }
+
+          // Prefill any available fields so the user can complete missing pieces
+          if (existingProfile.username) setUserName(existingProfile.username);
+          if (existingProfile.avatar_url) setAvatarPreview(existingProfile.avatar_url);
+          if (existingProfile.nationality) setNationality(existingProfile.nationality);
         }
 
       } catch (error: any) {
@@ -238,25 +256,28 @@ export default function CompleteProfile() {
       setUploadProgress(0);
       const avatarUrl = await uploadImage(user.id);
 
-      // Insert profile data
-      const { error: profileError } = await supabase
+      // Upsert profile data (handles partial existing rows created by auth triggers)
+      const profilePayload = {
+        user_id: user.id,
+        username: userName.trim() || null,
+        avatar_url: avatarUrl || null,
+        nationality: nationality || null,
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: upserted, error: upsertError } = await supabase
         .from('profiles')
-        .insert([
-          {
-            user_id: user.id,
-            username: userName.trim(),
-            avatar_url: avatarUrl,
-            nationality: nationality,
-            created_at: new Date().toISOString()
-          }
-        ]);
+        .upsert([profilePayload], { onConflict: 'user_id' })
+        .select()
+        .single();
 
-      if (profileError) throw profileError;
+      if (upsertError) throw upsertError;
 
-      toast.success('Profile setup complete!', { id: toastId });
+  toast.success('Profile saved!', { id: toastId });
 
-      // Redirect to dashboard and replace history so user cannot go back to onboarding
-      router.replace('/');
+  // Redirect to dashboard after successful save
+  router.replace('/');
 
     } catch (error: any) {
       console.error('Profile setup error:', error);
