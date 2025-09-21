@@ -37,6 +37,21 @@ CREATE POLICY notifications_system_insert
   USING (true)
   WITH CHECK (true);
 
+-- Allow authenticated users to SELECT their own notifications
+DROP POLICY IF EXISTS notifications_select_own ON public.notifications;
+CREATE POLICY notifications_select_own
+  ON public.notifications
+  FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+-- Allow authenticated users to UPDATE their own notifications (e.g., mark as read)
+DROP POLICY IF EXISTS notifications_update_own ON public.notifications;
+CREATE POLICY notifications_update_own
+  ON public.notifications
+  FOR UPDATE
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid())
+  WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
+
 -- 4) Replace handle_auth_user_email_confirmed with a safe SECURITY DEFINER version
 CREATE OR REPLACE FUNCTION public.handle_auth_user_email_confirmed()
 RETURNS trigger

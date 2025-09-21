@@ -43,6 +43,7 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [newNotificationAlert, setNewNotificationAlert] = useState<boolean>(false);
+  const [marketingOptIn, setMarketingOptIn] = useState<boolean>(false);
   const [lastNotificationCheck, setLastNotificationCheck] = useState<Date>(new Date());
   // We'll fetch notifications from the `public.notifications` table and
   // subscribe to realtime updates. If RLS prevents DB writes, the component
@@ -52,12 +53,22 @@ export default function Navbar() {
   const fetchNotifications = async (userId: string) => {
     try {
       // 1) Query the notifications table for this user
-      const { data: notifData, error: notifError } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(50);
+
+      // Respect marketing opt-in: if user hasn't opted in, exclude promotional notifications
+      if (!marketingOptIn) {
+        query = (query as any).neq('type', 'promotional');
+      }
+
+      // Fetch latest notifications (read or unread) and limit to 3 for the navbar
+      query = (query as any).limit(3);
+
+      const { data: notifData, error: notifError } = await query;
 
       if (notifError) {
         // If we hit a permission error because of RLS, log and fall back
@@ -68,7 +79,7 @@ export default function Navbar() {
       // Start with notifications from the DB (if any) and normalize shape.
       // The DB uses an `is_read` boolean column. Ensure `is_read` exists
       // and created_at is present for each notification.
-      const dbNotifsRaw: any[] = (notifData as any[] | undefined) || [];
+  const dbNotifsRaw: any[] = (notifData as any[] | undefined) || [];
       const dbNotifs: any[] = dbNotifsRaw.map((n: any) => ({
         ...n,
         // Ensure created_at exists and is a string/Date compatible field
@@ -196,10 +207,10 @@ export default function Navbar() {
         if (error) {
           console.warn('Failed to mark notifications read in DB (RLS?), falling back to local state:', error.message || error);
         } else {
-          // Update local cache to reflect DB change
-          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-          setUnreadCount(0);
-          setNewNotificationAlert(false);
+            // Update local cache to reflect DB change - keep items visible but mark as read
+            setNotifications(prev => prev.map(n => n.id ? { ...n, is_read: true } : n));
+            setUnreadCount(0);
+            setNewNotificationAlert(false);
           return;
         }
       }
@@ -248,6 +259,10 @@ export default function Navbar() {
           setAvatarUrl(profileData.avatar_url || "");
         }
 
+        // Fetch marketing opt-in from profile and then notifications
+        if (!profileError && profileData) {
+          setMarketingOptIn(Boolean((profileData as any).marketing_opt_in));
+        }
         // Fetch notifications for the user
         fetchNotifications(userId);
 
@@ -285,35 +300,38 @@ export default function Navbar() {
 
     // Subscribe to INSERT and UPDATE events on public.notifications for this user
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      const n = payload.new;
+      // Ignore notifications that are already read
+      // Respect marketing opt-in
+      if (n.type === 'promotional' && !marketingOptIn) return;
+      // Add new notification to the top, keep only the latest 3
       setNewNotificationAlert(true);
       const newNotif = {
-        ...payload.new,
-        created_at: payload.new.created_at || new Date().toISOString(),
-        is_read: !!payload.new.is_read,
+        ...n,
+        created_at: n.created_at || new Date().toISOString(),
+        is_read: !!n.is_read,
       };
       setNotifications(prev => {
-        const next = [newNotif, ...prev].slice(0, 50);
-        setUnreadCount(next.filter((n: any) => !n.is_read).length);
+        const next = [newNotif, ...prev].slice(0, 3);
+        setUnreadCount(next.filter((m: any) => !m.is_read).length);
         return next;
       });
-      toast.success(payload.new.title || 'New notification');
+      toast.success(n.title || 'New notification');
     });
 
     channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-      const updated = {
-        ...payload.new,
-        id: payload.new.id, // Ensure 'id' is present
-        is_read: !!payload.new.is_read,
-      };
-      setNotifications(prev => {
-        const next = (prev as any[]).map((item: any) => {
-          // Ensure item has an id property to avoid type errors
-          const itemId = item?.id ?? null;
-          if (itemId !== null && itemId === updated.id) return { ...item, ...updated, id: itemId };
-          return { ...item, id: itemId };
-        });
-        setUnreadCount(next.filter((n: any) => !n.is_read).length);
-        return next;
+      const n = payload.new;
+      // If updated notification is now read, remove it from the navbar list
+      // Respect marketing opt-in
+      if (n.type === 'promotional' && !marketingOptIn) {
+        return;
+      }
+      // Update item in place (keep it visible)
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, ...n } : x));
+      setUnreadCount(prev => {
+        const next = (prev && typeof prev === 'number') ? prev : 0;
+        // Recalculate from notifications state after update
+        return (notifications || []).filter((m: any) => !m.is_read).length;
       });
     });
 

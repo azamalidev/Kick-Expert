@@ -1,10 +1,11 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { Trophy, FileText, Activity, CreditCard, Gift, Bell } from 'lucide-react';
 
 export default function UserNotificationsPage() {
   const [loading, setLoading] = useState(true);
@@ -16,6 +17,22 @@ export default function UserNotificationsPage() {
   const [marketingOptIn, setMarketingOptIn] = useState<boolean>(false);
   const [savingOptIn, setSavingOptIn] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const filterContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Filter definitions using lucide icons
+  const filters = [
+    { id: 'all', label: 'All', Icon: Bell },
+    { id: 'trophy', label: 'Achievements', Icon: Trophy },
+    { id: 'quiz', label: 'Quizzes', Icon: FileText },
+    { id: 'competition', label: 'Competitions', Icon: Activity },
+    { id: 'transactional', label: 'Transactions', Icon: CreditCard },
+    { id: 'promotional', label: 'Promotions', Icon: Gift },
+  ];
+
+  // Ensure filter bar is scrolled to left on mount
+  useEffect(() => {
+    if (filterContainerRef.current) filterContainerRef.current.scrollLeft = 0;
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -26,18 +43,31 @@ export default function UserNotificationsPage() {
         return;
       }
       setUserId(user.id);
-      await fetchNotifications(user.id, 1);
+
+      // Load profile first so we know marketing opt-in preference
       await fetchUserProfile(user.id);
+
+      // Now load notifications respecting marketing opt-in
+      await fetchNotifications(user.id, 1);
       setLoading(false);
 
-      // subscribe to realtime
+      // subscribe to realtime (filter server-side by user_id, but respect opt-in client-side)
       const channel = supabase.channel(`notifications-inbox-${user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-          setNotifications(prev => [payload.new, ...prev]);
-          toast.success(payload.new.title || 'New notification');
+          const n = payload.new;
+          // If promotional notifications are disabled by user, ignore promotional payloads
+          if (n.type === 'promotional' && !marketingOptIn) return;
+          setNotifications(prev => [n, ...prev]);
+          toast.success(n.title || 'New notification');
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-          setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
+          const n = payload.new;
+          // If promotional and user opted-out, remove it from the list if present
+          if (n.type === 'promotional' && !marketingOptIn) {
+            setNotifications(prev => prev.filter(x => x.id !== n.id));
+            return;
+          }
+          setNotifications(prev => prev.map(x => x.id === n.id ? n : x));
         });
       channel.subscribe();
       return () => { try { channel.unsubscribe(); } catch (e) { } };
@@ -57,12 +87,19 @@ export default function UserNotificationsPage() {
     try {
       const from = (pageToLoad - 1) * pageSize;
       const to = from + pageSize - 1;
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*', { count: 'exact' })
         .eq('user_id', id)
         .order('created_at', { ascending: false })
         .range(from, to);
+
+      // If the user has not opted-in to promotional notifications, exclude them from results
+      if (!marketingOptIn) {
+        query = (query as any).neq('type', 'promotional');
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
       setNotifications(data || []);
@@ -77,12 +114,21 @@ export default function UserNotificationsPage() {
   };
 
   const toggleRead = async (notifId: string, markRead: boolean) => {
+    // Optimistic UI: update the local notification immediately
+    const previous = notifications;
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: markRead } : n));
+
     try {
-      const { error } = await supabase.from('notifications').update({ is_read: markRead }).eq('id', notifId);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: markRead })
+        .eq('id', notifId);
       if (error) throw error;
-      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: markRead } : n));
+      // success: nothing more to do (local state already updated)
     } catch (err) {
       console.error('Failed to update', err);
+      // revert optimistic update
+      setNotifications(previous);
       toast.error('Could not update notification');
     }
   };
@@ -107,6 +153,8 @@ export default function UserNotificationsPage() {
       const { error } = await supabase.from('profiles').upsert({ user_id: userId, marketing_opt_in: marketingOptIn }, { onConflict: 'user_id' });
       if (error) throw error;
       toast.success('Preferences saved');
+      // Refresh notifications to reflect new preference
+      await fetchNotifications(userId, 1);
     } catch (err) {
       console.error('Failed to save opt-in', err);
       toast.error('Could not save preference');
@@ -152,28 +200,27 @@ export default function UserNotificationsPage() {
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Filter Notifications</h4>
                 <p className="text-gray-600 text-sm mb-4">Show notifications by type</p>
                 
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'all', label: 'All', icon: '🔔' },
-                    { id: 'trophy', label: 'Achievements', icon: '🏆' },
-                    { id: 'quiz', label: 'Quizzes', icon: '📝' },
-                    { id: 'competition', label: 'Competitions', icon: '⚽' },
-                    { id: 'transactional', label: 'Transactions', icon: '💳' },
-                    { id: 'promotional', label: 'Promotions', icon: '🎉' },
-                  ].map((filter) => (
-                    <button
-                      key={filter.id}
-                      onClick={() => setActiveFilter(filter.id)}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center ${
-                        activeFilter === filter.id
-                          ? 'bg-lime-100 text-lime-800 border-lime-500 border'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-transparent'
-                      }`}
-                    >
-                      <span className="text-xl mr-2">{filter.icon}</span>
-                      <span className="font-medium">{filter.label}</span>
-                    </button>
-                  ))}
+                <div
+                  ref={filterContainerRef}
+                  className="flex gap-2 overflow-x-auto flex-nowrap py-2 px-1 scrollbar-hide"
+                >
+                  {filters.map((filter) => {
+                    const Icon = filter.Icon;
+                    return (
+                      <button
+                        key={filter.id}
+                        onClick={() => setActiveFilter(filter.id)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
+                          activeFilter === filter.id
+                            ? 'bg-lime-100 text-lime-800 border-lime-500 border'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-transparent'
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="font-medium whitespace-nowrap">{filter.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -296,7 +343,7 @@ export default function UserNotificationsPage() {
                 <button 
                   onClick={saveMarketingOptIn} 
                   disabled={savingOptIn}
-                  className="mt-6 w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-6 w-full px-4 py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {savingOptIn ? (
                     <span className="flex items-center justify-center">
@@ -306,11 +353,13 @@ export default function UserNotificationsPage() {
                       </svg>
                       Saving...
                     </span>
-                  ) : 'Save Preferences'}
+                  ) : (
+                    <span className="flex items-center gap-2"><svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg> Save Preferences</span>
+                  )}
                 </button>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
+              {/* <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Notification Tips</h4>
                 <ul className="space-y-3 text-sm text-gray-600">
                   <li className="flex items-start">
@@ -330,7 +379,7 @@ export default function UserNotificationsPage() {
                     <span>Scroll to see more notifications</span>
                   </li>
                 </ul>
-              </div>
+              </div> */}
             </aside>
           </div>
         </div>
