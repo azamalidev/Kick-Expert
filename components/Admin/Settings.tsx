@@ -1,6 +1,106 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { FiAlertTriangle, FiSave, FiUser, FiShield, FiHeadphones, FiClock, FiSettings, FiDollarSign, FiActivity, FiEdit, FiAlertCircle, FiDatabase, FiServer } from 'react-icons/fi';
+import { supabase } from '@/lib/supabaseClient';
+
+// Broadcast editor component
+const BroadcastEditor: React.FC = () => {
+  const [isEditing, setIsEditing] = useState(true);
+  const [type, setType] = useState('informational');
+  const [priority, setPriority] = useState('medium');
+  const [cta, setCta] = useState('');
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [isBanner, setIsBanner] = useState(false);
+  const [expiryDate, setExpiryDate] = useState('');
+
+  const handleBroadcast = async () => {
+    if (!title.trim() || !message.trim()) {
+      toast.error('Title and message are required');
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        toast.error('You must be signed in as an admin to broadcast');
+        return;
+      }
+
+  const payload = { type, priority, title: title.trim(), message: message.trim(), cta_url: cta.trim() || null, is_banner: isBanner, expiry_date: expiryDate || null };
+
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Failed');
+      toast.success('Broadcast queued successfully');
+      setIsEditing(false);
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Broadcast failed: ' + (e?.message || 'unknown'));
+    }
+  };
+
+  return (
+    <div>
+          {isEditing ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <select value={type} onChange={(e) => setType(e.target.value)} className="col-span-1 p-2 border rounded">
+              <option value="informational">Informational</option>
+              <option value="transactional">Transactional</option>
+              <option value="promotional">Promotional</option>
+            </select>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} className="col-span-1 p-2 border rounded">
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <input value={cta} onChange={(e) => setCta(e.target.value)} placeholder="Optional CTA URL" className="col-span-1 p-2 border rounded" />
+          </div>
+{/* 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex items-center space-x-2">
+              <input type="checkbox" checked={isBanner} onChange={(e) => setIsBanner(e.target.checked)} />
+              <span className="text-sm">Display as banner</span>
+            </label>
+            <input type="datetime-local" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="p-2 border rounded" />
+          </div> */}
+
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="w-full p-2 border rounded" />
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message" rows={4} className="w-full p-2 border rounded" />
+
+          <div className="flex justify-end space-x-3">
+            <button onClick={() => { setIsEditing(false); }} className="px-4 py-2 border rounded">Preview</button>
+            <button onClick={handleBroadcast} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center">
+              <FiSave className="mr-2" />
+              Broadcast
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row justify-between items-start">
+          <div className="p-3 sm:p-4 bg-indigo-50 border border-indigo-100 rounded-lg w-full mb-2 sm:mb-0">
+            <h3 className="text-gray-900 font-semibold mb-1">{title || 'No title set'}</h3>
+            <p className="text-gray-700 text-sm sm:text-base">{message || 'No message set'}</p>
+            {cta && <a className="text-indigo-600 text-sm block mt-2" href={cta} target="_blank" rel="noreferrer">CTA Link</a>}
+          </div>
+          <div className="ml-0 sm:ml-4 flex items-center">
+            <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 whitespace-nowrap flex items-center">
+              <FiEdit className="mr-2" />
+              Edit Broadcast
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AdminSettings = () => {
   // System Banner State
@@ -48,67 +148,10 @@ const AdminSettings = () => {
             </div>
           </div>
 
-          {/* System Banner Section */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
-                <FiAlertTriangle className="mr-2 text-yellow-500" />
-                System Banner
-              </h2>
-            </div>
-
-            <div className="p-4 sm:p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm sm:text-base font-medium text-gray-700 mb-2">
-                    Announcement Text
-                  </label>
-                  {isEditingBanner ? (
-                    <div className="space-y-4">
-                      <textarea
-                        className="w-full p-3 sm:p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                        rows={3}
-                        value={bannerText}
-                        onChange={(e) => setBannerText(e.target.value)}
-                        placeholder="Enter announcement text..."
-                      />
-                      <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
-                        <button
-                          onClick={() => setIsEditingBanner(false)}
-                          className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleBannerUpdate}
-                          className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center text-sm sm:text-base"
-                        >
-                          <FiSave className="mr-2" />
-                          Update Banner
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col sm:flex-row justify-between items-start">
-                      <div className="p-3 sm:p-4 bg-yellow-50 border border-yellow-100 rounded-lg w-full mb-2 sm:mb-0">
-                        <p className="text-gray-800 text-sm sm:text-base">{bannerText}</p>
-                      </div>
-                      <button
-                        onClick={() => setIsEditingBanner(true)}
-                        className="w-full sm:w-auto ml-0 sm:ml-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 whitespace-nowrap flex items-center text-sm sm:text-base"
-                      >
-                        <FiEdit className="mr-2" />
-                        Edit Banner
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          
 
           {/* System Logs Section */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {/* <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
                 <FiActivity className="mr-2 text-indigo-500" />
@@ -159,10 +202,10 @@ const AdminSettings = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div> */}
 
           {/* Admin Roles Section */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {/* <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
                 <FiUser className="mr-2 text-indigo-500" />
@@ -211,8 +254,25 @@ const AdminSettings = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
+
+          {/* Broadcast Notifications Section (styled like System Banner) */}
+          <div className="bg-white rounded-xl shadow-sm mt-6 overflow-hidden">
+            <div className="p-4 sm:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 flex items-center">
+                <FiAlertCircle className="mr-2 text-indigo-500" />
+                Broadcast Notification
+              </h2>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              <div className="space-y-4">
+                {/* Editable broadcast area with preview */}
+                <BroadcastEditor />
+              </div>
+            </div>
+          </div>
       </div>
     </div>
   );
