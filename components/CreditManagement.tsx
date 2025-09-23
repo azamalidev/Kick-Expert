@@ -431,11 +431,149 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
   );
 };
 
+  // Withdraw Modal Component
+  interface WithdrawModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    maxAmount: number;
+    onSubmit: (amount: number) => Promise<void>;
+    minAmount?: number;
+  }
+
+  const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20 }) => {
+    const [amount, setAmount] = useState<number | ''>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
+    const MAX_WITHDRAW_PER_REQUEST = 50;
+
+    useEffect(() => {
+      if (!isOpen) {
+        setAmount('');
+        setIsSubmitting(false);
+        setValidationError(null);
+      }
+    }, [isOpen]);
+
+    const handleSubmit = async () => {
+      // amount entered in credits (1 credit = $1)
+      if (amount === '' || Number(amount) <= 0) {
+        toast.error('Enter a valid number of credits');
+        return;
+      }
+
+      const credits = Math.floor(Number(amount));
+      if (credits < minAmount) {
+        const msg = `Minimum withdrawal is ${minAmount} credits ($${minAmount})`;
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (credits > MAX_WITHDRAW_PER_REQUEST) {
+        const msg = `Maximum withdrawal per request is ${MAX_WITHDRAW_PER_REQUEST} credits`;
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (credits > maxAmount) {
+        toast.error('Insufficient winnings credits for this withdrawal');
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+        setValidationError(null);
+        // convert credits to dollars (1:1) for backend amount
+        await onSubmit(credits);
+        // Show success message from caller; optimistic UI update is handled by parent
+        toast.success('Withdrawal request submitted — pending admin approval');
+        onClose();
+      } catch (err) {
+        console.error('Withdrawal submission error:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to submit withdrawal');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
+                <h2 className="text-lg font-bold text-center">Withdraw Winnings</h2>
+                <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-lime-200">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>${minAmount}</strong>. Maximum per request: <strong>$50</strong>.</p>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Credits)</label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">Cr</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))}
+                      placeholder={`Enter amount to withdraw`}
+                      className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-lime-500 outline-none"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{maxAmount} credits (${maxAmount})</strong></p>
+                  {validationError && <p className="text-sm text-red-600 mt-2">{validationError}</p>}
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="flex-1 bg-lime-600 hover:bg-lime-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Submitting...
+                      </>
+                    ) : (
+                      'Request Withdrawal'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    );
+  };
+
 const CreditManagement: React.FC = () => {
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBuyModalOpen, setBuyModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [withdrawMin] = useState(20);
 
   useEffect(() => {
     fetchBalance();
@@ -475,6 +613,7 @@ const CreditManagement: React.FC = () => {
 
   const [showPayPalModal, setShowPayPalModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ price: number; credits: number } | null>(null);
+  const [pendingWithdraw, setPendingWithdraw] = useState<any | null>(null);
 
   const handlePurchaseCredits = async (price: number, credits: number, method: 'stripe' | 'paypal') => {
     try {
@@ -521,6 +660,74 @@ const CreditManagement: React.FC = () => {
     } catch (error) {
       console.error('Error starting purchase:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to start purchase process');
+    }
+  };
+
+  // Handle withdrawal request submission (creates DB record, pending admin approval)
+  const handleWithdrawSubmit = async (amount: number) => {
+    try {
+      // Ensure session
+      const { data: { session: userSession } } = await supabase.auth.getSession();
+      if (!userSession) {
+        throw new Error('Please sign in to request a withdrawal');
+      }
+
+      // Check Stripe payment account / KYC status
+      const statusRes = await fetch('/api/payments/stripe/status', { headers: { Authorization: `Bearer ${userSession.access_token}` } });
+      if (!statusRes.ok) throw new Error('Failed to check payment account status');
+      const statusBody = await statusRes.json();
+
+      if (!statusBody.exists || statusBody.kyc_status !== 'verified') {
+        // Trigger onboarding - get a fresh onboarding link
+        const onboardRes = await fetch('/api/payments/stripe/onboard', { method: 'POST', headers: { Authorization: `Bearer ${userSession.access_token}` } });
+        if (!onboardRes.ok) throw new Error('Failed to create onboarding link');
+        const onboardBody = await onboardRes.json();
+        if (onboardBody.url) {
+          // Redirect user to Stripe onboarding
+          window.location.href = onboardBody.url;
+          return;
+        }
+        throw new Error('Could not get onboarding link');
+      }
+
+      const response = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userSession.access_token}`
+        },
+        body: JSON.stringify({ amount, userId: userSession.user.id })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create withdrawal request');
+      }
+
+      // Optimistically update UI: deduct winnings credits and notify the user
+      setBalance((prev) => {
+        if (!prev) return prev;
+        const current = prev.winnings_credits || 0;
+        return { ...prev, winnings_credits: Math.max(0, current - amount) };
+      });
+      // Try to parse server response to show details in confirmation modal
+      let respJson: any = null;
+      try {
+        respJson = await response.json().catch(() => null);
+      } catch (e) {
+        respJson = null;
+      }
+
+      // Set pending withdrawal details for modal (fallback to amount if server didn't return details)
+      setPendingWithdraw(respJson || { amount, status: 'pending', created_at: new Date().toISOString() });
+
+      toast.success(`Requested ${amount} credits — deducted from your winnings and pending admin approval`);
+
+      // Refresh balance in background to reconcile with server
+      fetchBalance();
+    } catch (err) {
+      console.error('Withdraw submit error:', err);
+      throw err;
     }
   };
 
@@ -591,9 +798,25 @@ const CreditManagement: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-lime-100 rounded-xl">
               <Coins className="h-6 w-6 text-lime-600" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  // Require at least the minimum available to open withdraw modal
+                  const available = balance?.winnings_credits || 0;
+                  if (available < withdrawMin) {
+                    toast.error(`Minimum withdrawal is ${withdrawMin} credits ($${withdrawMin})`);
+                    return;
+                  }
+                  setIsWithdrawOpen(true);
+                }}
+                className="ml-auto bg-lime-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-lime-700 transition-colors"
+              >
+                Withdraw
+              </button>
             </div>
           </div>
           <h2 className="text-lg font-semibold text-gray-800 mb-1">Winnings Credits</h2>
@@ -681,6 +904,50 @@ const CreditManagement: React.FC = () => {
         onClose={() => setBuyModalOpen(false)}
         onSelectPurchase={handlePurchaseCredits}
       />
+
+      <WithdrawModal
+        isOpen={isWithdrawOpen}
+        onClose={() => setIsWithdrawOpen(false)}
+        maxAmount={balance?.winnings_credits || 0}
+        onSubmit={handleWithdrawSubmit}
+        minAmount={withdrawMin}
+      />
+
+      {/* Pending approval modal shown immediately after a withdrawal request */}
+      <AnimatePresence>
+        {pendingWithdraw && (
+          <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-bold">Withdrawal Requested</h3>
+                  <p className="text-sm text-gray-600">Your withdrawal has been submitted and is pending admin approval.</p>
+                </div>
+                <button onClick={() => setPendingWithdraw(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              </div>
+
+              <div className="mt-4">
+                <div className="text-sm text-gray-700">Amount:</div>
+                <div className="text-2xl font-bold text-lime-600">{pendingWithdraw.amount || pendingWithdraw.credits || ''} credits</div>
+                {pendingWithdraw.id && <div className="mt-2 text-xs text-gray-500">Request ID: {pendingWithdraw.id}</div>}
+                <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <p className="text-sm text-gray-700">What happens next:</p>
+                  <ul className="text-sm text-gray-600 mt-2 space-y-2">
+                    <li>• Admin will review your request and either approve or reject it.</li>
+                    <li>• If approved, the payout will be sent to your connected account (may take a few business days).</li>
+                    <li>• You'll receive a notification when the request status changes.</li>
+                  </ul>
+                </div>
+
+                <div className="mt-4 flex space-x-2">
+                  
+                  <button onClick={() => { setPendingWithdraw(null); fetchBalance(); }} className="flex-1 bg-lime-600 text-white py-2 rounded-lg text-sm">Close</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {selectedPayment && (
         <PayPalPaymentModal

@@ -521,17 +521,6 @@ export default function Navbar() {
               </button>
             </Link>
 
-            <Link href="/leaderboard">
-              <button
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/leaderboard")
-                  ? "bg-lime-100 text-lime-700 shadow-inner"
-                  : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
-                  }`}
-              >
-                <Crown className="w-5 h-5" />
-                <span>Leaderboard</span>
-              </button>
-            </Link>
           </div>
         )}
 
@@ -719,6 +708,7 @@ export default function Navbar() {
                     </>
                   ) : (
                     <>
+                      
                       <Link
                         href="/profile"
                         className={`px-4 py-3 flex items-center transition-colors ${isActive("/profile")
@@ -759,6 +749,17 @@ export default function Navbar() {
                       >
                         <MdDashboard className="mr-3 text-lime-500 text-lg" />
                         <span>Dashboard</span>
+                      </Link>
+                      <Link
+                        href="/leaderboard"
+                        className={`px-4 py-3 flex items-center transition-colors ${isActive("/leaderboard")
+                          ? 'bg-lime-100 text-lime-700'
+                          : 'text-gray-700 hover:bg-lime-50'
+                          }`}
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        <Crown className="mr-3 text-lime-500 size-5" />
+                        <span>Leaderboard</span>
                       </Link>
                       <Link
                         href="/about"
