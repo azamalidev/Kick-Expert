@@ -166,6 +166,103 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
   );
 };
 
+// PayPal Withdraw modal: collect PayPal email and amount, then submit withdrawal
+interface PayPalWithdrawModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  amount: number; // not used, amount is entered by user
+  credits: number; // available winnings credits
+  onSubmit: (amount: number, paypalEmail: string) => Promise<void>;
+}
+
+const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClose, credits, onSubmit }) => {
+  const [amount, setAmount] = useState<number | ''>('');
+  const [paypalEmail, setPaypalEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const MIN_WITHDRAW = 20;
+  const MAX_WITHDRAW = 50;
+
+  useEffect(() => {
+    if (!isOpen) {
+      setAmount('');
+      setPaypalEmail('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const submit = async () => {
+    const amt = amount === '' ? 0 : Math.floor(Number(amount));
+    if (!amt || amt < MIN_WITHDRAW) {
+      toast.error(`Minimum withdrawal is ${MIN_WITHDRAW} credits`);
+      return;
+    }
+    if (amt > MAX_WITHDRAW) {
+      toast.error(`Maximum withdrawal per request is ${MAX_WITHDRAW} credits`);
+      return;
+    }
+    if (amt > credits) {
+      toast.error('Insufficient winnings credits');
+      return;
+    }
+    const email = paypalEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      toast.error('Enter a valid PayPal email');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(amt, email);
+      toast.success('Withdrawal requested — pending admin approval');
+      onClose();
+    } catch (e) {
+      console.error('PayPal withdraw submit error', e);
+      toast.error(e instanceof Error ? e.message : 'Failed to submit withdrawal');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.98 }} transition={{ type: 'spring', stiffness: 300, damping: 25 }} className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-5 text-white relative">
+              <h2 className="text-lg font-bold text-center">Withdraw via PayPal</h2>
+              <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-blue-200"><X size={18} /></button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">Enter your PayPal email and the amount of winnings credits to withdraw. Minimum ${MIN_WITHDRAW} — max ${MAX_WITHDRAW} per request.</p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">PayPal Email</label>
+                <input type="email" value={paypalEmail} onChange={(e) => setPaypalEmail(e.target.value)} placeholder="you@paypal.com" className="block w-full border border-gray-300 px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Credits)</label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">Cr</span>
+                  <input type="number" min={1} step={1} value={amount} onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))} placeholder={`Enter amount to withdraw`} className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{credits} credits (${credits})</strong></p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button onClick={onClose} disabled={isSubmitting} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition-colors">Cancel</button>
+                <button onClick={submit} disabled={isSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors">{isSubmitting ? 'Submitting...' : 'Request Withdrawal'}</button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   isOpen,
   onClose,
@@ -198,7 +295,7 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{packageName}</span></p>
-                <p className="text-2xl font-bold text-lime-600 mt-1">${amount}</p>
+
               </div>
 
               <div className="space-y-4">
@@ -430,27 +527,30 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
     </>
   );
 };
-
+  
   // Withdraw Modal Component
   interface WithdrawModalProps {
     isOpen: boolean;
     onClose: () => void;
     maxAmount: number;
-    onSubmit: (amount: number) => Promise<void>;
+    onSubmit: (amount: number, method: 'stripe' | 'paypal', paypalEmail?: string) => Promise<void>;
     minAmount?: number;
+    method: 'stripe' | 'paypal';
   }
 
-  const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20 }) => {
+  const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20, method }) => {
     const [amount, setAmount] = useState<number | ''>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const MAX_WITHDRAW_PER_REQUEST = 50;
+    const [paypalEmail, setPaypalEmail] = useState<string>('');
 
     useEffect(() => {
       if (!isOpen) {
         setAmount('');
         setIsSubmitting(false);
         setValidationError(null);
+        setPaypalEmail('');
       }
     }, [isOpen]);
 
@@ -476,6 +576,13 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
         return;
       }
 
+      if (method === 'paypal' && !paypalEmail.trim()) {
+        const msg = 'PayPal email is required';
+        setValidationError(msg);
+        toast.error(msg);
+        return;
+      }
+
       if (credits > maxAmount) {
         toast.error('Insufficient winnings credits for this withdrawal');
         return;
@@ -485,7 +592,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
         setIsSubmitting(true);
         setValidationError(null);
         // convert credits to dollars (1:1) for backend amount
-        await onSubmit(credits);
+        await onSubmit(credits, method, paypalEmail);
         // Show success message from caller; optimistic UI update is handled by parent
         toast.success('Withdrawal request submitted — pending admin approval');
         onClose();
@@ -536,6 +643,19 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                   {validationError && <p className="text-sm text-red-600 mt-2">{validationError}</p>}
                 </div>
 
+                {method === 'paypal' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">PayPal Email</label>
+                    <input
+                      type="email"
+                      value={paypalEmail}
+                      onChange={(e) => setPaypalEmail(e.target.value)}
+                      placeholder="Enter your PayPal email"
+                      className="block w-full border border-gray-300 px-3 py-2 rounded-md focus:ring-2 focus:ring-lime-500 outline-none"
+                    />
+                  </div>
+                )}
+
                 <div className="flex space-x-3">
                   <button
                     onClick={onClose}
@@ -566,6 +686,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
       </AnimatePresence>
     );
   };
+
 
 const CreditManagement: React.FC = () => {
   const [balance, setBalance] = useState<CreditBalance | null>(null);
@@ -612,8 +733,11 @@ const CreditManagement: React.FC = () => {
   };
 
   const [showPayPalModal, setShowPayPalModal] = useState(false);
+  const [showPayPalWithdrawModal, setShowPayPalWithdrawModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ price: number; credits: number } | null>(null);
   const [pendingWithdraw, setPendingWithdraw] = useState<any | null>(null);
+  const [isWithdrawMethodOpen, setIsWithdrawMethodOpen] = useState(false);
+  const [withdrawMethod, setWithdrawMethod] = useState<'stripe' | 'paypal' | null>(null);
 
   const handlePurchaseCredits = async (price: number, credits: number, method: 'stripe' | 'paypal') => {
     try {
@@ -664,7 +788,7 @@ const CreditManagement: React.FC = () => {
   };
 
   // Handle withdrawal request submission (creates DB record, pending admin approval)
-  const handleWithdrawSubmit = async (amount: number) => {
+  const handleWithdrawSubmit = async (amount: number, method: 'stripe' | 'paypal', paypalEmail?: string) => {
     try {
       // Ensure session
       const { data: { session: userSession } } = await supabase.auth.getSession();
@@ -672,22 +796,24 @@ const CreditManagement: React.FC = () => {
         throw new Error('Please sign in to request a withdrawal');
       }
 
-      // Check Stripe payment account / KYC status
-      const statusRes = await fetch('/api/payments/stripe/status', { headers: { Authorization: `Bearer ${userSession.access_token}` } });
-      if (!statusRes.ok) throw new Error('Failed to check payment account status');
-      const statusBody = await statusRes.json();
+      if (method === 'stripe') {
+        // Check Stripe payment account / KYC status
+        const statusRes = await fetch('/api/payments/stripe/status', { headers: { Authorization: `Bearer ${userSession.access_token}` } });
+        if (!statusRes.ok) throw new Error('Failed to check payment account status');
+        const statusBody = await statusRes.json();
 
-      if (!statusBody.exists || statusBody.kyc_status !== 'verified') {
-        // Trigger onboarding - get a fresh onboarding link
-        const onboardRes = await fetch('/api/payments/stripe/onboard', { method: 'POST', headers: { Authorization: `Bearer ${userSession.access_token}` } });
-        if (!onboardRes.ok) throw new Error('Failed to create onboarding link');
-        const onboardBody = await onboardRes.json();
-        if (onboardBody.url) {
-          // Redirect user to Stripe onboarding
-          window.location.href = onboardBody.url;
-          return;
+        if (!statusBody.exists || statusBody.kyc_status !== 'verified') {
+          // Trigger onboarding - get a fresh onboarding link
+          const onboardRes = await fetch('/api/payments/stripe/onboard', { method: 'POST', headers: { Authorization: `Bearer ${userSession.access_token}` } });
+          if (!onboardRes.ok) throw new Error('Failed to create onboarding link');
+          const onboardBody = await onboardRes.json();
+          if (onboardBody.url) {
+            // Redirect user to Stripe onboarding
+            window.location.href = onboardBody.url;
+            return;
+          }
+          throw new Error('Could not get onboarding link');
         }
-        throw new Error('Could not get onboarding link');
       }
 
       const response = await fetch('/api/withdrawals', {
@@ -696,7 +822,7 @@ const CreditManagement: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userSession.access_token}`
         },
-        body: JSON.stringify({ amount, userId: userSession.user.id })
+        body: JSON.stringify({ amount, userId: userSession.user.id, method, paypal_email: paypalEmail })
       });
 
       if (!response.ok) {
@@ -805,13 +931,14 @@ const CreditManagement: React.FC = () => {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => {
-                  // Require at least the minimum available to open withdraw modal
+                  // Require at least the minimum available to open withdraw flow
                   const available = balance?.winnings_credits || 0;
                   if (available < withdrawMin) {
                     toast.error(`Minimum withdrawal is ${withdrawMin} credits ($${withdrawMin})`);
                     return;
                   }
-                  setIsWithdrawOpen(true);
+                  // Open the payment method modal first (Stripe / PayPal)
+                  setIsWithdrawMethodOpen(true);
                 }}
                 className="ml-auto bg-lime-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-lime-700 transition-colors"
               >
@@ -911,6 +1038,41 @@ const CreditManagement: React.FC = () => {
         maxAmount={balance?.winnings_credits || 0}
         onSubmit={handleWithdrawSubmit}
         minAmount={withdrawMin}
+        method={withdrawMethod || 'stripe'}
+      />
+
+      {/* Payment Method modal for withdraw flow */}
+      <PaymentMethodModal
+        isOpen={isWithdrawMethodOpen}
+        onClose={() => setIsWithdrawMethodOpen(false)}
+        onSelectMethod={(method) => {
+          // For withdraw flow: if PayPal chosen, open PayPal withdraw modal to collect email + amount
+          if (method === 'paypal') {
+            setWithdrawMethod('paypal');
+            setIsWithdrawMethodOpen(false);
+            setShowPayPalWithdrawModal(true);
+            return;
+          }
+          // Set the method and open the Withdraw modal to enter amount (Stripe)
+          setWithdrawMethod(method);
+          setIsWithdrawMethodOpen(false);
+          setIsWithdrawOpen(true);
+        }}
+        packageName={`Withdraw to bank`}
+        amount={0}
+      />
+
+      {/* PayPal-specific withdraw modal: collects PayPal email + amount and submits immediately */}
+      <PayPalWithdrawModal
+        isOpen={showPayPalWithdrawModal}
+        onClose={() => setShowPayPalWithdrawModal(false)}
+        amount={0}
+        credits={balance?.winnings_credits || 0}
+        onSubmit={async (amount: number, paypalEmail: string) => {
+          // Delegate to the shared handler
+          await handleWithdrawSubmit(amount, 'paypal', paypalEmail);
+          setShowPayPalWithdrawModal(false);
+        }}
       />
 
       {/* Pending approval modal shown immediately after a withdrawal request */}
