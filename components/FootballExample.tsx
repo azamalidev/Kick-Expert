@@ -201,6 +201,35 @@ Tailor your response as if you're speaking to an advanced football fan who value
             height={50}
             className="w-8 h-8 md:w-12 md:h-12"
           />
+
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch("/api/send-transactional", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    type: "test", // 👈 This matches your handler's "test" type
+                    to: "aazam7246@gmail.com", // Replace with real email OR state variable
+                    data: {} // For "test", no extra data is needed
+                  }),
+                });
+
+                if (!res.ok) throw new Error("Failed to send email");
+
+                alert("✅ Test email sent successfully!");
+              } catch (err) {
+                console.error("Email send error:", err);
+                alert("❌ Failed to send test email.");
+              }
+            }}
+            className="bg-lime-500 hover:bg-lime-600 text-white px-4 py-2 rounded-lg ml-2"
+          >
+            Send Test Email
+          </button>
+
           <span className="ml-2 text-lime-400  font-bold text-xl md:text-2xl">
             Kick<span className="text-black ml-1">Expert</span>
           </span>
