@@ -10,6 +10,7 @@ import {
   getProgressToNextRank,
 } from "../utils/rankSystem";
 import { Trophy, TrophyStats } from "../types/trophy";
+import Link from "next/link";
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -64,7 +65,11 @@ interface SupportTicket {
 
 export default function Dashboard() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [purchasedCredits, setPurchasedCredits] = useState<number>(0);
+  const [winningsCredits, setWinningsCredits] = useState<number>(0);
+  const [referralCredits, setReferralCredits] = useState<number>(0);
+  const [totalCredits, setTotalCredits] = useState<number>(0);
+  const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
     []
   );
@@ -82,18 +87,20 @@ export default function Dashboard() {
   // Fallback states for when data is loading
   const [username, setUsername] = useState<string>("Loading...");
   const [userEmail, setUserEmail] = useState<string>("Loading...");
-  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [entryCredits, setEntryCredits] = useState<number>(2);
   const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(0);
   const [winPercentage, setWinPercentage] = useState<number>(0);
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
   const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
-  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  // default to history tab
   const [activeTab, setActiveTab] = useState<
     "wallet" | "history" | "notifications" | "support"
-  >("wallet");
+  >("history");
   const [supportTopic, setSupportTopic] = useState<string>("");
   const [supportDescription, setSupportDescription] = useState<string>("");
+  // Pagination for history
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 5; // items per page (show 5 results per page)
 
   // Handle client-side mounting to prevent hydration errors
   useEffect(() => {
@@ -160,50 +167,36 @@ export default function Dashboard() {
         setWinPercentage(winPercent);
       }
 
-      // Fetch wallet data
-      const { data: wallet, error: walletError } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", user.id)
-        .single();
+      // We're not using the `wallets` table anymore. Credits are shown from
+      // the `user_credits` table below.
 
-      if (walletError) {
-        console.error("Error fetching wallet:", walletError);
-        // Create wallet if it doesn't exist
-        if (walletError.code === "PGRST116") {
-          const { error: createWalletError } = await supabase
-            .from("wallets")
-            .insert({
-              user_id: user.id,
-              balance: 0,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
+      // Fetch user credits (new table `user_credits`) if available
+      try {
+        const { data: creditsData, error: creditsError } = await supabase
+          .from('user_credits')
+          .select('purchased_credits, winnings_credits, referral_credits')
+          .eq('user_id', user.id)
+          .single();
 
-          if (!createWalletError) {
-            setWalletBalance(0);
-          }
+        if (creditsError) {
+          // If table doesn't exist or permission error, log and continue
+          console.warn('user_credits fetch error (table may be missing):', creditsError.message || creditsError);
+        } else if (creditsData) {
+          const purchased = Number(creditsData.purchased_credits) || 0;
+          const winnings = Number(creditsData.winnings_credits) || 0;
+          // We intentionally do NOT surface referral credits in the main UI
+          setPurchasedCredits(purchased);
+          setWinningsCredits(winnings);
+          setReferralCredits(Number(creditsData.referral_credits) || 0); // keep in state but don't display
+          // Total shown to users should exclude referral credits per request
+          setTotalCredits(purchased + winnings);
         }
-      } else if (wallet) {
-        setWalletData(wallet);
-        setWalletBalance(Number(wallet.balance) || 0);
+      } catch (err) {
+        console.warn('Unexpected error fetching user_credits:', err);
       }
 
-      // Fetch total earnings from transactions
-      const { data: transactions, error: transactionsError } = await supabase
-        .from("transactions")
-        .select("amount")
-        .eq("user_id", user.id)
-        .eq("type", "reward")
-        .eq("status", "completed");
-
-      if (!transactionsError && transactions) {
-        const totalEarned = transactions.reduce(
-          (sum, transaction) => sum + (Number(transaction.amount) || 0),
-          0
-        );
-        setTotalEarnings(totalEarned);
-      }
+      // We no longer show Total Earnings as part of the dashboard. Keep
+      // transactions fetch for history only (fetchTransactions handles history).
 
       setLoading(false);
     } catch (error) {
@@ -258,6 +251,7 @@ export default function Dashboard() {
 
       if (data) {
         setTransactions(data);
+        setCurrentPage(1);
       }
     } catch (error) {
       console.error("Error fetching transactions:", error);
@@ -324,77 +318,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleWithdraw = async () => {
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount)) {
-      toast.error("Please enter a valid amount");
-      return;
-    }
-    if (amount < 5) {
-      toast.error("Minimum withdrawal amount is $5.00");
-      return;
-    }
-    if (amount > walletBalance) {
-      toast.error("Insufficient funds");
-      return;
-    }
-
-    try {
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("User not authenticated");
-        return;
-      }
-
-      // Update wallet balance in database
-      const newBalance = walletBalance - amount;
-      const { error: updateError } = await supabase
-        .from("wallets")
-        .update({
-          balance: newBalance,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (updateError) {
-        toast.error("Failed to process withdrawal");
-        console.error("Withdrawal error:", updateError);
-        return;
-      }
-
-      // Log the withdrawal transaction
-      const { error: transactionError } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: user.id,
-          amount: -amount, // Negative for withdrawal
-          type: "withdrawal",
-          status: "completed",
-          description: `Withdrawal of $${amount.toFixed(2)}`,
-          source: "manual_withdrawal",
-          created_at: new Date().toISOString(),
-        });
-
-      if (transactionError) {
-        console.error("Transaction logging error:", transactionError);
-        // Don't fail the withdrawal if transaction logging fails
-      }
-
-      // Update local state
-      setWalletBalance(newBalance);
-      setShowWithdrawModal(false);
-      setWithdrawAmount("");
-      toast.success(`Successfully withdrew $${amount.toFixed(2)}`);
-      // Refresh transactions
-      fetchTransactions();
-    } catch (error) {
-      console.error("Withdrawal error:", error);
-      toast.error("Failed to process withdrawal");
-    }
-  };
+  // Withdraw functionality removed - credits management handled via user_credits
 
   const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -483,47 +407,16 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          {/* Withdraw Modal */}
-          {showWithdrawModal && (
+          {/* Credits Modal (placeholder) */}
+          {showCreditsModal && (
             <div className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-lg">
               <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-gray-200 shadow-2xl">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">
-                  Withdraw Funds
+                  Manage Credits
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  Enter the amount you wish to withdraw. Current balance: $
-                  {walletBalance.toFixed(2)}. Min $5.00.
-                </p>
-
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold mb-2 text-gray-600">
-                    Amount
-                  </label>
-                  <input
-                    type="number"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-lime-400 text-gray-700 placeholder-gray-400"
-                    placeholder="e.g., 20.00"
-                    step="0.01"
-                    min="5"
-                    max={walletBalance}
-                  />
-                </div>
-
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => setShowWithdrawModal(false)}
-                    className="flex-1 py-3 px-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition duration-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleWithdraw}
-                    className="flex-1 py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
-                  >
-                    Confirm Withdraw
-                  </button>
+                <p className="text-gray-600 mb-4">This area will allow users to purchase or manage their credits. Implement your payment/purchase flow here.</p>
+                <div className="flex justify-end">
+                  <button onClick={() => setShowCreditsModal(false)} className="px-4 py-2 bg-gray-100 rounded-lg">Close</button>
                 </div>
               </div>
             </div>
@@ -657,12 +550,14 @@ export default function Dashboard() {
 
             {/* Enhanced Stats Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-              {/* Wallet Balance */}
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 py-8 rounded-xl border-2 border-green-200 hover:border-green-400 transition duration-200 shadow-md hover:shadow-lg">
+              {/* Credits card (replacing Wallet Balance) - kept above */}
+
+              {/* Total Credits card (excludes referral) */}
+              <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-5 py-8 rounded-xl border-2 border-lime-200 hover:border-lime-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg mr-3">
+                  <div className="p-2 bg-lime-100 rounded-lg mr-3">
                     <svg
-                      className="w-6 h-6 text-green-600"
+                      className="w-6 h-6 text-lime-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -677,13 +572,44 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Wallet Balance
+                      Total Credits
                     </p>
-                    <p className="text-xl font-bold text-green-700">
-                      ${walletBalance.toFixed(2)}
+                    <p className="text-xl font-bold text-lime-700">
+                      {totalCredits.toFixed(2)}
                     </p>
                   </div>
                 </div>
+          
+              </div>
+
+              {/* Winnings-only card */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
+                <div className="flex items-center">
+                  <div className="p-2 bg-emerald-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-emerald-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Winnings Credits
+                    </p>
+                    <p className="text-xl font-bold text-emerald-700">
+                      {winningsCredits.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
               </div>
 
               {/* XP Points */}
@@ -773,40 +699,14 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Total Earnings */}
-              <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-5 py-8 rounded-xl border-2 border-purple-200 hover:border-purple-400 transition duration-200 shadow-md hover:shadow-lg">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                    <svg
-                      className="w-6 h-6 text-purple-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Total Earnings
-                    </p>
-                    <p className="text-xl font-bold text-purple-700">
-                      ${totalEarnings.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              {/* (Removed Total Earnings card as per request) */}
             </div>
 
             {/* Action Buttons */}
+            <Link href="/credits/manage">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <button
-                onClick={() => setShowWithdrawModal(true)}
+                
                 className="w-full py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center"
               >
                 <svg
@@ -822,9 +722,9 @@ export default function Dashboard() {
                     d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                Withdraw Funds
+                Withdraw Credits
               </button>
-            </div>
+            </div></Link>
 
             {/* Leaderboard Section */}
             {/* <div className="bg-white rounded-2xl p-6 my-8 shadow-md border border-gray-100">
@@ -975,7 +875,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center mb-6">
                 <div className="w-full grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-2 md:justify-center">
                   {/* Wallet Button */}
-                  <button
+                  {/* <button
                     onClick={() => setActiveTab("wallet")}
                     className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors ${
                       activeTab === "wallet"
@@ -997,7 +897,7 @@ export default function Dashboard() {
                       />
                     </svg>
                     Wallet
-                  </button>
+                  </button> */}
 
                   {/* History Button */}
                   <button
@@ -1025,7 +925,7 @@ export default function Dashboard() {
                   </button>
 
                   {/* Notifications Button */}
-                  <button
+                  {/* <button
                     onClick={() => setActiveTab("notifications")}
                     className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors relative ${
                       activeTab === "notifications"
@@ -1050,7 +950,7 @@ export default function Dashboard() {
                       2
                     </span>
                     Notifications
-                  </button>
+                  </button> */}
 
                   {/* Support Button */}
                   <button
@@ -1080,7 +980,7 @@ export default function Dashboard() {
               </div>
 
               {/* Wallet Tab Content */}
-              {activeTab === "wallet" && (
+              {/* {activeTab === "wallet" && (
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-800">
@@ -1098,24 +998,7 @@ export default function Dashboard() {
                       )}
                     </button>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-500 uppercase">
-                          Current Balance
-                        </p>
-                        <p className="text-xl font-bold text-lime-600">
-                          ${walletBalance.toFixed(2)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowWithdrawModal(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                      >
-                        Withdraw
-                      </button>
-                    </div>
-                  </div>
+               
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
                     Recent Transactions
                   </h3>
@@ -1190,14 +1073,14 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-              )}
+              )} */}
 
               {/* History Tab Content */}
               {activeTab === "history" && (
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-800">
-                      Transaction History
+                       History
                     </h3>
                     <button
                       onClick={fetchTransactions}
@@ -1220,58 +1103,86 @@ export default function Dashboard() {
                     </div>
                   ) : transactions.length > 0 ? (
                     <div className="space-y-4">
-                      {transactions.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          className="flex justify-between items-start p-3 hover:bg-gray-50 rounded-lg transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="text-2xl">
-                              {getTransactionIcon(transaction.type)}
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-800">
-                                {transaction.description}
-                              </p>
-                              <p className="text-sm text-gray-500 mt-1">
-                                {transaction.source} •{" "}
-                                {new Date(
-                                  transaction.created_at
-                                ).toLocaleDateString()}
-                              </p>
-                              <span
-                                className={`inline-block px-2 py-1 rounded-full text-xs font-semibold mt-1 ${
-                                  transaction.status === "completed"
-                                    ? "bg-green-100 text-green-800"
-                                    : transaction.status === "pending"
-                                      ? "bg-yellow-100 text-yellow-800"
-                                      : "bg-red-100 text-red-800"
-                                }`}
+                      {(() => {
+                        const start = (currentPage - 1) * pageSize;
+                        const end = start + pageSize;
+                        const paginated = transactions.slice(start, end);
+                        return (
+                          <>
+                            {paginated.map((transaction) => (
+                              <div
+                                key={transaction.id}
+                                className="p-4 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow"
                               >
-                                {transaction.status
-                                  ? transaction.status.charAt(0).toUpperCase() +
-                                    transaction.status.slice(1)
-                                  : "Unknown"}
-                              </span>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-start space-x-4">
+                                    <div className="text-2xl mt-1">
+                                      {getTransactionIcon(transaction.type)}
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-gray-800">
+                                        {transaction.description}
+                                      </p>
+                                      <p className="text-sm text-gray-500 mt-1">
+                                        {transaction.source} • {new Date(transaction.created_at).toLocaleDateString()}
+                                      </p>
+                                      <div className="mt-2">
+                                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${transaction.status === "completed" ? "bg-green-100 text-green-800" : transaction.status === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
+                                          {transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : "Unknown"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className={`text-lg font-bold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                      {transaction.amount >= 0 ? "+" : ""}${Math.abs(transaction.amount).toFixed(2)}
+                                    </p>
+                                    <p className="text-sm text-gray-500 capitalize">{transaction.type}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Improved Pagination controls */}
+                            <div className="flex flex-col md:flex-row items-center justify-between mt-4">
+                              <div className="text-sm text-gray-600 mb-2 md:mb-0">
+                                Showing {(start + 1)}-{Math.min(end, transactions.length)} of {transactions.length}
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                            
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                  disabled={currentPage === 1}
+                                  className="px-3 py-2 bg-gray-100 rounded-md disabled:opacity-50"
+                                >
+                                  ‹ Prev
+                                </button>
+
+                                {/* page numbers */}
+                                {Array.from({ length: Math.ceil(transactions.length / pageSize) }, (_, i) => i + 1).map((pageNum) => (
+                                  <button
+                                    key={pageNum}
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className={`px-3 py-2 rounded-md ${pageNum === currentPage ? 'bg-lime-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                ))}
+
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(transactions.length / pageSize), p + 1))}
+                                  disabled={currentPage >= Math.ceil(transactions.length / pageSize)}
+                                  className="px-3 py-2 bg-gray-100 rounded-md disabled:opacity-50"
+                                >
+                                  Next ›
+                                </button>
+                    
+                              </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <p
-                              className={`text-lg font-bold ${
-                                transaction.amount >= 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              {transaction.amount >= 0 ? "+" : ""}$
-                              {Math.abs(transaction.amount).toFixed(2)}
-                            </p>
-                            <p className="text-sm text-gray-500 capitalize">
-                              {transaction.type}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="p-8 text-center text-gray-500">
@@ -1285,7 +1196,7 @@ export default function Dashboard() {
               )}
 
               {/* Notifications Tab Content */}
-              {activeTab === "notifications" && (
+              {/* {activeTab === "notifications" && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
                     Notifications
@@ -1351,7 +1262,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Support Tab Content */}
               {activeTab === "support" && (

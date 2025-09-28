@@ -163,17 +163,32 @@ export default function Navbar() {
 
       // Keep top 15 most recent
       const recentNotifications = merged.slice(0, 15);
-      setNotifications(recentNotifications);
 
-      // Calculate unread count using `is_read` boolean
-      const unread = recentNotifications.filter(notif => !notif.is_read).length;
+      // If a lastNotificationCheck exists (persisted), treat any notification
+      // with created_at <= lastNotificationCheck as read for local display
+      // and unread count calculation. This avoids showing the "new" badge
+      // after the user already viewed notifications when DB updates may be
+      // blocked by RLS.
+      const effective = recentNotifications.map(n => {
+        try {
+          const created = new Date(n.created_at);
+          if (lastNotificationCheck && created <= lastNotificationCheck) {
+            return { ...n, is_read: true };
+          }
+        } catch (err) {
+          // ignore parse errors and keep original is_read
+        }
+        return n;
+      });
+
+      setNotifications(effective);
+
+      // Calculate unread count using the effective is_read (local) value
+      const unread = effective.filter(notif => !notif.is_read).length;
       setUnreadCount(unread);
 
-      // Check for new notifications since last check
-      const newNotifications = recentNotifications.filter(notif =>
-        new Date(notif.created_at) > lastNotificationCheck
-      );
-
+      // Check for new notifications since last check (only those strictly newer)
+      const newNotifications = effective.filter(notif => new Date(notif.created_at) > (lastNotificationCheck || new Date(0)));
       if (newNotifications.length > 0 && !notificationOpen) {
         setNewNotificationAlert(true);
         // Show toast for new notifications
@@ -184,8 +199,10 @@ export default function Navbar() {
         }
       }
 
-      // Update last check time
-      setLastNotificationCheck(new Date());
+      // Do NOT update last-seen here. We only persist last-seen when the
+      // user actively opens/views notifications (see markNotificationsAsRead)
+      // or clicks an individual notification. Updating it here would cause
+      // fetches (e.g. on mount) to incorrectly advance the last-seen time.
 
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -211,6 +228,14 @@ export default function Navbar() {
             setNotifications(prev => prev.map(n => n.id ? { ...n, is_read: true } : n));
             setUnreadCount(0);
             setNewNotificationAlert(false);
+            // Persist last-seen timestamp now that DB update succeeded
+            try {
+              const now = new Date();
+              setLastNotificationCheck(now);
+              if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem('ke.notifications.lastSeenAt', now.toISOString());
+              }
+            } catch (err) { /* ignore */ }
           return;
         }
       }
@@ -219,6 +244,17 @@ export default function Navbar() {
       setNotifications(prev => prev.map(notif => ({ ...notif, is_read: true })));
       setUnreadCount(0);
       setNewNotificationAlert(false);
+
+      // Persist last-seen timestamp so refresh doesn't trigger "new" badges
+      try {
+        const now = new Date();
+        setLastNotificationCheck(now);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem('ke.notifications.lastSeenAt', now.toISOString());
+        }
+      } catch (err) {
+        // ignore storage errors
+      }
     } catch (error) {
       console.error("Error marking notifications as read:", error);
     }
@@ -226,6 +262,16 @@ export default function Navbar() {
 
   // Monitor auth state and fetch user data
   useEffect(() => {
+    // Initialize lastNotificationCheck from localStorage to avoid marking
+    // old notifications as "new" after a page refresh.
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const v = localStorage.getItem('ke.notifications.lastSeenAt');
+        if (v) setLastNotificationCheck(new Date(v));
+      }
+    } catch (err) {
+      // ignore
+    }
     const fetchUserData = async (userId: string) => {
       try {
         const { data, error } = await supabase
@@ -473,6 +519,60 @@ export default function Navbar() {
     }
   };
 
+  // Format unread badge count (cap at 9+ for small navbar badge)
+  const formatBadgeCount = (count: number) => {
+    if (!count || count <= 0) return '';
+    if (count > 9) return '9+';
+    return String(count);
+  };
+
+  // Handle click on a single notification in the navbar dropdown
+  const handleNotificationItemClick = async (notif: any) => {
+    if (!notif) return;
+
+    // Close dropdown immediately for snappy UX
+    setNotificationOpen(false);
+
+    // Optimistic update: mark as read locally
+    const prev = notifications;
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    setUnreadCount(u => Math.max(0, (u || 0) - (notif.is_read ? 0 : 1)));
+
+    try {
+      // Attempt to mark read in DB (if the table and permissions allow)
+      if (notif.id && user) {
+        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
+        if (error) {
+          console.warn('Failed to mark notification as read in DB:', error);
+        }
+      }
+    } catch (err) {
+      console.error('Error updating notification read state:', err);
+      // revert optimistic update
+      setNotifications(prev);
+      // Recalculate unread count from reverted state
+      setUnreadCount((prev as any[]).filter(n => !n.is_read).length);
+    }
+
+    // Navigate to a link if provided, otherwise go to the notifications page
+    try {
+      const target = notif?.url || notif?.link || '/user_notifications';
+      router.push(target);
+    } catch (err) {
+      console.error('Navigation error after clicking notification:', err);
+    }
+    // Persist last-seen timestamp after successful interaction
+    try {
+      const now = new Date();
+      setLastNotificationCheck(now);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('ke.notifications.lastSeenAt', now.toISOString());
+      }
+    } catch (err) {
+      // ignore storage errors
+    }
+  };
+
   return (
     <nav className="bg-white w-full z-50 shadow-sm fixed top-0">
       <div className="flex justify-between items-center px-4 py-3 md:px-8 lg:px-10">
@@ -526,9 +626,9 @@ export default function Navbar() {
 
         {/* Right Icons - Desktop */}
         <div className="hidden lg:flex items-center gap-6">
-          {role !== "admin" && (
+          {/* {role !== "admin" && (
             <div className="relative flex">
-              {/* Search Bar */}
+         
               <div
                 className={`absolute right-[-10px] bottom-[-10] bg-white border border-gray-200 rounded-full overflow-hidden transition-all duration-300 ease-in-out shadow-md ${isOpen ? "w-56 opacity-100" : "w-0 opacity-0"
                   }`}
@@ -545,7 +645,6 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Search Button */}
               <button
                 onClick={toggleSearch}
                 className={`text-gray-600 hover:text-lime-600 text-lg cursor-pointer transition-colors z-10 ${isOpen ? "text-lime-600" : ""
@@ -555,19 +654,19 @@ export default function Navbar() {
                 <FaSearch />
               </button>
             </div>
-          )}
+          )} */}
 
           {user && (
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={handleNotificationClick}
-                className="text-gray-600 hover:text-lime-600 cursor-pointer mt-[7px] text-lg transition-colors relative"
+                className="text-gray-600 hover:text-lime-600 cursor-pointer mt-[7px] text-lg transition-colors relative focus:outline-none"
                 aria-label="Notifications"
               >
                 <FaBell />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-bounce">
-                    {unreadCount}
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[11px] font-semibold">
+                    {formatBadgeCount(unreadCount)}
                   </span>
                 )}
                 {newNotificationAlert && unreadCount === 0 && (
@@ -594,8 +693,12 @@ export default function Navbar() {
                       notifications.slice(0, 3).map((notif) => (
                         <div
                           key={notif.id}
-                          className={`px-3 py-2 hover:bg-lime-50 transition-colors border-b border-gray-100 last:border-b-0 ${!notif.is_read ? 'bg-lime-50' : ''
-                            }`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleNotificationItemClick(notif)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleNotificationItemClick(notif); }}
+                          className={`px-3 py-2 hover:bg-lime-50 transition-colors border-b border-gray-100 last:border-b-0 cursor-pointer ${!notif.is_read ? 'bg-lime-50' : ''}
+                            `}
                         >
                           <div className="flex items-start gap-2">
                             {/* Notification Icon */}

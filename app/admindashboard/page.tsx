@@ -113,8 +113,8 @@ export default function AdminDashboard() {
                   <div className="flex items-center space-x-3">
                     <FiShield className="text-red-500 text-xl" />
                     <div>
-                      <h3 className="font-medium text-gray-900">super_admin@example.com</h3>
-                      <p className="text-sm text-gray-500">Super Admin</p>
+                      <h3 className="font-medium text-gray-900">admin@example.com</h3>
+                      <p className="text-sm text-gray-500">Admin</p>
                     </div>
                   </div>
                 </div>
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center space-x-3">
                     <FiShield className="text-blue-500 text-xl" />
                     <div>
-                      <h3 className="font-medium text-gray-900">admin@example.com</h3>
+                      <h3 className="font-medium text-gray-900">admin@gmail.com</h3>
                       <p className="text-sm text-gray-500">Admin</p>
                     </div>
                   </div>

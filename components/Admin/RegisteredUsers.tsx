@@ -255,8 +255,8 @@ const handleDelete = async (id: string) => {
 
         {/* Edit User Modal */}
         {editUser && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Edit User</h2>
               <form onSubmit={handleUpdate} className="space-y-4">
                 <div>
@@ -316,8 +316,8 @@ const handleDelete = async (id: string) => {
 
         {/* Delete Confirmation Modal */}
         {deleteConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+          <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-100 flex items-center justify-center  z-50">
+            <div className="bg-white shadow-2xl rounded-lg p-6 w-full max-w-sm">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Confirm Deletion</h2>
               <p className="text-gray-600 mb-6">Are you sure you want to delete this user? This action cannot be undone.</p>
               <div className="flex justify-end space-x-3">
