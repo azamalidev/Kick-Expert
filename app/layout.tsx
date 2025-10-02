@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { SupabaseProvider } from '../lib/supabase/provider';
 import './globals.css';
+import { Toaster } from 'react-hot-toast';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -12,7 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <SupabaseProvider>{children}</SupabaseProvider>
+        <SupabaseProvider>
+          <Toaster position="top-center" />
+          {children}
+        </SupabaseProvider>
       </body>
     </html>
   );

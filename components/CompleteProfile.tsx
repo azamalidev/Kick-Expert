@@ -115,59 +115,89 @@ export default function CompleteProfile() {
         if (error) throw error;
 
         if (!session?.user) {
-          router.push('/login');
-          return;
-        }
-
-        setUser(session.user);
-
-        // Get the name from signup data
-        const userMetadata = session.user.user_metadata;
-        if (userMetadata?.name) {
-          setUserName(userMetadata.name);
-        } else {
-          // Fallback: try to get from users table
-          const { data: userData } = await supabase
-            .from('users')
-            .select('name')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (userData?.name) {
-            setUserName(userData.name);
+          // If we have a verified email param, let the user complete profile without session
+          const params = new URLSearchParams(window.location.search);
+          const verified = params.get('verified');
+          const email = params.get('email');
+          if (verified === '1' && email) {
+            // fetch prefill data from server
+            try {
+              const r = await fetch(`/api/profile/prefill?email=${encodeURIComponent(email)}`);
+              if (r.ok) {
+                const json = await r.json();
+                setUser({ id: null, email: json.email });
+                if (json.name) {
+                  setUserName(json.name);
+                } else {
+                  setUserName("User");
+                }
+                // do not navigate to login — allow completion flow
+              } else {
+                router.push('/login');
+                return;
+              }
+            } catch (e) {
+              console.error('prefill fetch failed', e);
+              router.push('/login');
+              return;
+            }
           } else {
-            setUserName("User");
-          }
-        }
-
-        // Check if user already has a profile
-        const { data: existingProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error('Error loading profile:', profileError);
-        }
-
-        // If profile exists and appears complete, send user to dashboard.
-        // Otherwise, prefill fields from any partial profile and allow completion here.
-        if (existingProfile) {
-          const hasUsername = !!existingProfile.username;
-          const hasAvatar = !!existingProfile.avatar_url;
-          const hasNationality = !!existingProfile.nationality;
-
-          if (hasUsername && hasAvatar && hasNationality) {
-            // Profile appears complete — redirect to dashboard
-            router.replace('/');
+            router.push('/login');
             return;
           }
+        } else {
+          setUser(session.user);
 
-          // Prefill any available fields so the user can complete missing pieces
-          if (existingProfile.username) setUserName(existingProfile.username);
-          if (existingProfile.avatar_url) setAvatarPreview(existingProfile.avatar_url);
-          if (existingProfile.nationality) setNationality(existingProfile.nationality);
+          // Get the name from signup data
+          const sessUser = session.user;
+          const userMetadata = sessUser?.user_metadata;
+          if (userMetadata?.name) {
+            setUserName(userMetadata.name);
+          } else {
+            // Fallback: try to get from users table
+            const { data: userData } = await supabase
+              .from('users')
+              .select('name')
+              .eq('id', sessUser?.id)
+              .single();
+            
+            if (userData?.name) {
+              setUserName(userData.name);
+            } else {
+              setUserName("User");
+            }
+          }
+
+          // Check if user already has a profile
+          const { data: existingProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', sessUser?.id)
+            .maybeSingle();
+
+          if (profileError) {
+            console.error('Error loading profile:', profileError);
+          }
+
+          // If profile exists and appears complete, send user to dashboard.
+          // Otherwise, prefill fields from any partial profile and allow completion here.
+          if (existingProfile) {
+            const hasUsername = !!existingProfile.username;
+            const hasAvatar = !!existingProfile.avatar_url;
+            const hasNationality = !!existingProfile.nationality;
+
+            if (hasUsername && hasAvatar && hasNationality) {
+              // Profile appears complete — redirect to dashboard
+              router.replace('/');
+              return;
+            }
+
+            // Prefill any available fields so the user can complete missing pieces
+            if (existingProfile.username) setUserName(existingProfile.username);
+            if (existingProfile.avatar_url) setAvatarPreview(existingProfile.avatar_url);
+            if (existingProfile.nationality) setNationality(existingProfile.nationality);
+          }
+
         }
 
       } catch (error: any) {
@@ -252,33 +282,48 @@ export default function CompleteProfile() {
     const toastId = toast.loading('Setting up your profile...');
 
     try {
-      // Upload image first
-      setUploadProgress(0);
-      const avatarUrl = await uploadImage(user.id);
+      // If we have a real signed-in user, use the client-side upload flow
+      if (user?.id) {
+        // Upload image first
+        setUploadProgress(0);
+        const avatarUrl = await uploadImage(user.id);
 
-      // Upsert profile data (handles partial existing rows created by auth triggers)
-      const profilePayload = {
-        user_id: user.id,
-        username: userName.trim() || null,
-        avatar_url: avatarUrl || null,
-        nationality: nationality || null,
-        updated_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
+        // Upsert profile data (handles partial existing rows created by auth triggers)
+        const profilePayload = {
+          user_id: user.id,
+          username: userName.trim() || null,
+          avatar_url: avatarUrl || null,
+          nationality: nationality || null,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
 
-      const { data: upserted, error: upsertError } = await supabase
-        .from('profiles')
-        .upsert([profilePayload], { onConflict: 'user_id' })
-        .select()
-        .single();
+        const { data: upserted, error: upsertError } = await supabase
+          .from('profiles')
+          .upsert([profilePayload], { onConflict: 'user_id' })
+          .select()
+          .single();
 
-      if (upsertError) throw upsertError;
+        if (upsertError) throw upsertError;
 
-  toast.success('Profile saved!', { id: toastId });
+        toast.success('Profile saved!', { id: toastId });
 
-  // Redirect to dashboard after successful save
-  router.replace('/');
+        // Redirect to dashboard after successful save
+        router.replace('/');
+      } else {
+        // No session case: post form (including avatar file) to server endpoint
+        const form = new FormData();
+        form.append('email', user.email || '');
+        form.append('username', userName.trim() || '');
+        form.append('nationality', nationality || '');
+        if (avatarFile) form.append('avatar', avatarFile);
 
+        const r = await fetch('/api/profile/complete', { method: 'POST', body: form });
+        if (!r.ok) throw new Error('Server profile completion failed');
+
+        toast.success('Profile saved! Please log in.', { id: toastId });
+        router.replace('/login');
+      }
     } catch (error: any) {
       console.error('Profile setup error:', error);
       let errorMessage = 'Profile setup failed. Please try again.';

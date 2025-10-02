@@ -13,6 +13,7 @@ import SportsArticle from "@/components/SportsArticle";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { Suspense } from "react";
+import NewsletterForm from "@/components/NewsletterForm";
 
 export default function Home() {
   const pathname = usePathname();
@@ -75,6 +76,7 @@ export default function Home() {
 
       <div className="w-full mt-10 md:mt-20"></div>
       <SportsArticle />
+      {/* <NewsletterForm/> */}
 
       <Footer />
     </section>

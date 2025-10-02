@@ -189,17 +189,8 @@ export default function Login() {
     const toastId = toast.loading('Sending verification email...');
     
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: verificationEmail,
-        options: {
-          emailRedirectTo: getAuthCallbackUrl(),
-        }
-      });
-      
-      if (error) {
-        throw error;
-      }
+        const r = await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: verificationEmail }) });
+        if (!r.ok) throw new Error('Resend failed');
       
       toast.success('Verification email sent! Please check your inbox.', { id: toastId });
     } catch (error: any) {

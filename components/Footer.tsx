@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import toast from 'react-hot-toast';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -20,33 +21,77 @@ export default function Footer() {
     setError(null);
 
     try {
+      // Read currently signed-in user (if any) and prefer their name when sending subscribe
       const supabase = createClientComponentClient();
+      let subscriberName: string | null = null;
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData?.user;
+        if (user) {
+          // try metadata first
+          subscriberName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || null;
 
-      // Check if email already exists
-      const { data: existing } = await supabase
-        .from('newsletter_subscribers')
-        .select('email')
-        .eq('email', email)
-        .single();
+          // fallback: query profiles table for a nicer display name
+          if (!subscriberName) {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('user_id', user.id)
+                .limit(1)
+                .single();
 
-      if (existing) {
-        setSubscribed(true);
-        setEmail('');
-        return;
+              if (profile) {
+                subscriberName = profile.username || null;
+              }
+            } catch (err) {
+              // ignore profile lookup errors
+            }
+          }
+        }
+      } catch (err) {
+        // ignore - we'll still call subscribe without a name
       }
 
-      // Insert new subscriber
-      const { error: insertError } = await supabase
-        .from('newsletter_subscribers')
-        .insert([{ email }]);
+      // If footer had a manual name field (not currently), prefer it
+      // (we don't have a name input in the footer; use subscriberName)
 
-      if (insertError) throw insertError;
+      // Pre-check: if the email is already subscribed and confirmed, show toast and stop
+      try {
+        const { data: existing } = await supabase
+          .from('newsletter_subscribers')
+          .select('confirmed')
+          .eq('email', email.toLowerCase())
+          .limit(1)
+          .single();
+
+        if (existing && existing.confirmed) {
+          setSubscribed(true);
+          setEmail('');
+          toast('You are already subscribed', { icon: '✅' });
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        // ignore lookup errors and continue to subscribe flow
+      }
+
+      const res = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: subscriberName }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Subscribe failed');
 
       setSubscribed(true);
       setEmail('');
+      toast.success('Confirmation email sent — check your inbox');
     } catch (err) {
       setError('Failed to subscribe. Please try again.');
       console.error('Subscription error:', err);
+      toast.error('Subscription failed — try again');
     } finally {
       setLoading(false);
     }

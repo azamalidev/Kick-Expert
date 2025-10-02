@@ -240,36 +240,23 @@ useEffect(() => {
         if (existingUser.email_confirmed) {
           throw { code: "user_already_exists" };
         } else {
-          // Resend confirmation email
-          const { error: resendError } = await supabase.auth.resend({
-            type: "signup",
-            email: email,
-            options: {
-              emailRedirectTo: getAuthCallbackUrl(),
-            },
-          });
-
-          if (resendError) throw resendError;
-
-          toast.success("Confirmation email resent! Please check your inbox.", {
-            id: toastId,
-          });
+          // Resend confirmation email using server endpoint (branded)
+            const r = await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name }) });
+            if (!r.ok) throw new Error('Resend failed');
+            toast.success("Confirmation email resent! Please check your inbox.", { id: toastId });
           return;
         }
       }
 
-      // ✅ Step 2: Create auth account
-      const { data: { user }, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name },
-          emailRedirectTo: getAuthCallbackUrl(),
-        },
+      // ✅ Step 2: Create auth account via server so we send KickExpert-branded verification
+      const signupResp = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
       });
-
-      if (authError) throw authError;
-      if (!user) throw new Error("User creation failed");
+      const signupBody = await signupResp.json().catch(() => ({}));
+      if (!signupResp.ok) throw new Error(signupBody?.error || 'Signup failed');
+      const user = { id: signupBody.userId, email };
 
       // ✅ Step 3: Calculate age
       const birthDate = new Date(dateOfBirth);

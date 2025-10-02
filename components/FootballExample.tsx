@@ -1,8 +1,10 @@
-'use client';
+"use client";
 
 import Image from "next/image";
 import { useSearchParams } from 'next/navigation';
 import { useState, useRef, useEffect } from "react";
+import { useUser } from '@supabase/auth-helpers-react';
+import { useSupabase } from '@/lib/supabase/provider';
 import { FaArrowRight, FaSearch, FaPaperPlane } from "react-icons/fa";
 
 type Message = {
@@ -52,6 +54,9 @@ Tailor your response as if you're speaking to an advanced football fan who value
   };
 
   const searchParams = useSearchParams();
+  const user = useUser();
+  const supabase = useSupabase();
+  const [supabaseUserEmail, setSupabaseUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const urlQuestion = searchParams?.get('question');
@@ -69,6 +74,36 @@ Tailor your response as if you're speaking to an advanced football fan who value
       }
     }
   }, [searchParams]);
+
+  // Sync current user email from Supabase client (fallback if useUser() is not populated)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (!isMounted) return;
+        setSupabaseUserEmail(data?.user?.email ?? null);
+      } catch (err) {
+        console.error('Error fetching supabase user:', err);
+      }
+    };
+
+    fetchUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      try {
+        setSupabaseUserEmail(session?.user?.email ?? null);
+      } catch (e) {
+        setSupabaseUserEmail(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, [supabase]);
 
   const generateAIResponse = async (query: string, level: "easy" | "medium" | "hard") => {
     try {
@@ -202,33 +237,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
             className="w-8 h-8 md:w-12 md:h-12"
           />
 
-          <button
-            onClick={async () => {
-              try {
-                const res = await fetch("/api/send-transactional", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    type: "test", // 👈 This matches your handler's "test" type
-                    to: "aazam7246@gmail.com", // Replace with real email OR state variable
-                    data: {} // For "test", no extra data is needed
-                  }),
-                });
-
-                if (!res.ok) throw new Error("Failed to send email");
-
-                alert("✅ Test email sent successfully!");
-              } catch (err) {
-                console.error("Email send error:", err);
-                alert("❌ Failed to send test email.");
-              }
-            }}
-            className="bg-lime-500 hover:bg-lime-600 text-white px-4 py-2 rounded-lg ml-2"
-          >
-            Send Test Email
-          </button>
+          
 
           <span className="ml-2 text-lime-400  font-bold text-xl md:text-2xl">
             Kick<span className="text-black ml-1">Expert</span>

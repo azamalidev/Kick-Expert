@@ -30,13 +30,16 @@ export default function ForgotPassword() {
     const toastId = toast.loading('Sending password reset email...');
 
     try {
-      // Send password reset email using Supabase auth
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: getChangePasswordUrl(),
+      // Send password reset request to our server so it sends KickExpert-branded email
+      const resp = await fetch('/api/password/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
 
-      if (error) {
-        throw new Error(`Failed to send reset email: ${error.message}`);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err?.message || 'Failed to send reset email');
       }
 
       toast.success('Password reset email sent! Check your inbox.', { id: toastId });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useSupabase } from '../lib/supabase/provider';
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,6 +14,8 @@ export default function ChangePassword() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const router = useRouter();
   const supabase = useSupabase();
+  const params = useSearchParams();
+  const token = params?.get('token') || '';
 
   const validateForm = () => {
     if (!newPassword) {
@@ -38,12 +41,28 @@ export default function ChangePassword() {
     setIsSubmitting(true);
     const toastId = toast.loading('Updating password...');
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      toast.error(`Failed to update password: ${error.message}`, { id: toastId });
-    } else {
-      toast.success('Password updated! Redirecting...', { id: toastId });
-      setTimeout(() => router.push('/login'), 2000);
+    try {
+      if (token) {
+        // Token-based reset (user is not authenticated)
+        const resp = await fetch('/api/password/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password: newPassword }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body?.message || body?.error || 'Failed to update password');
+        toast.success('Password updated! Redirecting...', { id: toastId });
+        setTimeout(() => router.push('/login'), 2000);
+      } else {
+        // Authenticated user change
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+        toast.success('Password updated! Redirecting...', { id: toastId });
+        setTimeout(() => router.push('/login'), 2000);
+      }
+    } catch (err: any) {
+      console.error('Change password error', err);
+      toast.error(err?.message || 'Failed to update password', { id: toastId });
     }
 
     setIsSubmitting(false);

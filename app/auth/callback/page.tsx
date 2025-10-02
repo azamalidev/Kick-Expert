@@ -27,7 +27,7 @@ export default function AuthCallback() {
           return;
         }
 
-        // Try to parse session directly from the URL (recommended)
+    // Try to parse session directly from the URL (recommended)
         // supabase-js v2 exposes getSessionFromUrl which will parse tokens and store session
         let session: any = null;
         try {
@@ -61,14 +61,25 @@ export default function AuthCallback() {
           }
         }
 
-        if (!session) throw new Error('No user session found after waiting for auth initialization');
+        // If there's no session but the verify flag is present on the URL, redirect to complete-profile with verified flag
+        const verifiedFlag = params.get('verified');
+        const prefillEmail = params.get('email');
+        if (!session && verifiedFlag === '1') {
+          // send user to complete-profile so they can finish setup without signing in
+          const completeUrl = `/complete-profile?verified=1${prefillEmail ? `&email=${encodeURIComponent(prefillEmail)}` : ''}`;
+          router.replace(completeUrl);
+          return;
+        }
+        if (!session && verifiedFlag !== '1') throw new Error('No user session found after waiting for auth initialization');
 
-        // Best-effort: mark email confirmed in our users table
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ email_confirmed: true })
-          .eq('id', session.user.id);
-        if (updateError) console.warn('Unable to update email_confirmed:', updateError);
+        // Best-effort: mark email confirmed in our users table if we have a session
+        if (session) {
+          const { error: updateError } = await supabase
+            .from('users')
+            .update({ email_confirmed: true })
+            .eq('id', session.user.id);
+          if (updateError) console.warn('Unable to update email_confirmed:', updateError);
+        }
 
         // Success: redirect to complete-profile (replace so back button doesn't go back to callback)
         setStatus('success');

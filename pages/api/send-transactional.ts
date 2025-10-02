@@ -13,18 +13,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let html = '';
 
     if (type === 'signupVerification') {
-      subject = 'Verify your email';
-      html = transactionalTemplates.signupVerification(data.verifyLink);
+      const template = transactionalTemplates.signupVerification(data.verifyLink);
+      subject = template.subject;
+      html = template.html;
     }
 
     if (type === 'passwordReset') {
-      subject = 'Reset your password';
-      html = transactionalTemplates.passwordReset(data.resetLink);
+      const template = transactionalTemplates.passwordReset(data.resetLink);
+      subject = template.subject;
+      html = template.html;
     }
 
     if (type === 'test') {
-      subject = 'test  email';
-      html = transactionalTemplates.testCheck();
+      const template = transactionalTemplates.testCheck();
+      subject = template.subject;
+      html = template.html;
     }
 
     console.log(html, "htmlhtmlhtml-----------htmlhtmlhtml")
