@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
-import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles } from 'lucide-react';
+import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle } from 'lucide-react';
 
 interface CreditBalance {
   purchased_credits: number;
@@ -235,7 +235,7 @@ const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClo
             </div>
 
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">Enter your PayPal email and the amount of winnings credits to withdraw. Minimum ${MIN_WITHDRAW} — max ${MAX_WITHDRAW} per request.</p>
+              <p className="text-sm text-gray-600 mb-4">Enter your PayPal email and the amount of winnings credits to withdraw. Minimum 20 — max 50 per request.</p>
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">PayPal Email</label>
@@ -248,7 +248,7 @@ const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClo
                   <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">Cr</span>
                   <input type="number" min={1} step={1} value={amount} onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))} placeholder={`Enter amount to withdraw`} className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{credits} credits (${credits})</strong></p>
+                <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{credits} credits</strong></p>
               </div>
 
               <div className="flex space-x-3">
@@ -474,7 +474,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       Buy
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Displayed price is the face value. Payment processor fees apply and are handled by Stripe/PayPal — the platform does not mark them up or absorb them.</p>
+                  <p className="text-xs text-gray-500 mt-2">Fees are determined by Stripe/PayPal and are not collected by KickExpert. Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips.</p>
                 </div>
 
                 {/* Info Section */}
@@ -498,11 +498,15 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                     </li>
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
-                      All prices include payment processing fees
+                      Fees are determined by Stripe/PayPal and are not collected by KickExpert
                     </li>
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
-                      Credits are non-transferable between accounts
+                      Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
+                      Only Purchased Credits are refundable. Winnings Credits can be withdrawn. Referral Credits are non-withdrawable.
                     </li>
                   </ul>
                 </div>
@@ -563,7 +567,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
 
       const credits = Math.floor(Number(amount));
       if (credits < minAmount) {
-        const msg = `Minimum withdrawal is ${minAmount} credits ($${minAmount})`;
+        const msg = `Minimum withdrawal is ${minAmount} credits`;
         setValidationError(msg);
         toast.error(msg);
         return;
@@ -623,7 +627,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
               </div>
 
               <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>${minAmount}</strong>. Maximum per request: <strong>$50</strong>.</p>
+                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>20 credits</strong>. Maximum per request: <strong>50 credits</strong>. <strong>Withdrawals are available only from Winnings Credits.</strong></p>
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Credits)</label>
@@ -639,7 +643,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-lime-500 outline-none"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{maxAmount} credits (${maxAmount})</strong></p>
+                  <p className="text-xs text-gray-500 mt-2">Available winnings: <strong>{maxAmount} credits</strong></p>
                   {validationError && <p className="text-sm text-red-600 mt-2">{validationError}</p>}
                 </div>
 
@@ -695,6 +699,14 @@ const CreditManagement: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawMin] = useState(20);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Zap },
+    { id: 'buy', label: 'Buy Credits', icon: CreditCard },
+    { id: 'withdraw', label: 'Withdraw', icon: DollarSign },
+    { id: 'faq', label: 'FAQ', icon: HelpCircle },
+  ];
 
   useEffect(() => {
     fetchBalance();
@@ -875,155 +887,535 @@ const CreditManagement: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Credit Balance</h1>
-          <p className="text-gray-600 mt-1">Manage your credits and purchase more</p>
-        </div>
-        <button
-          onClick={() => setBuyModalOpen(true)}
-          className="bg-lime-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-lime-700 transition-colors flex items-center shadow-md hover:shadow-lg"
-        >
-          <CreditCard className="mr-2" size={20} />
-          Buy Credits
-        </button>
-      </div>
-
-      {/* Total Credits Summary */}
-      <div className="bg-gradient-to-r from-lime-500 to-lime-600 rounded-2xl p-6 text-white shadow-lg mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-lime-100">Total Credits</p>
-            <h2 className="text-4xl font-bold mt-1">{totalCredits}</h2>
-            <p className="text-lime-100 text-sm mt-2">Available across all credit types</p>
-          </div>
-          <div className="bg-lime-400 bg-opacity-30 p-4 rounded-xl">
-            <Zap size={32} className="text-white" />
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Credit Management</h1>
+          <p className="text-gray-600 mt-1">Manage your credits, purchases, and withdrawals</p>
         </div>
       </div>
 
-      {/* Credit Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-green-100 rounded-xl">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-            <button
-              onClick={fetchBalance}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Purchased Credits</h2>
-          <p className="text-3xl font-bold text-green-600">
-            {balance?.purchased_credits || 0}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">Refundable to payment method</p>
+      {/* Tabs */}
+      <div className="mb-8">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
+                    activeTab === tab.id
+                      ? 'border-lime-500 text-lime-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon size={16} className="mr-2" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-lime-100 rounded-xl">
-              <Coins className="h-6 w-6 text-lime-600" />
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'overview' && (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Total Credits Summary */}
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 rounded-2xl p-6 text-white shadow-lg mb-8">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-lime-100">Total Credits</p>
+                  <h2 className="text-4xl font-bold mt-1">{totalCredits}</h2>
+                  <p className="text-lime-100 text-sm mt-2">Available across all credit types</p>
+                </div>
+                <div className="bg-lime-400 bg-opacity-30 p-4 rounded-xl">
+                  <Zap size={32} className="text-white" />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {
-                  // Require at least the minimum available to open withdraw flow
-                  const available = balance?.winnings_credits || 0;
-                  if (available < withdrawMin) {
-                    toast.error(`Minimum withdrawal is ${withdrawMin} credits ($${withdrawMin})`);
-                    return;
+
+            {/* Credit Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                  </div>
+                  <button
+                    onClick={fetchBalance}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-1">Purchased Credits</h2>
+                <p className="text-3xl font-bold text-green-600">
+                  {balance?.purchased_credits || 0}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">Refundable to payment method</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-lime-100 rounded-xl">
+                    <Coins className="h-6 w-6 text-lime-600" />
+                  </div>
+                  {/* <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        const available = balance?.winnings_credits || 0;
+                        if (available < withdrawMin) {
+                          toast.error(`Minimum withdrawal is ${withdrawMin} credits ($${withdrawMin})`);
+                          return;
+                        }
+                        setIsWithdrawMethodOpen(true);
+                      }}
+                      className="ml-auto bg-lime-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-lime-700 transition-colors"
+                    >
+                      Withdraw
+                    </button>
+                  </div> */}
+                </div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-1">Winnings Credits</h2>
+                <p className="text-3xl font-bold text-lime-600">
+                  {balance?.winnings_credits || 0}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">Withdrawable to your account</p>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-lime-100 rounded-xl">
+                    <Gift className="h-6 w-6 text-lime-600" />
+                  </div>
+                </div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-1">Referral Credits</h2>
+                <p className="text-3xl font-bold text-lime-600">
+                  {balance?.referral_credits || 0}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">For competition entry only</p>
+              </div>
+            </div>
+
+            {/* Credit System Guide */}
+            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 border border-gray-200 transition hover:shadow-xl">
+              <h2 className="text-2xl font-extrabold text-gray-900 mb-6 flex items-center">
+                <Sparkles className="mr-3 text-lime-600 animate-pulse" size={22} />
+                Credit System Guide
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
+                  <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
+                    Using Your Credits
+                  </h3>
+                  <ul className="space-y-4 text-gray-700">
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">✅</span>
+                      Enter competitions using any type of credits
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">✅</span>
+                      Credits are deducted in order: Referral → Winnings → Purchased
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">✅</span>
+                      Win competitions to earn more credits
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
+                  <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
+                    Credit Types
+                  </h3>
+                  <ul className="space-y-4 text-gray-700">
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">💳</span>
+                      <span><strong>Purchased Credits:</strong> Refundable to original payment method</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">🏆</span>
+                      <span><strong>Winnings Credits:</strong> Can be withdrawn to your account</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-lime-600 mr-3">🎁</span>
+                      <span><strong>Referral Credits:</strong> Use for competition entry only</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'buy' && (
+          <motion.div
+            key="buy"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <CreditCard size={48} className="mx-auto text-lime-600 mb-4" />
+                <h3 className="text-2xl font-semibold text-gray-900 mb-2">Buy Credits</h3>
+                <p className="text-gray-600">Purchase credits to enter competitions and enhance your experience</p>
+              </div>
+
+              {/* Quick Purchase Button */}
+              <div className="bg-gradient-to-r from-lime-500 to-lime-600 rounded-2xl p-8 text-white text-center shadow-lg mb-8">
+                <h4 className="text-xl font-semibold mb-4">Ready to Buy Credits?</h4>
+                <p className="text-lime-100 mb-6">Choose from preset packages or enter a custom amount</p>
+                <button
+                  onClick={() => setBuyModalOpen(true)}
+                  className="px-8 py-4 bg-white text-lime-600 rounded-xl font-bold text-lg hover:bg-lime-50 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                >
+                  Open Purchase Options
+                </button>
+              </div>
+
+              {/* Credit Packages Preview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-2xl shadow-md p-6 border-2 border-gray-200 text-center">
+                  <div className="text-4xl font-bold text-lime-600 mb-2">10</div>
+                  <div className="text-gray-600 font-medium mb-2">Credits</div>
+                  <div className="text-sm text-gray-500 mb-4">Perfect for trying out competitions</div>
+                  <div className="text-2xl font-bold text-gray-900">$10</div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-md p-6 border-2 border-lime-500 text-center relative">
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-lime-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">MOST POPULAR</span>
+                  </div>
+                  <div className="text-4xl font-bold text-lime-600 mb-2">20</div>
+                  <div className="text-gray-600 font-medium mb-2">Credits</div>
+                  <div className="text-sm text-gray-500 mb-4">Most popular choice for regular players</div>
+                  <div className="text-2xl font-bold text-gray-900">$20</div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-md p-6 border-2 border-gray-200 text-center">
+                  <div className="text-4xl font-bold text-lime-600 mb-2">50</div>
+                  <div className="text-gray-600 font-medium mb-2">Credits</div>
+                  <div className="text-sm text-gray-500 mb-4">Best value for serious competitors</div>
+                  <div className="text-2xl font-bold text-gray-900">$50</div>
+                </div>
+              </div>
+
+              {/* Custom Amount Preview */}
+         
+
+              {/* Important Information */}
+              <div className="bg-gradient-to-br from-lime-50 to-green-50 rounded-2xl p-6 border border-lime-200">
+                <h4 className="font-semibold text-lime-900 mb-4 flex items-center text-lg">
+                  <Sparkles size={20} className="mr-2" />
+                  Important Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-3 mt-0.5">💳</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Purchased Credits</p>
+                        <p className="text-sm text-gray-700">Refundable to original payment method</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-3 mt-0.5">⚡</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Instant Access</p>
+                        <p className="text-sm text-gray-700">Credits available immediately after purchase</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-3 mt-0.5">🔒</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Secure Payment</p>
+                        <p className="text-sm text-gray-700">Protected by Stripe/PayPal security</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-3 mt-0.5">🎯</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Competition Ready</p>
+                        <p className="text-sm text-gray-700">Use credits to enter any competition</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setBuyModalOpen(true)}
+                    className="px-6 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors"
+                  >
+                    Start Purchasing Credits
+                  </button>
+                </div> */}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'withdraw' && (
+          <motion.div
+            key="withdraw"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <DollarSign size={48} className="mx-auto text-lime-600 mb-4" />
+                <h3 className="text-2xl font-semibold text-gray-900 mb-2">Withdraw Winnings</h3>
+                <p className="text-gray-600">Cash out your competition winnings securely</p>
+              </div>
+
+              {/* Withdrawal Info Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Coins className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Available Balance</h4>
+                  <p className="text-2xl font-bold text-green-600">{balance?.winnings_credits || 0}</p>
+                  <p className="text-sm text-gray-600">Winnings Credits</p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <DollarSign className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Minimum Withdrawal</h4>
+                  <p className="text-2xl font-bold text-blue-600">20</p>
+                  <p className="text-sm text-gray-600">Credits</p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <RefreshCw className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Maximum Per Request</h4>
+                  <p className="text-2xl font-bold text-orange-600">50</p>
+                  <p className="text-sm text-gray-600">Credits</p>
+                </div>
+              </div>
+
+              {/* Withdrawal Rules */}
+              <div className="bg-amber-50 rounded-xl p-6 border border-amber-200 mb-8">
+                <h4 className="font-semibold text-amber-800 mb-4 flex items-center">
+                  <HelpCircle size={20} className="mr-2" />
+                  Withdrawal Rules & Requirements
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-start">
+                      <span className="text-amber-600 mr-2">•</span>
+                      <span className="text-sm text-amber-700">Withdrawals only from Winnings Credits</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-amber-600 mr-2">•</span>
+                      <span className="text-sm text-amber-700">Minimum withdrawal: 20 credits</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-amber-600 mr-2">•</span>
+                      <span className="text-sm text-amber-700">Maximum per request: 50 credits</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-start">
+                      <span className="text-amber-600 mr-2">•</span>
+                      <span className="text-sm text-amber-700">All withdrawals require admin approval</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-amber-600 mr-2">•</span>
+                      <span className="text-sm text-amber-700">AML compliance verification required</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Withdrawal Action */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Ready to Withdraw?</h4>
+                <p className="text-gray-600 mb-6">
+                  {(balance?.winnings_credits || 0) >= 20
+                    ? "You have sufficient winnings credits to request a withdrawal."
+                    : "You need at least 20 winnings credits to withdraw."
                   }
-                  // Open the payment method modal first (Stripe / PayPal)
-                  setIsWithdrawMethodOpen(true);
-                }}
-                className="ml-auto bg-lime-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-lime-700 transition-colors"
-              >
-                Withdraw
-              </button>
+                </p>
+                <button
+                  onClick={() => {
+                    const available = balance?.winnings_credits || 0;
+                    if (available < withdrawMin) {
+                      toast.error(`Minimum withdrawal is ${withdrawMin} credits`);
+                      return;
+                    }
+                    setIsWithdrawMethodOpen(true);
+                  }}
+                  disabled={(balance?.winnings_credits || 0) < 20}
+                  className="px-8 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Request Withdrawal
+                </button>
+              </div>
             </div>
-          </div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Winnings Credits</h2>
-          <p className="text-3xl font-bold text-lime-600">
-            {balance?.winnings_credits || 0}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">Withdrawable to your account</p>
-        </div>
+          </motion.div>
+        )}
 
-        <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-lime-100 rounded-xl">
-              <Gift className="h-6 w-6 text-lime-600" />
+        {activeTab === 'faq' && (
+          <motion.div
+            key="faq"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <HelpCircle size={48} className="mx-auto text-lime-600 mb-4" />
+                <h3 className="text-2xl font-semibold text-gray-900 mb-2">Frequently Asked Questions</h3>
+                <p className="text-gray-600">Everything you need to know about credits and the platform</p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Core Principles */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-4 flex items-center text-lg">
+                    <Sparkles size={20} className="mr-2" />
+                    Core Principles
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <h5 className="font-medium text-blue-900 mb-2">What is KickExpert?</h5>
+                      <p className="text-blue-800 text-sm">KickExpert is a skill-based competition platform where participants use credits to enter football prediction competitions. Unlike gambling, success depends on knowledge and research, not chance.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <h5 className="font-medium text-blue-900 mb-2">Are credits real money?</h5>
+                      <p className="text-blue-800 text-sm">No, credits are not deposits, stored money, or e-wallets. They are solely units of value within the KickExpert platform for entering competitions.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Credit System */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-4 flex items-center text-lg">
+                    <Coins size={20} className="mr-2" />
+                    Credit System
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-green-900 mb-2">Purchased Credits</h5>
+                      <p className="text-green-800 text-sm">Bought with real money, refundable to original payment method. Used for competition entry.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-green-900 mb-2">Winnings Credits</h5>
+                      <p className="text-green-800 text-sm">Earned by winning competitions, can be withdrawn (min 20 credits). Subject to admin approval.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-green-900 mb-2">Referral Credits</h5>
+                      <p className="text-green-800 text-sm">Earned through referrals, used only for competition entry. Non-withdrawable.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <h5 className="font-medium text-green-900 mb-2">How credits are used</h5>
+                      <p className="text-green-800 text-sm">Credits are deducted in order: Referral → Winnings → Purchased when entering competitions.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buying Credits */}
+                <div className="bg-gradient-to-r from-lime-50 to-green-50 rounded-xl p-6 border border-lime-200">
+                  <h4 className="font-semibold text-lime-900 mb-4 flex items-center text-lg">
+                    <CreditCard size={20} className="mr-2" />
+                    Buying Credits
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-lime-100">
+                      <h5 className="font-medium text-lime-900 mb-2">Payment Methods</h5>
+                      <p className="text-lime-800 text-sm">We accept payments through Stripe (credit/debit cards) and PayPal. All transactions are secure and encrypted.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-lime-100">
+                      <h5 className="font-medium text-lime-900 mb-2">Custom Amounts</h5>
+                      <p className="text-lime-800 text-sm">You can purchase any amount of credits you want. Simply enter your desired amount and proceed with payment.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-lime-100">
+                      <h5 className="font-medium text-lime-900 mb-2">Processing Fees</h5>
+                      <p className="text-lime-800 text-sm">Fees are determined by Stripe/PayPal and are not collected by KickExpert. We do not mark up or absorb payment processing fees.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Withdrawals */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-200">
+                  <h4 className="font-semibold text-orange-900 mb-4 flex items-center text-lg">
+                    <DollarSign size={20} className="mr-2" />
+                    Withdrawals
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-orange-100">
+                      <h5 className="font-medium text-orange-900 mb-2">Withdrawal Requirements</h5>
+                      <p className="text-orange-800 text-sm">Only Winnings Credits can be withdrawn. Minimum withdrawal is 20 credits, maximum 50 credits per request. All withdrawals require admin approval.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-orange-100">
+                      <h5 className="font-medium text-orange-900 mb-2">Payment Methods</h5>
+                      <p className="text-orange-800 text-sm">Withdrawals can be sent to your connected bank account (Stripe) or PayPal account. AML compliance requires using the same payment method used for purchases.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Refunds & Cancellations */}
+                <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-200">
+                  <h4 className="font-semibold text-purple-900 mb-4 flex items-center text-lg">
+                    <RefreshCw size={20} className="mr-2" />
+                    Refunds & Competition Cancellations
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-purple-100">
+                      <h5 className="font-medium text-purple-900 mb-2">Refund Policy</h5>
+                      <p className="text-purple-800 text-sm">Purchased credits are refundable to the original payment method. Refunds cannot be redirected to another card/account for AML compliance.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-purple-100">
+                      <h5 className="font-medium text-purple-900 mb-2">Competition Cancellations</h5>
+                      <p className="text-purple-800 text-sm">If a competition is cancelled, credits are returned to their original source in this order: Referral → Purchased → Winnings.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tax & Compliance */}
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-xl p-6 border border-red-200">
+                  <h4 className="font-semibold text-red-900 mb-4 flex items-center text-lg">
+                    <HelpCircle size={20} className="mr-2" />
+                    Tax & Compliance
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border border-red-100">
+                      <h5 className="font-medium text-red-900 mb-2">Tax Reporting</h5>
+                      <p className="text-red-800 text-sm">If you win more than $600 in a calendar year, we are required to report this to the IRS (Form 1099-MISC). We track your annual winnings for compliance.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-red-100">
+                      <h5 className="font-medium text-red-900 mb-2">AML Compliance</h5>
+                      <p className="text-red-800 text-sm">We follow strict Anti-Money Laundering regulations. All large transactions and withdrawals require verification and may be reported to authorities.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Referral Credits</h2>
-          <p className="text-3xl font-bold text-lime-600">
-            {balance?.referral_credits || 0}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">For competition entry only</p>
-        </div>
-      </div>
-
-      {/* Credit System Guide */}
-    <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 border border-gray-200 transition hover:shadow-xl">
-  {/* Header */}
-  <h2 className="text-2xl font-extrabold text-gray-900 mb-6 flex items-center">
-    <Sparkles className="mr-3 text-lime-600 animate-pulse" size={22} />
-    Credit System Guide
-  </h2>
-
-  {/* Grid */}
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-    
-    {/* Using Credits */}
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
-      <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
-        <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
-        Using Your Credits
-      </h3>
-      <ul className="space-y-4 text-gray-700">
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">✅</span>
-          Enter competitions using any type of credits
-        </li>
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">✅</span>
-          Credits are deducted in order: Referral → Winnings → Purchased
-        </li>
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">✅</span>
-          Win competitions to earn more credits
-        </li>
-      </ul>
-    </div>
-
-    {/* Credit Types */}
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:border-lime-400 transition">
-      <h3 className="font-semibold text-gray-900 mb-4 text-lg flex items-center">
-        <span className="w-2 h-2 rounded-full bg-lime-500 mr-2"></span>
-        Credit Types
-      </h3>
-      <ul className="space-y-4 text-gray-700">
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">💳</span>
-          <span><strong>Purchased Credits:</strong> Refundable to original payment method</span>
-        </li>
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">🏆</span>
-          <span><strong>Winnings Credits:</strong> Can be withdrawn to your account</span>
-        </li>
-        <li className="flex items-start">
-          <span className="text-lime-600 mr-3">🎁</span>
-          <span><strong>Referral Credits:</strong> Use for competition entry only</span>
-        </li>
-      </ul>
-    </div>
-
-  </div>
-</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
 
       <BuyCreditModal

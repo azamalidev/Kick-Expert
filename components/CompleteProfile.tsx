@@ -321,8 +321,8 @@ export default function CompleteProfile() {
         const r = await fetch('/api/profile/complete', { method: 'POST', body: form });
         if (!r.ok) throw new Error('Server profile completion failed');
 
-        toast.success('Profile saved! Please log in.', { id: toastId });
-        router.replace('/login');
+        toast.success('Profile saved! Welcome to KickExpert!', { id: toastId });
+        router.replace('/');
       }
     } catch (error: any) {
       console.error('Profile setup error:', error);

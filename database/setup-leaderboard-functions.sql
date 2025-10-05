@@ -2,7 +2,7 @@
 -- Run this in your Supabase SQL Editor
 
 -- Function to get top 10 users by XP with rankings
-CREATE OR REPLACE FUNCTION get_top_users_leaderboard()
+CREATE OR REPLACE FUNCTION get_top_users_leaderboard(period TEXT DEFAULT 'all_time')
 RETURNS TABLE (
     user_id UUID,
     username TEXT,
@@ -15,8 +15,10 @@ RETURNS TABLE (
     rank_position INTEGER
 ) AS $$
 BEGIN
+    -- For now, all periods return the same all-time data
+    -- Future enhancement: implement period-specific logic when historical data is available
     RETURN QUERY
-    SELECT 
+    SELECT
         p.user_id,
         p.username,
         p.avatar_url,
@@ -24,13 +26,14 @@ BEGIN
         p.rank_label,
         p.total_games,
         p.total_wins,
-        CASE 
+        CASE
             WHEN p.total_games > 0 THEN ROUND((p.total_wins::DECIMAL / p.total_games) * 100, 2)
             ELSE 0.00
         END as win_rate,
         ROW_NUMBER() OVER (ORDER BY p.xp DESC, p.total_wins DESC, p.total_games ASC)::INTEGER as rank_position
     FROM profiles p
     WHERE p.xp > 0  -- Only include users with XP
+    AND p.public_profile = true  -- Only include users with public profiles
     ORDER BY p.xp DESC, p.total_wins DESC, p.total_games ASC
     LIMIT 10;
 END;
@@ -136,14 +139,14 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         t.id,
-        t.amount,
+        t.amount::DECIMAL(10,2),  -- Cast to ensure proper decimal type
         t.type,
         t.status,
         t.description,
         t.source,
-        t.created_at
+        t.created_at::TIMESTAMP WITH TIME ZONE  -- Cast to ensure proper timestamp type
     FROM transactions t
     WHERE t.user_id = target_user_id
     ORDER BY t.created_at DESC
@@ -172,7 +175,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create RLS policies for the functions
 -- Grant execute permissions to authenticated users
-GRANT EXECUTE ON FUNCTION get_top_users_leaderboard() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_top_users_leaderboard(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_detailed_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_xp_history(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_transaction_history(UUID) TO authenticated;

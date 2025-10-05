@@ -193,7 +193,7 @@ export default function Navbar() {
         setNewNotificationAlert(true);
         // Show toast for new notifications
         if (newNotifications.length === 1) {
-          toast.success(`New notification: ${newNotifications[0].title}`);
+          // toast.success(`New notification: ${newNotifications[0].title}`);
         } else {
           toast.success(`${newNotifications.length} new notifications`);
         }
@@ -1004,20 +1004,7 @@ export default function Navbar() {
                   </button>
                 </Link>
 
-                <Link href="/stats">
-                  <button
-                    className={`block w-full text-left py-3 px-4 rounded-lg font-medium transition-colors ${isActive("/stats")
-                      ? "bg-lime-100 text-lime-700"
-                      : "text-gray-700 hover:bg-lime-50"
-                      }`}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <BarChart3 className="w-5 h-5" />
-                      <span>Stats</span>
-                    </div>
-                  </button>
-                </Link>
+           
               </>
             )}
 

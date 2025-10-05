@@ -96,9 +96,9 @@ export class TrophyService {
    */
   static getTrophyIcon(trophyType: string): string {
     switch (trophyType) {
-      case 'bronze': return '🥉';
-      case 'silver': return '🥈';
-      case 'gold': return '🥇';
+      case 'bronze': return '🥉'; // Starter tier
+      case 'silver': return '🥈'; // Pro tier
+      case 'gold': return '🥇'; // Elite tier
       case 'platinum': return '🏆';
       case 'diamond': return '💎';
       default: return '🏅';
@@ -112,17 +112,17 @@ export class TrophyService {
     switch (trophyType) {
       case 'bronze':
         return { 
-          bg: 'bg-orange-100', 
-          text: 'text-orange-800', 
-          border: 'border-orange-300',
-          accent: 'bg-orange-500'
+          bg: 'bg-amber-100', 
+          text: 'text-amber-800', 
+          border: 'border-amber-300',
+          accent: 'bg-amber-500'
         };
       case 'silver':
         return { 
-          bg: 'bg-gray-100', 
-          text: 'text-gray-800', 
-          border: 'border-gray-300',
-          accent: 'bg-gray-500'
+          bg: 'bg-slate-100', 
+          text: 'text-slate-800', 
+          border: 'border-slate-300',
+          accent: 'bg-slate-500'
         };
       case 'gold':
         return { 
@@ -160,9 +160,9 @@ export class TrophyService {
    */
   static getTrophyRarity(trophyType: string): { level: number; label: string } {
     switch (trophyType) {
-      case 'bronze': return { level: 1, label: 'Common' };
-      case 'silver': return { level: 2, label: 'Uncommon' };
-      case 'gold': return { level: 3, label: 'Rare' };
+      case 'bronze': return { level: 1, label: 'Starter' };
+      case 'silver': return { level: 2, label: 'Pro' };
+      case 'gold': return { level: 3, label: 'Elite' };
       case 'platinum': return { level: 4, label: 'Epic' };
       case 'diamond': return { level: 5, label: 'Legendary' };
       default: return { level: 0, label: 'Unknown' };
@@ -189,10 +189,10 @@ export class TrophyService {
    */
   static getNextMilestone(userXP: number): { type: TrophyType; title: string; xpNeeded: number } | null {
     const milestones = [
-      { type: 'bronze' as TrophyType, title: 'Rising Star', xpThreshold: 200 }, // Updated to match new Starter rank
-      { type: 'silver' as TrophyType, title: 'Skilled Player', xpThreshold: 500 }, // Updated to match new Pro rank
-      { type: 'gold' as TrophyType, title: 'Expert Champion', xpThreshold: 1000 }, // Updated to match new Expert rank
-      { type: 'platinum' as TrophyType, title: 'Elite Master', xpThreshold: 2000 }, // Updated to match new Champion rank
+      { type: 'bronze' as TrophyType, title: 'Starter Achiever', xpThreshold: 200 },
+      { type: 'silver' as TrophyType, title: 'Pro Competitor', xpThreshold: 500 },
+      { type: 'gold' as TrophyType, title: 'Elite Champion', xpThreshold: 1000 },
+      { type: 'platinum' as TrophyType, title: 'Elite Master', xpThreshold: 2000 },
       { type: 'diamond' as TrophyType, title: 'Legendary Player', xpThreshold: 5000 }
     ];
 
