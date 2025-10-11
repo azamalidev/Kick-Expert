@@ -1258,6 +1258,206 @@ export default function Profile() {
             </div>
             {/* Right Column - Trophies, Rank Ladder & Password Security */}
             <div className="w-full lg:w-1/2 space-y-6">
+
+               {/* Game Statistics Card */}
+              <div className=" bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg
+                      className="w-5 h-5 mr-2 text-lime-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                    Game Statistics
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-lime-700">Total Games</p>
+                          <p className="text-2xl font-bold text-lime-800">{totalGames}</p>
+                        </div>
+                        <div className="p-2 bg-lime-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-lime-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 10V3L4 14h7v7l9-11h-7z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-700">Total Wins</p>
+                          <p className="text-2xl font-bold text-green-800">{totalWins}</p>
+                        </div>
+                        <div className="p-2 bg-green-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-green-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-700">Win Rate</p>
+                          <p className="text-2xl font-bold text-blue-800">
+                            {totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : 0}%
+                          </p>
+                        </div>
+                        <div className="p-2 bg-blue-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-blue-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-purple-700">Experience</p>
+                          <p className="text-2xl font-bold text-purple-800">{xp} XP</p>
+                        </div>
+                        <div className="p-2 bg-purple-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-purple-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    {/* <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-indigo-700">Credits</p>
+                          <p className="text-2xl font-bold text-indigo-800">{credits}</p>
+                        </div>
+                        <div className="p-2 bg-indigo-200 rounded-full">
+                          <svg
+                            className="w-5 h-5 text-indigo-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 8c-1.657 0-3 1.79-3 4s1.343 4 3 4 3-1.79 3-4-1.343-4-3-4zM12 4v4"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div> */}
+                  </div>
+                  {/* Rank Display */}
+                  <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <div className={`p-2 ${getRankFromXP(xp).bgColor} rounded-full mr-3`}>
+                          <span className="text-xl">{getRankFromXP(xp).icon}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-yellow-700">Current Rank</p>
+                          <p className={`text-xl font-bold ${getRankFromXP(xp).color}`}>
+                            {getRankFromXP(xp).label}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-yellow-600">XP Progress</p>
+                        <p className="text-lg font-bold text-yellow-800">{xp} XP</p>
+                      </div>
+                    </div>
+                    {/* Progress Bar to Next Rank */}
+                    {(() => {
+                      const nextRankInfo = getNextRank(xp);
+                      if (nextRankInfo) {
+                        const progress = getProgressToNextRank(xp);
+                        return (
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs text-yellow-600">
+                                Next: {nextRankInfo.nextRank.label}
+                              </span>
+                              <span className="text-xs text-yellow-600">
+                                {nextRankInfo.xpNeeded} XP needed
+                              </span>
+                            </div>
+                            <div className="w-full bg-yellow-200 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="text-center">
+                            <span className="text-xs text-yellow-600 font-medium">
+                              🏆 Maximum Rank Achieved! 🏆
+                            </span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                </div>
+              </div>
               {/* Trophies Card */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
