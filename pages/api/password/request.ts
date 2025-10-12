@@ -24,8 +24,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Find user in your users table (server-side)
     const { data: userRow } = await supabaseAdmin.from('users').select('id,email').eq('email', email).limit(1).maybeSingle();
 
-    // Always return 200 to avoid leaking whether an email exists
-    if (!userRow) return res.status(200).json({ success: true });
+    // Check if user exists - return error if not found
+    if (!userRow) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No account found with this email address. Please check your email or sign up.' 
+      });
+    }
 
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60).toISOString(); // 1 hour

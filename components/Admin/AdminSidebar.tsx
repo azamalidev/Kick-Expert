@@ -11,7 +11,8 @@ import {
   Bell, 
   Settings,
   FileQuestion,
-  DollarSign
+  DollarSign,
+  Shield
 } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
@@ -19,9 +20,10 @@ import clsx from "clsx";
 const menuItems = [
   { label: "Dashboard", icon: Home, href: "/admindashboard" },
   { label: "Registered Users", icon: Users, href: "/admindashboard/users" },
-  { label: "Competitions", icon: Trophy, href: "/admindashboard/competitions" },
+  // { label: "Competitions", icon: Trophy, href: "/admindashboard/competitions" },
   { label: "Questions", icon: FileQuestion, href: "/admindashboard/question" },
   { label: "Payouts", icon: DollarSign, href: "/admindashboard/payout" },
+  { label: "Anti-Cheat", icon: Shield, href: "/admindashboard/cheat-actions" },
   { label: "Support", icon: HelpCircle, href: "/admindashboard/support" },
   { label: "Notification", icon: Bell, href: "/admindashboard/notification" },
   { label: "Settings", icon: Settings, href: "/admindashboard/settings" },

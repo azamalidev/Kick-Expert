@@ -30,7 +30,7 @@ const BroadcastEditor: React.FC = () => {
 
   const payload = { type, priority, title: title.trim(), message: message.trim(), cta_url: cta.trim() || null, is_banner: isBanner, expiry_date: expiryDate || null };
 
-      const res = await fetch('/api/admin/broadcast', {
+      const res = await fetch('/api/admin/broadcasts', {
         method: 'POST',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),

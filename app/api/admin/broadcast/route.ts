@@ -61,8 +61,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Forbidden: admin only' }, { status: 403 });
     }
 
+    // Normalize type to match notifications.type check constraint (same mapping as DB functions)
+    function normalizeType(t: any) {
+      const v = String(t || '').toLowerCase();
+      switch (v) {
+        case 'informational':
+        case 'info':
+          return 'Info';
+        case 'promotional':
+        case 'marketing':
+          return 'Marketing';
+        case 'support':
+          return 'Support';
+        case 'wallet':
+          return 'Wallet';
+        case 'game':
+          return 'Game';
+        case 'alert':
+          return 'Alert';
+        case 'referral':
+          return 'Referral';
+        case 'transactional':
+        case 'system':
+          return 'System';
+        default:
+          return (String(t || '') || 'Info').toString().replace(/^./, s => s.toUpperCase());
+      }
+    }
+
+    const normalizedType = normalizeType(type);
+
     // Call the JSON wrapper RPC to avoid parameter ordering/schema issues
-    const payload = { type, priority, title, message, is_banner: Boolean(is_banner) ?? false, cta_url: cta_url ?? null, expiry_date: expiry_date ?? null };
+    const payload = { type: normalizedType, priority, title, message, is_banner: Boolean(is_banner) ?? false, cta_url: cta_url ?? null, expiry_date: expiry_date ?? null };
     const { error } = await supabaseAdmin.rpc('broadcast_notification_from_json', { p_payload: payload });
 
     if (error) {

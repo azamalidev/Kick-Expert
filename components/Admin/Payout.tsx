@@ -14,6 +14,7 @@ type Withdrawal = {
   provider_account?: string | null;
   provider_payout_id?: string | null;
   provider_response?: any;
+  provider_kyc_status?: string | null;
 };
 
 const supabase = createClient(
@@ -49,17 +50,24 @@ const Payout = () => {
       });
       if (!res.ok) throw new Error('Failed to fetch withdrawals');
       const body = await res.json();
-      const rows: Withdrawal[] = (body.withdrawals || []).map((r: any) => ({
-        id: r.id,
-        user_id: r.user_id,
-        amount: Number(r.amount),
-        requested_at: r.requested_at,
-        status: r.status,
-        provider: r.provider,
-        provider_account: r.provider_account,
-        provider_payout_id: r.provider_payout_id,
-        provider_response: r.provider_response
-      }));
+      const rows: Withdrawal[] = (body.withdrawals || []).map((r: any) => {
+        // provider_response may come from user_payment_accounts.metadata or provider_payouts.response
+        const provResp = r.provider_response || r.metadata || {};
+        // If provider_account missing, try to infer from the provider_response (stripe account id in `id`)
+        const provAcct = r.provider_account || provResp?.id || null;
+        return {
+          id: r.id,
+          user_id: r.user_id,
+          amount: Number(r.amount),
+          requested_at: r.requested_at,
+          status: r.status,
+          provider: r.provider,
+          provider_account: provAcct,
+          provider_payout_id: r.provider_payout_id,
+          provider_response: provResp,
+          provider_kyc_status: r.provider_kyc_status ?? null
+        } as Withdrawal;
+      });
       setWithdrawals(rows);
     } catch (err) {
       console.error('Fetch withdrawals error', err);
@@ -130,15 +138,15 @@ const Payout = () => {
   };
 
   const refreshKyc = async (providerAccountId?: string) => {
-    if (!providerAccountId) {
-      toast.error('No provider account');
-      return;
-    }
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return toast.error('Admin session missing');
 
-      const res = await fetch('/api/payments/stripe/refresh', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` } });
+      // allow admin to pass providerAccountId or rely on provider_response.id if available
+      const payload: any = {};
+      if (providerAccountId) payload.provider_account_id = providerAccountId;
+
+      const res = await fetch('/api/admin/payments/stripe/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(payload) });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Failed to refresh');
       toast.success(`KYC status: ${body.kyc_status}`);
@@ -267,7 +275,7 @@ const Payout = () => {
                               <div>
                                 <div><strong>Provider:</strong> {w.provider ?? '—'}</div>
                                 <div><strong>Provider Account:</strong> {w.provider_account ?? '—'}</div>
-                                <div><strong>Provider Payout ID:</strong> {w.provider_payout_id ?? '—'}</div>
+
                               </div>
                               <div className="text-right">
                                 <div className="text-sm text-gray-600 mb-2"><strong>KYC:</strong> {/* we'll show 'unknown' unless provider_response contains account metadata */}
@@ -287,10 +295,7 @@ const Payout = () => {
                               </div>
                             </div>
 
-                            <div>
-                              <strong>Provider Response</strong>
-                              <pre className="text-xs bg-white border rounded p-2 max-h-40 overflow-auto mt-2 text-gray-700">{JSON.stringify(w.provider_response || {}, null, 2)}</pre>
-                            </div>
+                          
                           </div>
                         </td>
                       </tr>

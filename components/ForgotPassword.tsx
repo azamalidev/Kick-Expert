@@ -37,14 +37,19 @@ export default function ForgotPassword() {
         body: JSON.stringify({ email }),
       });
 
+      const data = await resp.json().catch(() => ({}));
+
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err?.message || 'Failed to send reset email');
+        // Handle specific error messages from the server
+        if (resp.status === 404) {
+          throw new Error('No account found with this email address. Please check your email or sign up.');
+        }
+        throw new Error(data?.message || 'Failed to send reset email');
       }
 
       toast.success('Password reset email sent! Check your inbox.', { id: toastId });
       setEmail('');
-      setTimeout(() => router.push('/change-password'), 2000);
+      setTimeout(() => router.push('/login'), 2000);
     } catch (error: any) {
       console.error('Error sending reset email:', error.message || error);
       toast.error(error.message || 'Failed to send reset email. Please try again.', { id: toastId });
@@ -103,6 +108,9 @@ export default function ForgotPassword() {
               </div>
               <h2 className="text-2xl font-bold text-gray-800">Forgot Password</h2>
             </div>
+            
+            
+
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-600 uppercase">
@@ -140,7 +148,7 @@ export default function ForgotPassword() {
                 </svg>
               </button>
             </form>
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <p className="text-gray-600">
                 Remember your password?{' '}
                 <Link href="/login" className="text-lime-600 hover:text-lime-800 font-medium">

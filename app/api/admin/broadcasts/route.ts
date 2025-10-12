@@ -30,12 +30,42 @@ export async function POST(req: Request) {
   if (!title || !message) return NextResponse.json({ error: 'Missing title or message' }, { status: 400 });
 
   try {
+    // Normalize incoming type to match DB check constraint (same logic as RPC)
+    function normalizeType(t: any) {
+      const v = String(t || '').toLowerCase();
+      switch (v) {
+        case 'informational':
+        case 'info':
+          return 'Info';
+        case 'promotional':
+        case 'marketing':
+          return 'Marketing';
+        case 'support':
+          return 'Support';
+        case 'wallet':
+          return 'Wallet';
+        case 'game':
+          return 'Game';
+        case 'alert':
+          return 'Alert';
+        case 'referral':
+          return 'Referral';
+        case 'transactional':
+        case 'system':
+          return 'System';
+        default:
+          return (String(t || '') || 'Info').toString().replace(/^./, s => s.toUpperCase());
+      }
+    }
+
+    const normalizedType = normalizeType(type);
+
     // Insert broadcast record (if broadcasts table exists)
     let broadcast: any = null;
     if (await tableExists(supabaseAdmin, 'broadcasts')) {
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('broadcasts')
-        .insert([{ created_by: userData.user.id, title, message, type, priority, cta_url, is_banner: !!is_banner, expiry_date: expiry_date ?? null, target, schedule_at }])
+        .insert([{ created_by: userData.user.id, title, message, type: normalizedType, priority, cta_url, is_banner: !!is_banner, expiry_date: expiry_date ?? null, target, schedule_at }])
         .select()
         .maybeSingle();
       if (insertError) throw insertError;
@@ -52,7 +82,7 @@ export async function POST(req: Request) {
       // fall back to a safe server-side implementation that inserts into
       // `public.notifications` in chunks. This allows the admin UI to work
       // immediately without requiring DB migrations.
-      const payload = { type, priority, title, message, is_banner: Boolean(is_banner), cta_url: cta_url ?? null, expiry_date: expiry_date ?? null };
+  const payload = { type: normalizedType, priority, title, message, is_banner: Boolean(is_banner), cta_url: cta_url ?? null, expiry_date: expiry_date ?? null };
 
       let rpcCalled = false;
       try {
@@ -82,17 +112,17 @@ export async function POST(req: Request) {
           const chunkSize = 500; // safe chunk to avoid very large single inserts
           for (let i = 0; i < userIds.length; i += chunkSize) {
             const chunk = userIds.slice(i, i + chunkSize);
-            const rows = chunk.map(uid => ({
-              user_id: uid,
-              type: type || 'informational',
-              priority: priority || 'medium',
-              title,
-              message,
-              is_banner: !!is_banner,
-              cta_url: cta_url ?? null,
-              expiry_date: expiry_date ?? null,
-              created_at: new Date().toISOString()
-            }));
+              const rows = chunk.map(uid => ({
+                user_id: uid,
+                type: normalizedType,
+                priority: priority || 'medium',
+                title,
+                message,
+                is_banner: !!is_banner,
+                cta_url: cta_url ?? null,
+                expiry_date: expiry_date ?? null,
+                created_at: new Date().toISOString()
+              }));
 
             const { error: insertErr } = await supabaseAdmin.from('notifications').insert(rows);
             if (insertErr) {

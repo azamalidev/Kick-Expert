@@ -7,6 +7,15 @@ import Image from "next/image";
 import toast, { Toaster } from 'react-hot-toast';
 import Link from "next/link";
 import { SupabaseUser } from '@/types/user';
+import { 
+  getBrowserFingerprint, 
+  getDeviceInfo, 
+  getIPAddress, 
+  saveBrowserFingerprint,
+  checkActiveSession,
+  handleForceLogin
+} from '@/utils/fingerprint';
+import DeviceSwitchModal from './DeviceSwitchModal';
 
 // Resolve auth callback URL: prefer NEXT_PUBLIC_SITE_URL, fallback to window origin
 const getAuthCallbackUrl = () => {
@@ -21,6 +30,10 @@ export default function Login() {
   const [loading, setLoading] = useState<boolean>(false);
   const [showVerificationScreen, setShowVerificationScreen] = useState<boolean>(false);
   const [verificationEmail, setVerificationEmail] = useState<string>("");
+  const [showDeviceModal, setShowDeviceModal] = useState<boolean>(false);
+  const [existingSessionData, setExistingSessionData] = useState<any>(null);
+  const [pendingUserData, setPendingUserData] = useState<any>(null);
+  const [deviceSwitchLoading, setDeviceSwitchLoading] = useState<boolean>(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -92,6 +105,112 @@ export default function Login() {
     return true;
   }, [email, password]);
 
+  // Complete login flow with fingerprint and navigation
+  const completeLoginFlow = async (user: any, userData: any, role: string, toastId?: string) => {
+    try {
+      // Save browser fingerprint for device tracking
+      const fingerprintData = await getBrowserFingerprint();
+      if (fingerprintData) {
+        const deviceInfo = getDeviceInfo();
+        const ipAddress = await getIPAddress();
+        
+        // Use "global_login" as competition_id for app-wide tracking
+        await saveBrowserFingerprint(
+          'global_login',
+          user.id,
+          fingerprintData.fingerprintId,
+          deviceInfo,
+          ipAddress
+        );
+        
+        console.log('✅ Device fingerprint saved:', fingerprintData.fingerprintId);
+      }
+
+      if (toastId) {
+        toast.success('Logged in successfully!', { id: toastId });
+      } else {
+        toast.success('Logged in successfully!');
+      }
+
+      setTimeout(() => {
+        const targetRoute = role === "admin" ? "/admindashboard" : "/";
+        console.log(`Navigating to: ${targetRoute}`);
+        router.replace(targetRoute);
+      }, 1500);
+    } catch (fpError) {
+      console.warn('Could not save fingerprint (non-critical):', fpError);
+      // Continue navigation even if fingerprint fails
+      if (toastId) {
+        toast.success('Logged in successfully!', { id: toastId });
+      } else {
+        toast.success('Logged in successfully!');
+      }
+      
+      setTimeout(() => {
+        const targetRoute = role === "admin" ? "/admindashboard" : "/";
+        router.replace(targetRoute);
+      }, 1500);
+    }
+  };
+
+  // Handle force login (Login Anyway)
+  const handleLoginAnyway = async () => {
+    if (!pendingUserData) return;
+    
+    setDeviceSwitchLoading(true);
+    const toastId = toast.loading('Switching devices...');
+
+    try {
+      const { user, userData, role } = pendingUserData;
+
+      // Get new fingerprint
+      const fingerprintData = await getBrowserFingerprint();
+      if (!fingerprintData) {
+        throw new Error('Could not generate device fingerprint');
+      }
+
+      const deviceInfo = getDeviceInfo();
+
+      // Force login - deactivates old sessions and creates new one
+      const result = await handleForceLogin(
+        user.id,
+        fingerprintData.fingerprintId,
+        deviceInfo,
+        'global_login'
+      );
+
+      if (!result.success) {
+        throw new Error('Failed to create new session');
+      }
+
+      console.log('✅ Forced login successful, old sessions deactivated');
+
+      // Close modal
+      setShowDeviceModal(false);
+      setPendingUserData(null);
+      setExistingSessionData(null);
+      setDeviceSwitchLoading(false);
+
+      // Complete login flow
+      await completeLoginFlow(user, userData, role, toastId);
+    } catch (error: any) {
+      console.error('Force login error:', error);
+      setDeviceSwitchLoading(false);
+      toast.error('Failed to switch devices. Please try again.', { id: toastId });
+    }
+  };
+
+  // Handle modal cancel
+  const handleCancelDeviceSwitch = async () => {
+    setShowDeviceModal(false);
+    setPendingUserData(null);
+    setExistingSessionData(null);
+    
+    // Sign out the current attempt
+    await supabase.auth.signOut();
+    toast('Login cancelled. Your other session remains active.');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -148,12 +267,23 @@ export default function Login() {
       const role = userData.role || 'user';
       console.log("User data from Supabase:", { ...userData, role });
 
-      toast.success('Logged in successfully!', { id: toastId });
-      setTimeout(() => {
-        const targetRoute = role === "admin" ? "/admindashboard" : "/";
-        console.log(`Navigating to: ${targetRoute}`);
-        router.replace(targetRoute);
-      }, 1500);
+      // 🔒 Check for existing active session before saving fingerprint
+      const { hasActiveSession, sessionData } = await checkActiveSession(user.id);
+      
+      if (hasActiveSession && sessionData) {
+        console.log('🔔 Active session detected:', sessionData);
+        
+        // Store pending data for device switch modal
+        setPendingUserData({ user, userData, role });
+        setExistingSessionData(sessionData);
+        setShowDeviceModal(true);
+        setLoading(false);
+        toast.dismiss(toastId);
+        return; // Wait for user decision
+      }
+
+      // No active session, proceed with normal login flow
+      await completeLoginFlow(user, userData, role, toastId);
     } catch (error: any) {
       console.error("Login Error:", error.code, error.message);
       let errorMessage: any = 'Login failed. Please try again.';
@@ -490,6 +620,15 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* Device Switch Modal */}
+      <DeviceSwitchModal
+        isOpen={showDeviceModal}
+        deviceInfo={existingSessionData?.device_info || {}}
+        onCancel={handleCancelDeviceSwitch}
+        onLoginAnyway={handleLoginAnyway}
+        isLoading={deviceSwitchLoading}
+      />
     </div>
   );
 }

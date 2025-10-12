@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     if (!dbUser || (dbUser as any).role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     // list pending withdrawals
-    const { data, error } = await supabaseAdmin
+    const { data: withdrawals, error } = await supabaseAdmin
       .from('withdrawals')
       .select('*')
       .eq('status', 'pending')
@@ -30,7 +30,52 @@ export async function GET(req: Request) {
       .limit(200);
 
     if (error) throw error;
-    return NextResponse.json({ withdrawals: data || [] });
+
+    const rows = (withdrawals || []) as any[];
+
+    // gather related ids
+    const userIds = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)));
+    const withdrawalIds = Array.from(new Set(rows.map(r => r.id).filter(Boolean)));
+
+    // fetch user payment accounts (provider account / kyc metadata)
+    let paymentAccounts: any[] = [];
+    if (userIds.length) {
+      const { data: payData, error: payErr } = await supabaseAdmin
+        .from('user_payment_accounts')
+        .select('user_id, provider_account_id, kyc_status, metadata')
+        .in('user_id', userIds);
+      if (payErr) console.warn('Failed to fetch payment accounts', payErr);
+      paymentAccounts = payData || [];
+    }
+
+    // fetch provider payouts keyed by withdrawal
+    let providerPayouts: any[] = [];
+    if (withdrawalIds.length) {
+      const { data: ppData, error: ppErr } = await supabaseAdmin
+        .from('provider_payouts')
+        .select('withdrawal_id, provider_payout_id, response')
+        .in('withdrawal_id', withdrawalIds);
+      if (ppErr) console.warn('Failed to fetch provider payouts', ppErr);
+      providerPayouts = ppData || [];
+    }
+
+    // merge related data into each withdrawal object for frontend
+    const merged = rows.map(r => {
+      const pa = paymentAccounts.find(p => p.user_id === r.user_id) || null;
+      // prefer payment account metadata (stripe account) to show KYC info
+      const provider_response = pa?.metadata || (providerPayouts.find(p => p.withdrawal_id === r.id)?.response ?? null);
+      const provider_payout = providerPayouts.find(p => p.withdrawal_id === r.id) || null;
+
+      return {
+        ...r,
+        provider_account: pa?.provider_account_id ?? null,
+        provider_kyc_status: pa?.kyc_status ?? null,
+        provider_response,
+        provider_payout_id: provider_payout?.provider_payout_id ?? null
+      };
+    });
+
+    return NextResponse.json({ withdrawals: merged });
   } catch (err) {
     console.error('Error listing admin withdrawals', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

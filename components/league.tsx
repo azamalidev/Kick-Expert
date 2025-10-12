@@ -7,6 +7,7 @@ import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Award, Star, Clock, Users, ChevronRight, Home, RotateCcw, Shield } from 'lucide-react';
+import { handleFingerprintCheck, logCheatAction } from '@/utils/fingerprint';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -80,11 +81,13 @@ export default function LeaguePage() {
   const [showCompetitionEndModal, setShowCompetitionEndModal] = useState(false);
   const nextCalled = useRef(false);
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
+  const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
+  const responseLatencies = useRef<number[]>([]); // Track all response times
   const router = useRouter();
   const searchParams = useSearchParams();
   const competitionId = searchParams ? searchParams.get('competitionId') || '' : '';
 
-  // Fetch competition details
+  // Fetch competition detail
   useEffect(() => {
     const fetchCompetitionDetails = async () => {
       if (!competitionId) return;
@@ -93,6 +96,26 @@ export default function LeaguePage() {
         // First, check if user is authenticated
         const authResponse = await supabase.auth.getUser();
         if (authResponse.data.user) {
+          // 🔒 STEP 2: Browser Fingerprint Check
+          console.log('🔍 Checking device fingerprint...');
+          const fingerprintResult = await handleFingerprintCheck(
+            competitionId,
+            authResponse.data.user.id,
+            null
+          );
+
+          if (!fingerprintResult.allowed) {
+            // Device conflict detected - block access
+            setError(fingerprintResult.message || 'Device verification failed');
+            setInitializing(false);
+            setTimeout(() => {
+              router.push('/livecompetition');
+            }, 4000);
+            return;
+          }
+
+          console.log('✅ Device verified:', fingerprintResult.fingerprintId);
+
           // Check if user has already played this competition
           const { data: existingSession } = await supabase
             .from('competition_sessions')
@@ -358,8 +381,9 @@ export default function LeaguePage() {
   useEffect(() => {
     if (phase !== 'quiz' || quizCompleted || showResult || questions.length === 0) return;
 
-    // Set the start time for this question
+    // Set the start time for this question (for both timer and speed detection)
     timerStartTime.current = Date.now();
+    questionStartTime.current = Date.now(); // Track question display time for speed detection
     const questionDuration = 30000; // 30 seconds in milliseconds
 
     const timerInterval = setInterval(() => {
@@ -512,6 +536,23 @@ export default function LeaguePage() {
     if (questions.length === 0) {
       return;
     }
+
+    // Calculate response latency for speed detection
+    const answerTime = Date.now();
+    let latencyMs = 0;
+    if (questionStartTime.current && selectedChoice) {
+      latencyMs = answerTime - questionStartTime.current;
+      responseLatencies.current.push(latencyMs);
+      
+      // Log for debugging
+      console.log(`Response latency: ${latencyMs}ms`);
+      
+      // Flag suspicious activity if response is too fast (< 300ms)
+      if (latencyMs < 300) {
+        console.warn(`⚠️ Suspicious response time detected: ${latencyMs}ms (< 300ms threshold)`);
+        setSuspiciousActivity(true);
+      }
+    }
     
     
     const currentQuestion = questions[currentQuestionIndex];
@@ -565,6 +606,26 @@ export default function LeaguePage() {
       };
 
       await supabase.from('competition_answers').insert(payload);
+
+      // Save speed detection data if user selected an answer
+      if (selectedChoice && latencyMs > 0) {
+        try {
+          const { error: speedError } = await supabase
+            .from('competition_speed_detection')
+            .insert({
+              competition_id: competitionId,
+              user_id: userId,
+              latency_ms: latencyMs,
+              detected_at: new Date().toISOString()
+            });
+
+          if (speedError) {
+            console.error('Error saving speed detection:', speedError);
+          }
+        } catch (err) {
+          console.error('Unexpected error in speed detection:', err);
+        }
+      }
     }
     
     // Move to next question or complete the quiz
@@ -589,10 +650,57 @@ export default function LeaguePage() {
     }, 300);
   };
 
+  // Analyze response patterns for cheating detection
+  const analyzeResponsePatterns = () => {
+    const latencies = responseLatencies.current;
+    if (latencies.length === 0) return { isSuspicious: false, reasons: [] };
+
+    const reasons: string[] = [];
+    let isSuspicious = false;
+
+    // Check 1: Average response time too fast (< 1 second)
+    const avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+    if (avgLatency < 1000) {
+      reasons.push(`Average response time too fast: ${avgLatency.toFixed(0)}ms`);
+      isSuspicious = true;
+    }
+
+    // Check 2: Multiple extremely fast responses (< 300ms)
+    const fastResponses = latencies.filter(l => l < 300).length;
+    if (fastResponses >= 3) {
+      reasons.push(`${fastResponses} responses under 300ms (bot-like behavior)`);
+      isSuspicious = true;
+    }
+
+    // Check 3: Identical or nearly identical response times (pattern cheating)
+    const uniqueLatencies = new Set(latencies.map(l => Math.floor(l / 100) * 100)); // Group by 100ms
+    if (uniqueLatencies.size <= 2 && latencies.length >= 5) {
+      reasons.push('Identical response time pattern detected');
+      isSuspicious = true;
+    }
+
+    // Check 4: Perfect accuracy with fast responses
+    const correctAnswers = answers.filter(a => a.is_correct).length;
+    const accuracy = correctAnswers / answers.length;
+    if (accuracy >= 0.95 && avgLatency < 2000) {
+      reasons.push(`Impossible combination: ${(accuracy * 100).toFixed(0)}% accuracy with ${avgLatency.toFixed(0)}ms avg response`);
+      isSuspicious = true;
+    }
+
+    return { isSuspicious, reasons, avgLatency, fastResponses };
+  };
+
   const completeQuiz = async () => {
     if (!sessionId) {
       console.error("No session ID found");
       return;
+    }
+
+    // Analyze patterns before completing
+    const patternAnalysis = analyzeResponsePatterns();
+    if (patternAnalysis.isSuspicious) {
+      console.warn('🚨 SUSPICIOUS ACTIVITY DETECTED:', patternAnalysis.reasons);
+      setSuspiciousActivity(true);
     }
     
     
@@ -646,6 +754,25 @@ export default function LeaguePage() {
           prize_amount: prizeAmount,
           created_at: new Date().toISOString(),
         });
+
+        // Log suspicious activity if detected
+        if (patternAnalysis.isSuspicious) {
+          try {
+            const avgLatency = patternAnalysis.avgLatency || 0;
+            const reasonDetails = `Speed anomaly detected: ${patternAnalysis.reasons.join(', ')}. Avg latency: ${avgLatency.toFixed(2)}ms, Fast responses: ${patternAnalysis.fastResponses}/${responseLatencies.current.length}`;
+            
+            await logCheatAction(
+              competitionId,
+              userId,
+              'flag',
+              reasonDetails
+            );
+            
+            console.log('✅ Suspicious speed activity logged to competition_cheat_actions');
+          } catch (err) {
+            console.warn('Could not log cheat action:', err);
+          }
+        }
 
         // Add winning credits to user's account if they won a prize
         if (userRank <= 3 && prizeAmount > 0) {
