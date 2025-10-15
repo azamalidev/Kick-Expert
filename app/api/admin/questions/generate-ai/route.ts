@@ -1,0 +1,336 @@
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Types for request/response
+interface GenerateRequest {
+  totalQuestions: number;
+  difficultyRatio: {
+    easy: number;
+    medium: number;
+    hard: number;
+  };
+  category?: string;
+  topic?: string;
+}
+
+interface GeneratedQuestion {
+  question_text: string;
+  choice_1: string;
+  choice_2: string;
+  choice_3: string;
+  choice_4: string;
+  correct_answer: string;
+  explanation: string;
+  category: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+/**
+ * POST /api/admin/questions/generate-ai
+ * Generate football trivia questions using OpenAI
+ */
+export async function POST(request: NextRequest) {
+  try {
+    // Validate OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your environment variables.',
+        },
+        { status: 500 }
+      );
+    }
+
+    // Parse request body
+    const body: GenerateRequest = await request.json();
+    const { totalQuestions, difficultyRatio, category, topic } = body;
+
+    // Validate input
+    if (!totalQuestions || totalQuestions < 1 || totalQuestions > 50) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Total questions must be between 1 and 50.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate difficulty ratio sums to 100
+    const ratioSum = difficultyRatio.easy + difficultyRatio.medium + difficultyRatio.hard;
+    if (Math.abs(ratioSum - 100) > 0.1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Difficulty ratios must sum to 100%. Current sum: ${ratioSum}%`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Calculate question distribution
+    const easyCount = Math.round((totalQuestions * difficultyRatio.easy) / 100);
+    const mediumCount = Math.round((totalQuestions * difficultyRatio.medium) / 100);
+    const hardCount = totalQuestions - easyCount - mediumCount; // Ensure total matches exactly
+
+    console.log(`Generating ${totalQuestions} questions: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard`);
+
+    // Build prompt for OpenAI
+    const systemPrompt = `You are a professional football (soccer) trivia question generator. 
+Generate high-quality, accurate, and engaging football trivia questions.
+
+IMPORTANT RULES:
+1. Questions must be factually accurate
+2. All 4 answer choices must be plausible (no obviously wrong answers)
+3. Only ONE choice should be correct
+4. Provide a brief explanation (1-2 sentences) for the correct answer
+5. Use proper grammar and formatting
+6. Questions should test real football knowledge
+7. Avoid overly obscure or trick questions
+8. Include a mix of topics: players, teams, tournaments, history, records, tactics, etc.`;
+
+    const categoryText = category ? ` in the category of "${category}"` : '';
+    const topicText = topic ? ` focusing on the topic of "${topic}"` : '';
+
+    const userPrompt = `Generate exactly ${totalQuestions} football trivia questions${categoryText}${topicText}.
+
+DIFFICULTY DISTRIBUTION:
+- ${easyCount} EASY questions (basic football knowledge, famous players/teams, major tournaments)
+- ${mediumCount} MEDIUM questions (more specific knowledge, statistics, historical events)
+- ${hardCount} HARD questions (detailed knowledge, lesser-known facts, specific records)
+
+Return ONLY a valid JSON array with this exact structure:
+[
+  {
+    "question_text": "Which country won the FIFA World Cup in 2018?",
+    "choice_1": "France",
+    "choice_2": "Croatia",
+    "choice_3": "Brazil",
+    "choice_4": "Germany",
+    "correct_answer": "France",
+    "explanation": "France won the 2018 FIFA World Cup in Russia, defeating Croatia 4-2 in the final.",
+    "category": "${category || 'General'}",
+    "difficulty": "easy"
+  }
+]
+
+CRITICAL: 
+- Return ONLY the JSON array, no other text
+- Ensure "correct_answer" exactly matches one of the four choices
+- Distribute difficulties: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard
+- Each question must have all required fields`;
+
+    console.log('Calling OpenAI API...');
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini', // Using GPT-4o-mini for cost efficiency (you can change to gpt-4 for better quality)
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.8, // Some creativity, but not too random
+      max_tokens: 4000, // Enough for 50 questions
+      response_format: { type: 'json_object' }, // Ensure JSON response
+    });
+
+    console.log('OpenAI API response received');
+
+    // Parse response
+    const responseContent = completion.choices[0]?.message?.content;
+    if (!responseContent) {
+      throw new Error('No response from OpenAI API');
+    }
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(responseContent);
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI response:', responseContent);
+      throw new Error('Invalid JSON response from OpenAI');
+    }
+
+    // Extract questions array (handle different response structures)
+    let questions: GeneratedQuestion[];
+    if (Array.isArray(parsedResponse)) {
+      questions = parsedResponse;
+    } else if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+      questions = parsedResponse.questions;
+    } else {
+      throw new Error('Unexpected response structure from OpenAI');
+    }
+
+    // Validate generated questions
+    const validatedQuestions: GeneratedQuestion[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const questionNum = i + 1;
+
+      // Check required fields
+      if (!q.question_text || q.question_text.length < 10) {
+        errors.push(`Question ${questionNum}: Missing or too short question_text`);
+        continue;
+      }
+      if (!q.choice_1 || !q.choice_2 || !q.choice_3 || !q.choice_4) {
+        errors.push(`Question ${questionNum}: Missing one or more choices`);
+        continue;
+      }
+      if (!q.correct_answer) {
+        errors.push(`Question ${questionNum}: Missing correct_answer`);
+        continue;
+      }
+
+      // Verify correct_answer matches one of the choices
+      const choices = [q.choice_1, q.choice_2, q.choice_3, q.choice_4];
+      if (!choices.includes(q.correct_answer)) {
+        errors.push(
+          `Question ${questionNum}: correct_answer "${q.correct_answer}" doesn't match any choice`
+        );
+        continue;
+      }
+
+      // Validate difficulty
+      if (!['easy', 'medium', 'hard'].includes(q.difficulty)) {
+        q.difficulty = 'medium'; // Default to medium if invalid
+      }
+
+      // Set defaults for optional fields
+      if (!q.explanation) {
+        q.explanation = '';
+      }
+      if (!q.category) {
+        q.category = category || 'General';
+      }
+
+      validatedQuestions.push(q);
+    }
+
+    console.log(`Validated ${validatedQuestions.length} out of ${questions.length} questions`);
+
+    if (validatedQuestions.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'No valid questions generated. Please try again.',
+          validationErrors: errors,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Return generated questions
+    return NextResponse.json({
+      success: true,
+      questions: validatedQuestions,
+      generated: validatedQuestions.length,
+      requested: totalQuestions,
+      distribution: {
+        easy: validatedQuestions.filter((q) => q.difficulty === 'easy').length,
+        medium: validatedQuestions.filter((q) => q.difficulty === 'medium').length,
+        hard: validatedQuestions.filter((q) => q.difficulty === 'hard').length,
+      },
+      validationErrors: errors.length > 0 ? errors : undefined,
+      model: completion.model,
+      tokensUsed: completion.usage?.total_tokens || 0,
+    });
+  } catch (error: unknown) {
+    console.error('Error generating questions with AI:', error);
+
+    // Handle OpenAI specific errors
+    if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
+      const apiError = error as { status?: number; message: string; type?: string };
+      return NextResponse.json(
+        {
+          success: false,
+          error: `OpenAI API Error: ${apiError.message}`,
+          details: apiError.type,
+        },
+        { status: apiError.status || 500 }
+      );
+    }
+
+    // Generic error
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate questions',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/admin/questions/generate-ai
+ * Get configuration info and usage guidelines
+ */
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    endpoint: '/api/admin/questions/generate-ai',
+    method: 'POST',
+    description: 'Generate football trivia questions using OpenAI',
+    configured: !!process.env.OPENAI_API_KEY,
+    model: 'gpt-4o-mini',
+    parameters: {
+      totalQuestions: {
+        type: 'number',
+        required: true,
+        min: 1,
+        max: 50,
+        description: 'Total number of questions to generate',
+      },
+      difficultyRatio: {
+        type: 'object',
+        required: true,
+        properties: {
+          easy: { type: 'number', description: 'Percentage of easy questions (0-100)' },
+          medium: { type: 'number', description: 'Percentage of medium questions (0-100)' },
+          hard: { type: 'number', description: 'Percentage of hard questions (0-100)' },
+        },
+        note: 'easy + medium + hard must equal 100',
+      },
+      category: {
+        type: 'string',
+        required: false,
+        description: 'Optional category for questions (e.g., "Premier League", "World Cup")',
+      },
+      topic: {
+        type: 'string',
+        required: false,
+        description: 'Optional specific topic (e.g., "Cristiano Ronaldo", "2022 World Cup")',
+      },
+    },
+    example: {
+      totalQuestions: 20,
+      difficultyRatio: {
+        easy: 40,
+        medium: 40,
+        hard: 20,
+      },
+      category: 'World Cup',
+      topic: '2022 Qatar',
+    },
+    validCategories: [
+      'General',
+      'Premier League',
+      'La Liga',
+      'Serie A',
+      'Bundesliga',
+      'Champions League',
+      'World Cup',
+      'European Championship',
+      'Player Trivia',
+      'Team History',
+      'Records & Statistics',
+    ],
+  });
+}

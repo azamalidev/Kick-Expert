@@ -16,7 +16,7 @@ const supabase = createClient(
 );
 
 interface Question {
-  id: number;
+  id: number | string;
   sourceQuestionId?: number | string;
   question_text: string;
   category: string;
@@ -27,7 +27,7 @@ interface Question {
 }
 
 interface AnswerRecord {
-  question_id: number;
+  question_id: number | string;
   is_correct: boolean;
   difficulty: string;
 }
@@ -285,7 +285,7 @@ export default function LeaguePage() {
         // Normalize returned rows to client's Question shape. Keep competition_question_id
         // and question_id where present.
         const normalized = questionsData.map((q: any) => ({
-          id: q.question_id ?? null, // canonical integer id when available
+          id: q.competition_question_id ?? null, // UUID string id from competition_questions
           sourceQuestionId: q.source_question_id ?? q.question_id ?? null,
           competition_question_id: q.competition_question_id ?? null,
           question_text: q.question_text,
@@ -380,6 +380,26 @@ export default function LeaguePage() {
   // Timer for each question - using timestamp to work even when tab is inactive
   useEffect(() => {
     if (phase !== 'quiz' || quizCompleted || showResult || questions.length === 0) return;
+
+    // Mark the current question as used (displayed to user)
+    const currentQuestion = questions[currentQuestionIndex];
+    if (currentQuestion) {
+      const markAsUsed = async () => {
+        try {
+          // Use competition_question_id for competition questions
+          const competitionQuestionId = (currentQuestion as any).competition_question_id;
+          
+          if (competitionQuestionId) {
+            await supabase.rpc('mark_question_as_used', {
+              p_competition_question_id: competitionQuestionId
+            });
+          }
+        } catch (err) {
+          console.error('Failed to mark question as used:', err);
+        }
+      };
+      markAsUsed();
+    }
 
     // Set the start time for this question (for both timer and speed detection)
     timerStartTime.current = Date.now();
@@ -556,6 +576,9 @@ export default function LeaguePage() {
     
     
     const currentQuestion = questions[currentQuestionIndex];
+    
+    // Determine if question was skipped (no answer selected)
+    const wasSkipped = !selectedChoice;
     const isCorrect = selectedChoice === currentQuestion?.correct_answer;
     
     
@@ -606,6 +629,23 @@ export default function LeaguePage() {
       };
 
       await supabase.from('competition_answers').insert(payload);
+
+      // Track question statistics for analytics
+      try {
+        await fetch('/api/track-answer-stats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question_id: fkQuestionId,
+            competition_question_id: competitionQuestionId,
+            is_correct: isCorrect,
+            was_skipped: wasSkipped,
+            response_time_ms: latencyMs > 0 ? latencyMs : null
+          })
+        });
+      } catch (statsErr) {
+        console.error('Failed to track answer stats:', statsErr);
+      }
 
       // Save speed detection data if user selected an answer
       if (selectedChoice && latencyMs > 0) {

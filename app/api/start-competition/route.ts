@@ -20,11 +20,12 @@ export async function POST(req: NextRequest) {
     console.error('Failed to mark registrations as entered:', err);
   }
 
-  // Fetch competition_questions
+  // Fetch competition_questions (only active ones with status = true)
   const { data: compQs, error: compError } = await supabase
     .from('competition_questions')
     .select('*')
-    .eq('competition_id', competitionId);
+    .eq('competition_id', competitionId)
+    .eq('status', true); // Only fetch enabled questions
 
   if (compError) {
     console.error('Error fetching competition_questions:', compError);
@@ -32,6 +33,17 @@ export async function POST(req: NextRequest) {
   }
 
   const questions = (compQs || []) as any[];
+
+  // Mark questions as used (update last_used_at timestamp)
+  for (const q of questions) {
+    try {
+      await supabase.rpc('mark_question_as_used', {
+        p_competition_question_id: q.id
+      });
+    } catch (err) {
+      console.error('Failed to mark question as used:', err);
+    }
+  }
 
   // Collect any numeric source_question_id values to fetch canonical questions
   const numericSourceIds = questions

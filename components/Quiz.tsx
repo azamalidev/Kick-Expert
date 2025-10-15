@@ -35,6 +35,7 @@ export default function QuizDashboard() {
   const [answers, setAnswers] = useState<AnswerRecord[]>([]);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [questionStartTime, setQuestionStartTime] = useState<number | null>(null); // Track when question was shown
 
   // Shuffle array function
   const shuffleArray = (array: any[]) => {
@@ -51,9 +52,9 @@ export default function QuizDashboard() {
       setUserId(user?.id || null);
 
       const [easyQuestions, mediumQuestions, hardQuestions] = await Promise.all([
-        supabase.from('questions').select('*').eq('difficulty', 'Easy'),
-        supabase.from('questions').select('*').eq('difficulty', 'Medium'),
-        supabase.from('questions').select('*').eq('difficulty', 'Hard')
+        supabase.from('questions').select('*').eq('difficulty', 'Easy').eq('status', true),
+        supabase.from('questions').select('*').eq('difficulty', 'Medium').eq('status', true),
+        supabase.from('questions').select('*').eq('difficulty', 'Hard').eq('status', true)
       ]);
 
       if (easyQuestions.error || mediumQuestions.error || hardQuestions.error) {
@@ -71,6 +72,9 @@ export default function QuizDashboard() {
       ]);
 
       setQuestions(allQuestions);
+
+      // DON'T mark questions as used here - they'll be marked when actually served to user
+      // Removing the premature mark_question_as_used calls
 
       const { data: session, error: sessionError } = await supabase
         .from('free_quiz_sessions')
@@ -102,6 +106,27 @@ export default function QuizDashboard() {
     initializeQuiz();
   }, []);
 
+  // Track when a new question is displayed
+  useEffect(() => {
+    if (currentQuestion && !quizCompleted) {
+      // Mark question as used when it's displayed
+      const markAsUsed = async () => {
+        try {
+          await supabase.rpc('mark_question_as_used', {
+            p_question_id: currentQuestion.id,
+            p_competition_question_id: null
+          });
+        } catch (err) {
+          console.error('Failed to mark question as used:', err);
+        }
+      };
+      
+      markAsUsed();
+      // Set the time when this question was shown
+      setQuestionStartTime(Date.now());
+    }
+  }, [currentQuestionIndex, quizCompleted]);
+
   // Trigger confetti for scores >= 10
   useEffect(() => {
     if (quizCompleted && score >= 1) {
@@ -125,6 +150,13 @@ export default function QuizDashboard() {
 
   const handleNextQuestion = async () => {
     const isCorrect = selectedChoice === currentQuestion.correct_answer;
+    const wasSkipped = !selectedChoice; // True if no answer selected
+    
+    // Calculate response time
+    let responseTimeMs: number | null = null;
+    if (questionStartTime && selectedChoice) {
+      responseTimeMs = Date.now() - questionStartTime;
+    }
     
     if (isCorrect) {
       setScore(score + 1);
@@ -138,6 +170,23 @@ export default function QuizDashboard() {
         difficulty: currentQuestion.difficulty
       }
     ]);
+
+    // Track question statistics
+    try {
+      await fetch('/api/track-answer-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_id: currentQuestion.id,
+          competition_question_id: null,
+          is_correct: isCorrect,
+          was_skipped: wasSkipped,
+          response_time_ms: responseTimeMs
+        })
+      });
+    } catch (err) {
+      console.error('Failed to track answer stats:', err);
+    }
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);

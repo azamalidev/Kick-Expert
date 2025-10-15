@@ -29,53 +29,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ questions: [] });
     }
 
-    const compName: string = (compRow && compRow.name) || '';
-
-    // Map competition name to difficulty — adjust these rules if your naming differs
-    const mapNameToDifficulty = (name: string) => {
-      const n = (name || '').toLowerCase();
-      if (n.includes('starter')) return 'Easy';
-      if (n.includes('pro')) return 'Medium';
-      if (n.includes('elite')) return 'Hard';
-      // fallback: medium
-      return 'Medium';
-    };
-
-    const difficulty = mapNameToDifficulty(compName);
-
-    // Default number of questions to return — change as needed or accept from client
-    const limit = 20;
-
-    // Fetch from `questions` table directly (as requested)
+    // Fetch from `competition_questions` table for the specific competition (only active ones)
     const { data: qsData, error: qsErr } = await supabase
-      .from('questions')
+      .from('competition_questions')
       .select('*')
-      .eq('difficulty', difficulty)
-      .limit(limit)
-      .order('id', { ascending: true });
+      .eq('competition_id', competitionId)
+      .eq('status', true) // Only fetch enabled questions
+      .order('created_at', { ascending: true });
 
     if (qsErr) {
-      console.error('Error fetching questions table:', qsErr);
+      console.error('Error fetching competition_questions table:', qsErr);
       return NextResponse.json({ questions: [] });
     }
 
     let finalQs = (qsData || []) as any[];
 
-    // If not enough questions found for that difficulty, fetch more without difficulty filter
-    if (finalQs.length < limit) {
-      const { data: more, error: moreErr } = await supabase
-        .from('questions')
-        .select('*')
-        .limit(limit)
-        .order('id', { ascending: true });
-      if (!moreErr && more) finalQs = more;
-    }
+    // Don't mark questions as used here - they should be marked when actually displayed to user
+    // This will be handled in league.tsx when each question is shown
 
     const normalized = finalQs.map((q: any, idx: number) => ({
-      competition_question_id: null,
+      competition_question_id: q.id, // uuid from competition_questions
       competition_id: competitionId,
-      question_id: q.id,
-      source_question_id: null,
+      question_id: null, // not from questions table
+      source_question_id: q.source_question_id,
       question_text: q.question_text,
       choices: q.choices,
       correct_answer: q.correct_answer,
