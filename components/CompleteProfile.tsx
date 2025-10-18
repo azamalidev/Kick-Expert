@@ -328,25 +328,28 @@ export default function CompleteProfile() {
             const storedEmail = sessionStorage.getItem('signup_email');
             const storedPassword = sessionStorage.getItem('signup_password');
             if (storedEmail && storedPassword) {
+              console.debug('Attempting auto-login with stored credentials for', storedEmail);
               const { data, error } = await supabase.auth.signInWithPassword({ email: storedEmail, password: storedPassword });
+              console.debug('Auto-login result', { data, error });
               if (error) {
                 console.warn('Auto-login after profile complete failed', error);
+                toast.error('Auto-login failed. Please sign in manually.', { id: toastId });
                 // fallback: go to login page with prefilled email
                 router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
               } else if (data?.session) {
                 // Successfully signed in — clear stored creds and redirect to dashboard
                 try { sessionStorage.removeItem('signup_email'); sessionStorage.removeItem('signup_password'); } catch (e) { /* ignore */ }
-                // Ensure nav/state refresh — hard reload is a reliable fallback when SPA state doesn't update
+                toast.success('Signed in successfully. Redirecting...', { id: toastId });
+                // Do a full navigation to ensure Supabase client reads persisted session and Navbar picks it up
                 try {
-                  router.replace('/');
-                  // Small delay to allow client state to settle before reload
-                  setTimeout(() => {
-                    try { window.location.reload(); } catch (e) { /* ignore */ }
-                  }, 250);
+                  window.location.assign('/');
                 } catch (e) {
-                  try { window.location.reload(); } catch (e) { /* ignore */ }
+                  // Fallback to SPA navigation + reload
+                  router.replace('/');
+                  setTimeout(() => { try { window.location.reload(); } catch (e) { /* ignore */ } }, 300);
                 }
               } else {
+                toast('Unable to sign you in automatically. Please log in.', { id: toastId });
                 router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
               }
               return;

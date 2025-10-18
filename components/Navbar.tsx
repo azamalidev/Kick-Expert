@@ -319,6 +319,7 @@ export default function Navbar() {
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.debug('onAuthStateChange event', { event, session });
       const currentUser = session?.user || null;
       setUser(currentUser);
       if (currentUser) fetchUserData(currentUser.id);
