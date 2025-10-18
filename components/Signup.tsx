@@ -355,6 +355,16 @@ useEffect(() => {
       
       // ✅ Step 8: Redirect
       setTimeout(() => {
+        // Persist credentials temporarily so the complete-profile flow can auto-login the user
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('signup_email', email);
+            sessionStorage.setItem('signup_password', password);
+          }
+        } catch (e) {
+          console.warn('Unable to persist signup credentials for auto-login', e);
+        }
+
         router.push(`/login?verify=true&email=${encodeURIComponent(email)}`);
       }, 2000);
     } catch (error: any) {

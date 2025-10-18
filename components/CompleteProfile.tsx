@@ -322,6 +322,41 @@ export default function CompleteProfile() {
         if (!r.ok) throw new Error('Server profile completion failed');
 
         toast.success('Profile saved! Welcome to KickExpert!', { id: toastId });
+        // Try to auto-login the user if we have stored signup credentials (signup flow)
+        try {
+          if (typeof window !== 'undefined') {
+            const storedEmail = sessionStorage.getItem('signup_email');
+            const storedPassword = sessionStorage.getItem('signup_password');
+            if (storedEmail && storedPassword) {
+              const { data, error } = await supabase.auth.signInWithPassword({ email: storedEmail, password: storedPassword });
+              if (error) {
+                console.warn('Auto-login after profile complete failed', error);
+                // fallback: go to login page with prefilled email
+                router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
+              } else if (data?.session) {
+                // Successfully signed in — clear stored creds and redirect to dashboard
+                try { sessionStorage.removeItem('signup_email'); sessionStorage.removeItem('signup_password'); } catch (e) { /* ignore */ }
+                // Ensure nav/state refresh — hard reload is a reliable fallback when SPA state doesn't update
+                try {
+                  router.replace('/');
+                  // Small delay to allow client state to settle before reload
+                  setTimeout(() => {
+                    try { window.location.reload(); } catch (e) { /* ignore */ }
+                  }, 250);
+                } catch (e) {
+                  try { window.location.reload(); } catch (e) { /* ignore */ }
+                }
+              } else {
+                router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Auto-login attempt failed', e);
+        }
+
+        // Default redirect if auto-login not possible
         router.replace('/');
       }
     } catch (error: any) {
