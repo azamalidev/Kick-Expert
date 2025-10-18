@@ -86,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(); // 24h
     await supabaseAdmin.from('email_verifications').insert([{ user_id: userId, token, expires_at: expiresAt }]);
 
-    const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const verifyLink = `${base.replace(/\/$/, '')}/api/auth/verify?token=${token}`;
+  const base = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://www.kickexpert.com';
+  const verifyLink = `${base.replace(/\/$/, '')}/api/auth/verify?token=${token}`;
     const tpl = transactionalTemplates.signupVerification(verifyLink, name);
 
     if (process.env.SENDGRID_API_KEY) {

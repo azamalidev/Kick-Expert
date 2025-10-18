@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: userRow } = await supabaseAdmin.from('users').select('email').eq('id', userId).limit(1).maybeSingle();
     const userEmail = (userRow as any)?.email || null;
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const base = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://www.kickexpert.com';
   // Redirect to /auth/callback so the client-side callback can attempt to parse a session.
   // Include verified flag and email (if found) so the callback can forward to login with an email prefill when no session exists.
   const redirectUrl = `${base.replace(/\/$/, '')}/auth/callback?verified=1${userEmail ? `&email=${encodeURIComponent(userEmail)}` : ''}`;

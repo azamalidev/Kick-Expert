@@ -59,13 +59,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let html = '';
 
     if (type === 'signupVerification') {
-      const verifyLink = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/verify?token=${data?.token}`;
+      const siteBase = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://www.kickexpert.com';
+      const verifyLink = `${siteBase.replace(/\/$/, '')}/auth/verify?token=${data?.token}`;
       const tpl = transactionalTemplates.signupVerification(verifyLink, recipientName);
       subject = tpl.subject; html = tpl.html;
     }
 
     if (type === 'passwordReset') {
-      const resetLink = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/reset-password?token=${data?.token}`;
+      const siteBase = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://www.kickexpert.com';
+      const resetLink = `${siteBase.replace(/\/$/, '')}/auth/reset-password?token=${data?.token}`;
       const tpl = transactionalTemplates.passwordReset(resetLink);
       subject = tpl.subject; html = tpl.html;
     }
