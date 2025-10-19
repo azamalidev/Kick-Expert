@@ -72,8 +72,9 @@ export default function AIGeneratePanel() {
   const [editedQuestion, setEditedQuestion] = useState<GeneratedQuestion | null>(null);
 
   // Upload state
+  // Default to competition_questions per request
   const [targetTable, setTargetTable] = useState<'questions' | 'competition_questions'>(
-    'questions'
+    'competition_questions'
   );
   const [isUploading, setIsUploading] = useState(false);
 

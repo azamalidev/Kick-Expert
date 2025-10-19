@@ -142,28 +142,95 @@ CRITICAL:
 
     console.log('OpenAI API response received');
 
-    // Parse response
-    const responseContent = completion.choices[0]?.message?.content;
-    if (!responseContent) {
+    // Parse response (handle both string and object responses)
+    const responseContent = completion.choices?.[0]?.message?.content;
+    if (responseContent === undefined || responseContent === null) {
       throw new Error('No response from OpenAI API');
     }
 
-    let parsedResponse;
-    try {
-      parsedResponse = JSON.parse(responseContent);
-    } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', responseContent);
-      throw new Error('Invalid JSON response from OpenAI');
+    console.debug('OpenAI response content type:', typeof responseContent);
+
+    let parsedResponse: any = null;
+
+    if (typeof responseContent === 'object') {
+      // Some SDK/formatters return a parsed object already
+      parsedResponse = responseContent;
+    } else if (typeof responseContent === 'string') {
+      // Try to parse the entire string as JSON
+      try {
+        parsedResponse = JSON.parse(responseContent);
+      } catch (e) {
+        // If parsing fails, attempt to extract a JSON array/object substring from the text
+        const arrayMatch = responseContent.match(/\[\s*\{[\s\S]*\}\s*\]/m);
+        const objMatch = responseContent.match(/\{[\s\S]*\}/m);
+        const candidate = arrayMatch?.[0] || objMatch?.[0];
+        if (candidate) {
+          try {
+            parsedResponse = JSON.parse(candidate);
+          } catch (e2) {
+            console.error('Failed to parse extracted JSON candidate from OpenAI response');
+            console.error('Raw response:', responseContent);
+            throw new Error('Invalid JSON response from OpenAI');
+          }
+        } else {
+          console.error('OpenAI returned non-JSON text:', responseContent);
+          throw new Error('Invalid JSON response from OpenAI');
+        }
+      }
+    } else {
+      console.error('Unhandled OpenAI response content type', typeof responseContent, responseContent);
+      throw new Error('Unexpected response type from OpenAI');
     }
 
     // Extract questions array (handle different response structures)
-    let questions: GeneratedQuestion[];
+    let questions: GeneratedQuestion[] = [];
     if (Array.isArray(parsedResponse)) {
       questions = parsedResponse;
-    } else if (parsedResponse.questions && Array.isArray(parsedResponse.questions)) {
+    } else if (parsedResponse && Array.isArray(parsedResponse.questions)) {
       questions = parsedResponse.questions;
+    } else if (parsedResponse && Array.isArray(parsedResponse.data)) {
+      questions = parsedResponse.data;
     } else {
-      throw new Error('Unexpected response structure from OpenAI');
+      // Try to aggressively extract JSON array/object substrings from the original string response
+      const rawString = typeof responseContent === 'string' ? responseContent : JSON.stringify(responseContent);
+      let extracted: any = null;
+
+      try {
+        const startArr = rawString.indexOf('[');
+        const endArr = rawString.lastIndexOf(']');
+        if (startArr !== -1 && endArr !== -1 && endArr > startArr) {
+          const candidate = rawString.slice(startArr, endArr + 1);
+          extracted = JSON.parse(candidate);
+          if (Array.isArray(extracted)) questions = extracted;
+        }
+      } catch (e) {
+        // ignore and try object extraction
+      }
+
+      if (questions.length === 0) {
+        try {
+          const startObj = rawString.indexOf('{');
+          const endObj = rawString.lastIndexOf('}');
+          if (startObj !== -1 && endObj !== -1 && endObj > startObj) {
+            const candidateObj = rawString.slice(startObj, endObj + 1);
+            const parsedObj = JSON.parse(candidateObj);
+            if (parsedObj && Array.isArray(parsedObj.questions)) questions = parsedObj.questions;
+            else if (parsedObj && Array.isArray(parsedObj.data)) questions = parsedObj.data;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      if (!questions || questions.length === 0) {
+        console.error('Parsed OpenAI response structure not recognized:', parsedResponse);
+        console.error('Raw OpenAI response content:', responseContent);
+        const debugPayload: any = { success: false, error: 'Unexpected response structure from OpenAI' };
+        if (process.env.NODE_ENV !== 'production') {
+          debugPayload.debug = { parsedResponse, raw: responseContent };
+        }
+        return NextResponse.json(debugPayload, { status: 500 });
+      }
     }
 
     // Validate generated questions
