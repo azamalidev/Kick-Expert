@@ -29,11 +29,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ questions: [] });
     }
 
-    // Fetch from `competition_questions` table for the specific competition (only active ones)
+    // Fetch from `competition_questions` table for the specific competition (only active ones).
+    // Include global (competition_id IS NULL) questions as a fallback so competitions with no assigned
+    // competition-specific rows can still use the shared pool.
     const { data: qsData, error: qsErr } = await supabase
       .from('competition_questions')
       .select('*')
-      .eq('competition_id', competitionId)
+      .or(`competition_id.eq.${competitionId},competition_id.is.null`)
       .eq('status', true) // Only fetch enabled questions
       .order('created_at', { ascending: true });
 
@@ -42,7 +44,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ questions: [] });
     }
 
-    let finalQs = (qsData || []) as any[];
+  let finalQs = (qsData || []) as any[];
+  console.debug(`competition-questions: found ${finalQs.length} rows for competitionId=${competitionId}`);
 
     // Don't mark questions as used here - they should be marked when actually displayed to user
     // This will be handled in league.tsx when each question is shown
