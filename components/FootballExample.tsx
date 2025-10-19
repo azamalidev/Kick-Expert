@@ -107,39 +107,21 @@ Tailor your response as if you're speaking to an advanced football fan who value
 
   const generateAIResponse = async (query: string, level: "easy" | "medium" | "hard") => {
     try {
-      // Dynamic system prompt to handle historical questions
-      const isHistorical = /\b(18|19|early 20|FIFA|FA Cup|history|origin|found|first|oldest)\b/i.test(query);
-
-      const systemPrompt = isHistorical
-        ? `You are a football historian AI. Provide accurate, detailed, and well-researched answers about football history. Include relevant dates, names, matches, tournaments, and events. Focus on clarity and factual accuracy, even for events from the 1800s and early 1900s.`
-        : aiModels[level]?.systemPrompt || "You are a helpful AI assistant answering football-related questions.";
-
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: query
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: level === "easy" ? 300 : level === "medium" ? 600 : 1000
-        })
+      // Proxy the request to our server-side OpenAI endpoint so the key isn't exposed to the browser
+      const r = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: query, level }),
       });
 
-      const data = await response.json();
+      if (!r.ok) {
+        const err = await r.json().catch(() => null);
+        console.error('AI proxy error', err);
+        return "Sorry, I'm having trouble answering right now. Please try again later.";
+      }
 
-      return data.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
+      const json = await r.json();
+      return json.text || "I couldn't generate a response. Please try again.";
     } catch (error) {
       console.error("Error calling OpenAI API:", error);
       return "Sorry, I'm having trouble answering right now. Please try again later.";
