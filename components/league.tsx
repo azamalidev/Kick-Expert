@@ -284,9 +284,10 @@ export default function LeaguePage() {
 
         // Normalize returned rows to client's Question shape. Keep competition_question_id
         // and question_id where present.
-        const normalized = questionsData.map((q: any) => ({
-          id: q.competition_question_id ?? null, // UUID string id from competition_questions
+        const normalizedAll: Question[] = questionsData.map((q: any) => ({
+          id: q.competition_question_id ?? null,
           sourceQuestionId: q.source_question_id ?? q.question_id ?? null,
+          // @ts-ignore preserve for later inserts
           competition_question_id: q.competition_question_id ?? null,
           question_text: q.question_text,
           category: q.category,
@@ -296,7 +297,45 @@ export default function LeaguePage() {
           explanation: q.explanation,
         }));
 
-        setQuestions(normalized);
+        // Enforce 20 questions per session with a 40/40/20 difficulty split
+        const targetTotal = 20;
+        const targetEasy = Math.round(targetTotal * 0.4); // 8
+        const targetMedium = Math.round(targetTotal * 0.4); // 8
+        const targetHard = targetTotal - targetEasy - targetMedium; // 4
+
+        const shuffle = <T,>(arr: T[]): T[] => {
+          const a = [...arr];
+          for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+          }
+          return a;
+        };
+
+        const easyQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('easy'));
+        const mediumQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('medium'));
+        const hardQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('hard'));
+
+        let selected: Question[] = [];
+        selected = [
+          ...shuffle(easyQs).slice(0, targetEasy),
+          ...shuffle(mediumQs).slice(0, targetMedium),
+          ...shuffle(hardQs).slice(0, targetHard),
+        ];
+
+        // If any bucket lacked enough questions, backfill from remaining pool to reach 20
+        if (selected.length < targetTotal) {
+          const selectedIds = new Set(selected.map(q => q.id as any));
+          const remaining = shuffle(normalizedAll.filter(q => !selectedIds.has(q.id as any)));
+          selected = [...selected, ...remaining.slice(0, targetTotal - selected.length)];
+        }
+
+        // Ensure we do not exceed total
+        if (selected.length > targetTotal) {
+          selected = shuffle(selected).slice(0, targetTotal);
+        }
+
+        setQuestions(selected);
 
 
         
@@ -342,20 +381,23 @@ export default function LeaguePage() {
           .insert({
             competition_id: competitionId,
             user_id: authResponse.data.user.id,
-            questions_played: questionsData.length,
+            questions_played: Math.min(20, (Array.isArray(questionsData) ? questionsData.length : 0)),
             correct_answers: 0,
             score_percentage: 0,
             start_time: new Date().toISOString(),
             // quiz_type is required by DB (NOT NULL). Use 'competition' for league sessions.
             quiz_type: 'competition',
             // compute difficulty breakdown from the questions
-            difficulty_breakdown: questionsData.reduce((acc: any, q: any) => {
-              const d = (q.difficulty || '').toString().toLowerCase();
-              if (d.includes('easy')) acc.easy = (acc.easy || 0) + 1;
-              else if (d.includes('medium')) acc.medium = (acc.medium || 0) + 1;
-              else if (d.includes('hard')) acc.hard = (acc.hard || 0) + 1;
+            difficulty_breakdown: ((): any => {
+              const acc: any = { easy: 0, medium: 0, hard: 0 };
+              (selected || []).forEach((q: any) => {
+                const d = (q.difficulty || '').toString().toLowerCase();
+                if (d.includes('easy')) acc.easy += 1;
+                else if (d.includes('medium')) acc.medium += 1;
+                else if (d.includes('hard')) acc.hard += 1;
+              });
               return acc;
-            }, {}),
+            })(),
           })
           .select()
           .single();
@@ -437,8 +479,7 @@ export default function LeaguePage() {
     showResult,
     questions.length,
     currentQuestionIndex,
-    timerKey,
-    selectedChoice
+    timerKey
   ]);
 
   // Confetti effect on quiz completion
@@ -539,6 +580,12 @@ export default function LeaguePage() {
   setSelectedChoice(choice);
   };
 
+  // Keep a ref of the current selection so the timer effect does not restart on select
+  const selectedChoiceRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedChoiceRef.current = selectedChoice;
+  }, [selectedChoice]);
+
   const handleNextQuestion = async () => {
     // Prevent multiple calls
     if (nextCalled.current) {
@@ -560,7 +607,7 @@ export default function LeaguePage() {
     // Calculate response latency for speed detection
     const answerTime = Date.now();
     let latencyMs = 0;
-    if (questionStartTime.current && selectedChoice) {
+    if (questionStartTime.current && selectedChoiceRef.current) {
       latencyMs = answerTime - questionStartTime.current;
       responseLatencies.current.push(latencyMs);
       
@@ -578,8 +625,8 @@ export default function LeaguePage() {
     const currentQuestion = questions[currentQuestionIndex];
     
     // Determine if question was skipped (no answer selected)
-    const wasSkipped = !selectedChoice;
-    const isCorrect = selectedChoice === currentQuestion?.correct_answer;
+    const wasSkipped = !selectedChoiceRef.current;
+    const isCorrect = selectedChoiceRef.current === currentQuestion?.correct_answer;
     
     
     // Update score
@@ -623,7 +670,7 @@ export default function LeaguePage() {
         question_id: fkQuestionId,
         competition_question_id: competitionQuestionId,
         registration_id: registrationId,
-        selected_answer: selectedChoice,
+        selected_answer: selectedChoiceRef.current,
         is_correct: isCorrect,
         submitted_at: new Date().toISOString(),
       };
@@ -648,7 +695,7 @@ export default function LeaguePage() {
       }
 
       // Save speed detection data if user selected an answer
-      if (selectedChoice && latencyMs > 0) {
+      if (selectedChoiceRef.current && latencyMs > 0) {
         try {
           const { error: speedError } = await supabase
             .from('competition_speed_detection')
@@ -1257,6 +1304,7 @@ export default function LeaguePage() {
                 <Trophy className="h-6 w-6" />
                 League Recap
               </h2>
+           
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -1420,21 +1468,8 @@ export default function LeaguePage() {
                 transition={{ duration: 0.3 }}
                 className="p-4 sm:p-6"
               >
-                {/* Question Metadata */}
-                <div className="flex flex-wrap justify-between items-center mb-5 gap-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-xs sm:text-sm text-gray-600 font-medium">
-                      {questions[currentQuestionIndex]?.category}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${
-                      questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                      questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {questions[currentQuestionIndex]?.difficulty}
-                    </span>
-                  </div>
-                </div>
+                {/* Question Metadata hidden per request */}
+                <div className="hidden"></div>
 
                 {/* Question Text */}
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 mb-6 shadow-sm">
