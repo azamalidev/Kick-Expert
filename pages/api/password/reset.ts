@@ -29,7 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Use Supabase admin API to update password
     let updated = false;
     try {
-      // @ts-ignore
       const { data: updatedUser, error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
       if (updateErr) throw updateErr;
       if (updatedUser) updated = true;
@@ -37,9 +36,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.warn('Supabase admin SDK update failed, falling back to REST admin endpoint:', sdkErr?.message || sdkErr);
       // Fallback: call Supabase Admin REST API directly using service role key
       try {
-  const baseUrl = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/, '') : '';
-        const restHeaders = new Headers({ 'Content-Type': 'application/json', Authorization: `Bearer ${String(SERVICE_ROLE_KEY)}`, apikey: String(SERVICE_ROLE_KEY) });
-        const resp = await fetch(`${baseUrl}/admin/v1/users/${userId}`, { method: 'PATCH', headers: restHeaders, body: JSON.stringify({ password }) });
+        const baseUrl = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/, '') : '';
+        const restHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+        };
+        if (SERVICE_ROLE_KEY) {
+          restHeaders['apikey'] = SERVICE_ROLE_KEY;
+        }
+        const resp = await fetch(`${baseUrl}/auth/v1/admin/users/${userId}`, { 
+          method: 'PUT', 
+          headers: restHeaders, 
+          body: JSON.stringify({ password }) 
+        });
 
         if (!resp.ok) {
           const text = await resp.text();
