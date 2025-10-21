@@ -2,9 +2,14 @@
 
 import { useState } from "react"
 import { Star, ArrowRight } from "lucide-react"
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import toast from 'react-hot-toast'
 
 export default function CustomerReviews() {
   const [email, setEmail] = useState("")
+  const [subscribed, setSubscribed] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const reviewData = [
     { stars: 5, percentage: 75, count: 982 },
@@ -13,6 +18,87 @@ export default function CustomerReviews() {
     { stars: 2, percentage: 1, count: 17 },
     { stars: 1, percentage: 3, count: 46 },
   ]
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Read currently signed-in user (if any) and prefer their name when sending subscribe
+      const supabase = createClientComponentClient()
+      let subscriberName: string | null = null
+      try {
+        const { data: userData } = await supabase.auth.getUser()
+        const user = userData?.user
+        if (user) {
+          // try metadata first
+          subscriberName = (user.user_metadata as any)?.full_name || (user.user_metadata as any)?.name || null
+
+          // fallback: query profiles table for a nicer display name
+          if (!subscriberName) {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('user_id', user.id)
+                .limit(1)
+                .single()
+
+              if (profile) {
+                subscriberName = profile.username || null
+              }
+            } catch (err) {
+              // ignore profile lookup errors
+            }
+          }
+        }
+      } catch (err) {
+        // ignore - we'll still call subscribe without a name
+      }
+
+      // Pre-check: if the email is already subscribed and confirmed, show toast and stop
+      try {
+        const { data: existing } = await supabase
+          .from('newsletter_subscribers')
+          .select('confirmed')
+          .eq('email', email.toLowerCase())
+          .limit(1)
+          .single()
+
+        if (existing && existing.confirmed) {
+          setSubscribed(true)
+          setEmail('')
+          toast('You are already subscribed', { icon: '✅' })
+          setLoading(false)
+          return
+        }
+      } catch (err) {
+        // ignore lookup errors and continue to subscribe flow
+      }
+
+      const res = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: subscriberName }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.message || 'Subscribe failed')
+
+      setSubscribed(true)
+      setEmail('')
+      toast.success('Confirmation email sent — check your inbox')
+    } catch (err) {
+      setError('Failed to subscribe. Please try again.')
+      console.error('Subscription error:', err)
+      toast.error('Subscription failed — try again')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <section className="py-16 sm:py-20 lg:py-28 bg-gray-50">
@@ -93,24 +179,34 @@ export default function CustomerReviews() {
                 Get the latest football insights, tactics, and updates delivered to your inbox.
               </p>
 
-              <div className="flex max-w-md">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="flex-1 px-4 py-3 text-base text-gray-900 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-lime-300"
-                />
-                <button className="px-6 py-3 bg-gray-900 text-white rounded-r-lg hover:bg-gray-800 transition-colors flex items-center gap-2">
-                  <span>Join</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
+              {subscribed ? (
+                <p className="text-white text-lg">Thank you for subscribing!</p>
+              ) : (
+                <form onSubmit={handleSubscribe} className="flex max-w-md">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 px-4 py-3 text-base text-gray-900 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-lime-300"
+                    required
+                  />
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-3 bg-gray-900 text-white rounded-r-lg hover:bg-gray-800 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span>{loading ? 'Joining...' : 'Join'}</span>
+                    {!loading && <ArrowRight className="w-5 h-5" />}
+                  </button>
+                </form>
+              )}
+              {error && <p className="text-white/90 text-sm mt-2">{error}</p>}
             </div>
 
             {/* Featured content */}
             <div className="bg-white p-8 sm:p-12 lg:p-16 flex flex-col justify-center">
-              <div className="mb-4 inline-flex items-center gap-2 bg-gray-100 px-4 py-1 rounded-full">
+              <div className="mb-4 w-fit inline-flex items-center gap-2 bg-gray-100 px-4 py-1 rounded-full">
                 <span className="text-xs font-medium text-gray-600">FEATURED ARTICLE</span>
               </div>
               
