@@ -93,7 +93,24 @@ IMPORTANT RULES:
 5. Use proper grammar and formatting
 6. Questions should test real football knowledge
 7. Avoid overly obscure or trick questions
-8. Include a mix of topics: players, teams, tournaments, history, records, tactics, etc.`;
+8. Include a mix of topics: players, teams, tournaments, history, records, tactics, etc.
+9. NEVER use phrases like "As of 2023", "As of [year]", or similar time qualifiers in explanations
+10. Write explanations as definitive facts without temporal disclaimers
+
+AVAILABLE CATEGORIES (use these exact names):
+- Premier League
+- La Liga
+- Serie A
+- Bundesliga
+- Champions League
+- World Cup
+- World Cup History
+- European Championship
+- Player Trivia
+- Team History
+- Records & Statistics
+
+Assign appropriate categories based on the question content using ONLY the categories listed above.`;
 
     const categoryText = category ? ` in the category of "${category}"` : '';
     const topicText = topic ? ` focusing on the topic of "${topic}"` : '';
@@ -115,16 +132,18 @@ Return ONLY a valid JSON array with this exact structure:
     "choice_4": "Germany",
     "correct_answer": "France",
     "explanation": "France won the 2018 FIFA World Cup in Russia, defeating Croatia 4-2 in the final.",
-    "category": "${category || 'General'}",
+    "category": "${category || 'Premier League'}",
     "difficulty": "easy"
   }
 ]
 
-CRITICAL: 
+CRITICAL REQUIREMENTS: 
 - Return ONLY the JSON array, no other text
 - Ensure "correct_answer" exactly matches one of the four choices
 - Distribute difficulties: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard
-- Each question must have all required fields`;
+- Each question must have all required fields
+- Use EXACT category names from the list above (Premier League, La Liga, Serie A, Bundesliga, Champions League, World Cup, World Cup History, European Championship, Player Trivia, Team History, Records & Statistics)
+- Do NOT use variations like "UEFA Champions League" or "FIFA World Cup" - use the exact names listed`;
 
     console.log('Calling OpenAI API...');
 
@@ -387,13 +406,13 @@ export async function GET() {
       topic: '2022 Qatar',
     },
     validCategories: [
-      'General',
       'Premier League',
       'La Liga',
       'Serie A',
       'Bundesliga',
       'Champions League',
       'World Cup',
+      'World Cup History',
       'European Championship',
       'Player Trivia',
       'Team History',

@@ -39,13 +39,17 @@ const REQUIRED_FIELDS = [
 // Valid values
 const VALID_DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
 const VALID_CATEGORIES = [
-  'History',
-  'Geography',
-  'Sports',
-  'Science',
-  'Entertainment',
-  'Arts & Literature',
-  'General Knowledge',
+  'Premier League',
+  'La Liga',
+  'Serie A',
+  'Bundesliga',
+  'Champions League',
+  'World Cup',
+  'World Cup History',
+  'European Championship',
+  'Player Trivia',
+  'Team History',
+  'Records & Statistics',
 ];
 
 /**

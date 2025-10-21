@@ -30,28 +30,65 @@ const capitalizeFirst = (str: string): string => {
 };
 
 /**
- * Helper: Map AI-generated categories to valid CSV categories
+ * Helper: Map AI-generated categories to valid category names
+ * Ensures AI output matches the exact category names expected by validation
  */
 const mapCategoryToValid = (aiCategory: string): string => {
+  if (!aiCategory) return 'Premier League';
+  
+  // Normalize the category name
+  const normalized = aiCategory.trim();
+  
+  // Direct matches (case-sensitive)
+  const validCategories = [
+    'Premier League',
+    'La Liga',
+    'Serie A',
+    'Bundesliga',
+    'Champions League',
+    'World Cup',
+    'World Cup History',
+    'European Championship',
+    'Player Trivia',
+    'Team History',
+    'Records & Statistics',
+  ];
+  
+  if (validCategories.includes(normalized)) {
+    return normalized;
+  }
+  
+  // Fuzzy matching for common AI variations
   const categoryMap: Record<string, string> = {
-    'General': 'General Knowledge',
-    'Premier League': 'Sports',
-    'La Liga': 'Sports',
-    'Serie A': 'Sports',
-    'Bundesliga': 'Sports',
-    'Champions League': 'Sports',
-    'World Cup': 'Sports',
-    'European Championship': 'Sports',
-    'Player Trivia': 'Sports',
-    'Team History': 'History',
-    'Records & Statistics': 'Sports',
-    'Records': 'Sports',
-    'Clubs': 'Sports',
-    'Players': 'Sports',
-    'Tournaments': 'Sports',
+    'UEFA Champions League': 'Champions League',
+    'UCL': 'Champions League',
+    'FIFA World Cup': 'World Cup',
+    'World Cup Finals': 'World Cup',
+    'Euro': 'European Championship',
+    'Euros': 'European Championship',
+    'European Championships': 'European Championship',
+    'UEFA European Championship': 'European Championship',
+    'EPL': 'Premier League',
+    'English Premier League': 'Premier League',
+    'Spanish La Liga': 'La Liga',
+    'Italian Serie A': 'Serie A',
+    'German Bundesliga': 'Bundesliga',
+    'Players': 'Player Trivia',
+    'Player Stats': 'Player Trivia',
+    'Teams': 'Team History',
+    'Club History': 'Team History',
+    'Records': 'Records & Statistics',
+    'Statistics': 'Records & Statistics',
+    'Stats': 'Records & Statistics',
   };
-
-  return categoryMap[aiCategory] || 'Sports'; // Default to Sports for football questions
+  
+  // Check fuzzy matches
+  if (categoryMap[normalized]) {
+    return categoryMap[normalized];
+  }
+  
+  // Default fallback
+  return 'Premier League';
 };
 
 export default function AIGeneratePanel() {
@@ -301,13 +338,13 @@ export default function AIGeneratePanel() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Categories</option>
-              <option value="General">General</option>
               <option value="Premier League">Premier League</option>
               <option value="La Liga">La Liga</option>
               <option value="Serie A">Serie A</option>
               <option value="Bundesliga">Bundesliga</option>
               <option value="Champions League">Champions League</option>
               <option value="World Cup">World Cup</option>
+              <option value="World Cup History">World Cup History</option>
               <option value="European Championship">European Championship</option>
               <option value="Player Trivia">Player Trivia</option>
               <option value="Team History">Team History</option>
