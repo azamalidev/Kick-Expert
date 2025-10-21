@@ -51,8 +51,8 @@ export default function SportArticleView() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 mb-12">
-        <div className="md:w-1/2">
-          <div className="relative h-full w-full overflow-hidden rounded-lg shadow-lg">
+        <div className="w-full md:w-1/2">
+          <div className="relative h-64 sm:h-80 md:h-full w-full overflow-hidden rounded-lg shadow-lg">
             <Image
               src={article.image}
               alt={article.title}
@@ -63,7 +63,7 @@ export default function SportArticleView() {
           </div>
         </div>
         
-        <div className="md:w-1/2 space-y-8">
+        <div className="w-full md:w-1/2 space-y-8">
           {article.paragraphs.map((para, index) => (
             <p
               key={index}

@@ -73,11 +73,11 @@ const CookiePolicy = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-            <div className="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center mr-4">
-              <Shield className="w-5 h-5 text-lime-600" />
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+            <div className="w-16 h-16 sm:w-10 sm:h-10 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4">
+              <Shield className="w-8 h-8 sm:w-5 sm:h-5 text-lime-600" />
             </div>
-            What Are Cookies?
+            <span className="text-center sm:text-left">What Are Cookies?</span>
           </h2>
           <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
             <p className="text-gray-700 text-base mb-4">
@@ -97,11 +97,11 @@ const CookiePolicy = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-            <div className="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center mr-4">
-              <Settings className="w-5 h-5 text-lime-600" />
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+            <div className="w-16 h-16 sm:w-10 sm:h-10 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4">
+              <Settings className="w-8 h-8 sm:w-5 sm:h-5 text-lime-600" />
             </div>
-            Why We Use Cookies
+            <span className="text-center sm:text-left">Why We Use Cookies</span>
           </h2>
           <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
             <ul className="space-y-4 text-gray-700">
@@ -147,11 +147,11 @@ const CookiePolicy = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-            <div className="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center mr-4">
-              <BarChart2 className="w-5 h-5 text-lime-600" />
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+            <div className="w-16 h-16 sm:w-10 sm:h-10 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4">
+              <BarChart2 className="w-8 h-8 sm:w-5 sm:h-5 text-lime-600" />
             </div>
-            Types of Cookies We Use
+            <span className="text-center sm:text-left">Types of Cookies We Use</span>
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
             {cookieTypes.map((cookie, index) => (
@@ -183,11 +183,11 @@ const CookiePolicy = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-            <div className="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center mr-4">
-              <TrendingUp className="w-5 h-5 text-lime-600" />
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+            <div className="w-16 h-16 sm:w-10 sm:h-10 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4">
+              <TrendingUp className="w-8 h-8 sm:w-5 sm:h-5 text-lime-600" />
             </div>
-            Third-Party Cookies
+            <span className="text-center sm:text-left">Third-Party Cookies</span>
           </h2>
           <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
             <p className="text-gray-700 text-base mb-6">
@@ -220,11 +220,11 @@ const CookiePolicy = () => {
           viewport={{ once: true, margin: "-50px" }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-            <div className="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center mr-4">
-              <RefreshCw className="w-5 h-5 text-lime-600" />
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+            <div className="w-16 h-16 sm:w-10 sm:h-10 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4">
+              <RefreshCw className="w-8 h-8 sm:w-5 sm:h-5 text-lime-600" />
             </div>
-            Managing Cookies
+            <span className="text-center sm:text-left">Managing Cookies</span>
           </h2>
           <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
             <p className="text-gray-700 text-base mb-4">

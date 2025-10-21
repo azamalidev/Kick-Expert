@@ -64,11 +64,11 @@ const TrustAndSafety = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Shield className="w-6 h-6 text-lime-600" />
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+              <div className="w-16 h-16 sm:w-12 sm:h-12 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4 shadow-sm">
+                <Shield className="w-8 h-8 sm:w-6 sm:h-6 text-lime-600" />
               </div>
-              Secure Data & Account Protection
+              <span className="text-center sm:text-left">Secure Data & Account Protection</span>
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
@@ -119,11 +119,11 @@ const TrustAndSafety = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Shield className="w-6 h-6 text-lime-600" />
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+              <div className="w-16 h-16 sm:w-12 sm:h-12 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4 shadow-sm">
+                <Shield className="w-8 h-8 sm:w-6 sm:h-6 text-lime-600" />
               </div>
-              Payment & Wallet Security
+              <span className="text-center sm:text-left">Payment & Wallet Security</span>
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
@@ -174,11 +174,11 @@ const TrustAndSafety = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Shield className="w-6 h-6 text-lime-600" />
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+              <div className="w-16 h-16 sm:w-12 sm:h-12 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4 shadow-sm">
+                <Shield className="w-8 h-8 sm:w-6 sm:h-6 text-lime-600" />
               </div>
-              Fair Access & Equal Competition
+              <span className="text-center sm:text-left">Fair Access & Equal Competition</span>
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
@@ -229,11 +229,11 @@ const TrustAndSafety = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Shield className="w-6 h-6 text-lime-600" />
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+              <div className="w-16 h-16 sm:w-12 sm:h-12 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4 shadow-sm">
+                <Shield className="w-8 h-8 sm:w-6 sm:h-6 text-lime-600" />
               </div>
-              AI Usage Transparency
+              <span className="text-center sm:text-left">AI Usage Transparency</span>
             </h2>
             <motion.div
               whileHover={{ y: -5 }}
@@ -284,11 +284,11 @@ const TrustAndSafety = () => {
             viewport={{ once: true, margin: "-50px" }}
             className="mb-16"
           >
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6 flex items-center">
-              <div className="w-12 h-12 rounded-full bg-lime-100 flex items-center justify-center mr-4 shadow-sm">
-                <Shield className="w-6 h-6 text-lime-600" />
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-6 flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-0">
+              <div className="w-16 h-16 sm:w-12 sm:h-12 rounded-full bg-lime-100 flex items-center justify-center sm:mr-4 shadow-sm">
+                <Shield className="w-8 h-8 sm:w-6 sm:h-6 text-lime-600" />
               </div>
-              Report Concerns
+              <span className="text-center sm:text-left">Report Concerns</span>
             </h2>
             <motion.div
               whileHover={{ y: -5 }}

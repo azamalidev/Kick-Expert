@@ -434,12 +434,29 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle hash changes
+  // Handle hash changes and scroll to section on load
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const updateHash = () => setCurrentHash(window.location.hash);
+    
+    const updateHash = () => {
+      const hash = window.location.hash;
+      setCurrentHash(hash);
+      
+      // Scroll to section if hash exists
+      if (hash) {
+        const sectionId = hash.replace('#', '');
+        setTimeout(() => {
+          const element = document.getElementById(sectionId);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 100);
+      }
+    };
+    
     window.addEventListener("hashchange", updateHash);
-    updateHash();
+    updateHash(); // Run on mount
+    
     return () => window.removeEventListener("hashchange", updateHash);
   }, []);
 
@@ -483,13 +500,26 @@ export default function Navbar() {
   };
 
   const scrollToSection = (sectionId: string) => {
+    setMenuOpen(false);
+    
     if (pathname !== "/") {
+      // Navigate to home page with hash
       router.push(`/#${sectionId}`);
+      // Wait for navigation and page load, then scroll
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 500);
       return;
     }
+    
+    // Already on home page, scroll immediately
     const element = document.getElementById(sectionId);
-    if (element) element.scrollIntoView({ behavior: "smooth", block: "start" });
-    setMenuOpen(false);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   const isActive = (href: string, section?: string) => {

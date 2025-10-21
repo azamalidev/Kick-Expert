@@ -207,7 +207,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
   const currentModel = aiModels[activeLevel];
 
   return (
-    <div id="football-example" className="flex flex-col items-center justify-center px-4 pt-20 pb-8 md:pt-28 min-h-screen">
+    <div id="chat-assistant" className="flex flex-col items-center justify-center px-4 pt-20 pb-8 md:pt-28 min-h-screen">
       {/* Header section */}
       <div className="relative text-center mb-10 w-full max-w-4xl">
         <div className="flex items-center mb-4 justify-center">
