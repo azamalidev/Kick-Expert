@@ -26,12 +26,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userId = (tokenRow as any).user_id;
 
+    // Get user email from users table
+    const { data: userRow, error: userErr } = await supabaseAdmin
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .limit(1)
+      .maybeSingle();
+    
+    if (userErr || !userRow) {
+      console.error('User not found in users table:', userId, userErr);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User account not found.' 
+      });
+    }
+
+    const userEmail = (userRow as any).email;
+    console.log('Found user email:', userEmail);
+
+    // Get auth user by email
+    const { data: authUsers, error: authListErr } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (authListErr) {
+      console.error('Error listing auth users:', authListErr);
+      throw authListErr;
+    }
+
+    const authUser = authUsers.users.find(u => u.email === userEmail);
+    
+    if (!authUser) {
+      console.error('Auth user not found for email:', userEmail);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User account not found in authentication system. The account may have been deleted.' 
+      });
+    }
+
+    const authUserId = authUser.id;
+    console.log('Found auth user ID:', authUserId, 'for email:', userEmail);
+
     // Use Supabase admin API to update password
     let updated = false;
     try {
-      const { data: updatedUser, error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
-      if (updateErr) throw updateErr;
-      if (updatedUser) updated = true;
+      const { data: updatedUser, error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, { password });
+      if (updateErr) {
+        console.error('Password update error:', updateErr);
+        throw updateErr;
+      }
+      if (updatedUser) {
+        console.log('Password updated successfully via SDK for user:', userEmail);
+        updated = true;
+      }
     } catch (sdkErr: any) {
       console.warn('Supabase admin SDK update failed, falling back to REST admin endpoint:', sdkErr?.message || sdkErr);
       // Fallback: call Supabase Admin REST API directly using service role key
@@ -44,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (SERVICE_ROLE_KEY) {
           restHeaders['apikey'] = SERVICE_ROLE_KEY;
         }
-        const resp = await fetch(`${baseUrl}/auth/v1/admin/users/${userId}`, { 
+        const resp = await fetch(`${baseUrl}/auth/v1/admin/users/${authUserId}`, { 
           method: 'PUT', 
           headers: restHeaders, 
           body: JSON.stringify({ password }) 
@@ -52,9 +98,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (!resp.ok) {
           const text = await resp.text();
+          console.error('REST API update failed:', resp.status, text);
           throw new Error(`Admin REST update failed: ${resp.status} ${text}`);
         }
 
+        console.log('Password updated successfully via REST API for user:', userEmail);
         updated = true;
       } catch (restErr) {
         console.error('Supabase admin REST update failed:', restErr);
