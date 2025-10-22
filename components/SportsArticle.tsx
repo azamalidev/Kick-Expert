@@ -7,32 +7,37 @@ import { useState, useEffect } from "react";
 export const articles = [
   {
     id: 1,
-    category: "Football History",
-    image: "/images/football_history1.jpg",
+    category: "Football Trivia",
+    image: "/images/blog_new1.jpg",
     authorImage: "/images/image6.png",
-    author: "James Wilson",
-    date: "15 March 2023",
-    title: "The Birth of Modern Football: From England to the World",
-    desc: "Tracing the origins of football in 19th-century England, where the sport was formalized, leading to the global phenomenon we know today.",
+    author: "Michael Brown",
+    date: "10 May 2023",
+    title: "🏆 Test Your Knowledge: Ultimate Football Trivia Challenge",
+    desc: "Explore fascinating football facts, records, and legendary moments that test even the most devoted fans’ knowledge of the beautiful game.",
     paragraphs: [
-      "The modern game of football has its roots in medieval ball games played throughout Europe, but it was in 19th-century England that the sport was formally organized. The first standardized rules were established in 1863 with the formation of The Football Association in London. This marked a pivotal moment when football began to distinguish itself from rugby and other similar games.",
-      "As the industrial revolution progressed, football became increasingly popular among the working classes. Factory workers needed recreational activities, and football's simple requirements - just a ball and some open space - made it accessible to everyone. The establishment of the Football League in 1888 created the world's first organized league competition, setting the template for professional football worldwide.",
-      "The British Empire played a crucial role in spreading football globally. British sailors, traders, and workers introduced the game to ports and cities around the world. By the early 20th century, football had taken root in South America, continental Europe, and other regions, each developing their own distinctive styles of play while maintaining the fundamental rules established in England."
+      "Football, often called the beautiful game, is more than just a sport — it’s a global phenomenon that unites billions of fans, stirs emotions, and creates unforgettable moments. Beyond the goals, trophies, and rivalries, lies a fascinating world of trivia that challenges even the most passionate supporters. The Ultimate Football Trivia Challenge takes you on a journey through the sport’s most iconic records, surprising facts, and remarkable stories from across decades of play.",
+      "Did you know that the fastest goal in World Cup history was scored by Hakan Şükür of Turkey in just 11 seconds against South Korea during the 2002 tournament? Or that Cristiano Ronaldo, one of football’s all-time greats, holds the record for most goals in UEFA Champions League history with 140 goals (as of 2023)? These milestones not only highlight individual brilliance but also represent the evolving legacy of football’s modern era.",
+      "Some trivia questions dive into the game’s quirky and lesser-known corners. For instance, which player has won the most World Cup matches without ever lifting the trophy? The answer is Miroslav Klose of Germany — who remarkably won 17 World Cup games before finally tasting victory in 2014. And few know that during World War II, the original World Cup trophy was secretly hidden in a shoebox under a bed by Italian official Ottorino Barassi, protecting it from Nazi confiscation — a story worthy of a spy novel.",
+      "The club scene has its own legendary trivia moments. Real Madrid’s domination of European football in the 1950s, winning five consecutive European Cups (1956–1960), remains a record unmatched to this day. In England, Arsenal’s “Invincibles” achieved immortality by going an entire Premier League season unbeaten (2003–04) — a feat that has yet to be replicated in modern times. Meanwhile, clubs like Barcelona, Manchester United, and Bayern Munich continue to inspire generations with their unforgettable performances and iconic players.",
+      "Football trivia isn’t just about remembering dates or statistics — it’s about reliving moments of passion, resilience, and genius that define the sport. From the stunning upsets to the legendary goals, from record-breaking streaks to dramatic last-minute winners, every fact tells a story.",
+      "So, whether you’re a die-hard fan, a casual viewer, or someone looking to challenge their friends, the Ultimate Football Trivia Challenge is the perfect test of your football knowledge. Step up, take the quiz, and see how well you truly know the game that has captured the hearts of millions across the world."
     ]
   },
   {
     id: 2,
-    category: "Football",
-    image: "/images/football_match1.jpg",
+    category: "Football History",
+    image: "/images/blog_new2.jpg",
     authorImage: "/images/testimonial1.png",
-    author: "Emma Davis",
-    date: "20 April 2023",
-    title: "Epic Comebacks in UEFA Champions League History",
-    desc: "Reliving the most thrilling comebacks in Champions League history, including Liverpool's miracle in Istanbul.",
+    author: "James Wilson",
+    date: "15 March 2023",
+    title: "The Birth of Modern Football: From England to the World",
+    desc: "Discover how football evolved from rough street games into a global sport through innovation, industrialization, and international expansion.",
     paragraphs: [
-      "The UEFA Champions League has witnessed some of the most dramatic comebacks in football history. Perhaps none more famous than Liverpool's miraculous recovery in the 2005 final against AC Milan. Trailing 3-0 at halftime, Liverpool staged an unbelievable second-half comeback to level the score 3-3, eventually winning on penalties. This match, now known as the 'Miracle of Istanbul,' redefined what was possible in football.",
-      "Another unforgettable comeback occurred in 2019 when Liverpool overturned a 3-0 first-leg deficit against Barcelona in the semifinals. Without several key players, Liverpool produced a stunning 4-0 victory at Anfield, with Divock Origi and Georginio Wijnaldum both scoring twice. This remarkable turnaround demonstrated the power of belief and the unique atmosphere of European nights at Anfield.",
-      "Manchester United's 1999 final victory over Bayern Munich remains one of the most dramatic last-minute turnarounds in football history. Trailing 1-0 as the match entered injury time, United scored twice in quick succession through Teddy Sheringham and Ole Gunnar Solskjær to complete an improbable treble-winning season. These moments remind us why the Champions League is considered the pinnacle of club football."
+      "The story of modern football is one of transformation — from rough, chaotic street games to a global sport that captivates billions. While versions of ball games existed for centuries across Europe, Asia, and even the Americas, it was in 19th-century England that football took its modern shape. The formation of The Football Association (FA) in London in 1863 marked a revolutionary turning point. For the first time, a set of standardized rules was established, clearly separating football from its close cousin, rugby. This moment laid the foundation for the world’s most popular game.",
+      "During the Industrial Revolution, football evolved from a pastime into a social phenomenon. As cities grew and factory life became the norm, workers sought an outlet for recreation and community. Football — requiring only a ball, a bit of space, and a few enthusiastic players — became the perfect solution. It was simple, inclusive, and exhilarating. Local clubs sprang up across England, and in 1888, the creation of The Football League introduced the first-ever structured league competition. This innovation transformed football into a professional sport and inspired similar leagues across the globe.",
+      "The spread of football beyond England’s borders was swift and far-reaching. The British Empire, with its vast global connections, acted as the primary vehicle for the game’s expansion. Sailors, merchants, engineers, and soldiers carried the sport to ports and colonies from South America to Asia, and from Africa to continental Europe. What began as an English pastime soon became an international passion.",
+      "By the early 20th century, football had taken deep root worldwide. Nations such as Brazil, Argentina, and Uruguay embraced the sport and infused it with creativity, rhythm, and flair, giving rise to a uniquely South American style. Meanwhile, in continental Europe, countries like Italy, Germany, and Spain developed tactical sophistication and disciplined play, shaping football’s diverse global character. Despite cultural variations, the core principles — the rules laid out in 1863 — remained universally respected.",
+      "Football’s journey from the muddy fields of Victorian England to packed stadiums across the world is a testament to its universal appeal. It bridges class, culture, and geography — uniting people in a shared love for the game. What started as an organized effort by a few English gentlemen in a London tavern has become a sport that defines nations, creates legends, and connects humanity through passion and play."
     ]
   },
   {
@@ -72,12 +77,15 @@ export const articles = [
     authorImage: "/images/testimonial4.png",
     author: "Emma Davis",
     date: "05 July 2023",
-    title: "Lionel Messi's Legacy: Breaking Records in 2023",
-    desc: "A look at Messi's incredible 2023 season, including his impact on and off the pitch.",
+    title: "Lionel Messi’s Legacy: Breaking Records in 2023",
+    desc: "A look at Messi's incredible 2023 season, highlighting his impact on and off the pitch as he continues to redefine football greatness.",
     paragraphs: [
-      "Lionel Messi's 2023 season cemented his status as one of football's all-time greats. After leading Argentina to World Cup glory in Qatar (2022), Messi continued breaking records with Paris Saint-Germain before moving to Inter Miami. His World Cup victory filled the last major gap in his trophy cabinet, completing a career that had already included numerous Ballon d'Or awards and Champions League titles with Barcelona.",
-      "Statistically, Messi's 2022-23 season was remarkable. He became the first player to score in every stage of the World Cup (group stage through final) since the knockout format began in 1986. At club level, he surpassed 800 career goals and became the most decorated footballer in history with 43 trophies. Even at 35, Messi demonstrated the dribbling, vision, and finishing that have defined his career.",
-      "Beyond statistics, Messi's impact on football culture is immeasurable. His move to MLS brought unprecedented attention to North American soccer, with ticket prices soaring and jersey sales breaking records. Young players worldwide continue to model their game after Messi, proving that technical ability and intelligence can triumph over physicality. As Messi's career enters its twilight, his influence on the sport will be felt for generations"
+      "Few athletes in history have transcended their sport quite like Lionel Messi. His 2023 season did more than add to an already glittering résumé — it solidified his place among the greatest icons in football history. Following his long-awaited World Cup triumph with Argentina in Qatar (2022), Messi’s performances throughout 2023 reminded the world why he remains the gold standard for excellence, consistency, and humility in the beautiful game.",
+      "After leading his nation to its third World Cup title, Messi continued to shine with Paris Saint-Germain (PSG), breaking milestones that seemed untouchable. He became the first player to score in every stage of a World Cup — from the group phase all the way to the final — since the knockout format was introduced in 1986. His performances were a masterclass in leadership and artistry, combining technical precision with unmatched football intelligence.",
+      "By mid-2023, Messi had crossed the 800-career-goal milestone, joining a select group of legends to achieve such a feat. With a record 43 trophies, he officially became the most decorated footballer in history, surpassing long-time rival Dani Alves. His list of achievements includes 7 Ballon d’Or titles, 4 Champions League trophies, and numerous domestic titles in both Spain and France — yet his hunger to compete and inspire never waned.",
+      "But Messi’s story in 2023 was not just about numbers. It was about legacy. His move to Inter Miami in Major League Soccer marked the beginning of a new chapter — one that carried enormous cultural significance. In just weeks, his arrival transformed American soccer: stadiums sold out, ticket prices skyrocketed, viewership hit record highs, and Inter Miami jerseys became global best-sellers. Messi brought a wave of enthusiasm and legitimacy to football in North America, echoing what Pelé did for the sport decades earlier.",
+      "Beyond the pitch, Messi’s influence extends to every corner of the footballing world. Young players everywhere study his technique — the way he glides past defenders, his perfect first touch, his composure in front of goal. Coaches use his gameplay as a model for creativity and efficiency. And fans, regardless of allegiance, recognize the humility and professionalism that have made him one of the most beloved figures in sports history.",
+      "At 35, Messi continues to redefine longevity and excellence. His career stands as a testament to dedication, discipline, and the power of believing in one’s own vision. As the twilight of his playing days approaches, his impact on football culture — from Rosario to Barcelona, Paris to Miami — is immeasurable. Lionel Messi’s journey is not merely about breaking records; it’s about rewriting what is possible in the world’s most beloved sport. His legacy will inspire generations long after he hangs up his boots."
     ]
   },
   {
@@ -88,13 +96,17 @@ export const articles = [
     author: "Michael Brown",
     date: "12 August 2023",
     title: "Who's the GOAT? Debating Football's Greatest Players",
-    desc: "A fun exploration of the greatest footballers of all time, with questions to spark debate among fans.",
+    desc: "A deep dive into football’s most debated question — who truly deserves the GOAT title?",
     paragraphs: [
-      "The debate over football's Greatest of All Time (GOAT) is one that sparks passionate arguments among fans worldwide. Traditional contenders include Pelé, who won three World Cups with Brazil; Diego Maradona, whose 1986 World Cup performance is legendary; and modern stars Lionel Messi and Cristiano Ronaldo, who have dominated the Ballon d'Or awards for over a decade. Each brings unique qualities to the debate - Pelé's trophy haul, Maradona's single-handed dominance, and the sustained excellence of Messi and Ronaldo.",
-      "Comparing across eras presents challenges. Older players competed in different conditions - heavier balls, worse pitches, more physical defending. Modern players benefit from sports science, nutrition, and rule changes that protect attackers. Some argue that Alfredo Di Stéfano (Real Madrid's 1950s star) or Johan Cruyff (architect of Total Football) deserve consideration. The debate often reflects what we value most in football - pure skill, trophies, longevity, or transformative impact on the game.",
-      "Perhaps the GOAT debate is ultimately unanswerable, but that's what makes it compelling. Football has seen so many extraordinary talents across different positions and eras that comparing them directly may be impossible. Instead of seeking one definitive answer, we can appreciate how each great player has contributed to football's rich history and inspired generations of fans and players worldwide"
+      "The question of who is football’s Greatest of All Time (GOAT) has ignited debates, divided generations, and fueled countless discussions across living rooms, pubs, and social media platforms around the world. It’s a question without a definitive answer — and perhaps that’s what makes it so fascinating. Each era of football has produced its icons, but only a few names consistently rise to the top of the conversation: Pelé, Diego Maradona, Lionel Messi, and Cristiano Ronaldo.",
+      "Each of these legends brought something extraordinary to the game. Pelé, the Brazilian prodigy, was football’s first global superstar. His three World Cup victories (1958, 1962, and 1970) remain unmatched, and his blend of athleticism, vision, and finishing made him the embodiment of footballing perfection in his time. Diego Maradona, on the other hand, redefined what individual brilliance could achieve. His 1986 World Cup performance — highlighted by the “Hand of God” and the “Goal of the Century” — remains one of the most iconic displays of dominance in sports history. He was flawed, fiery, and utterly mesmerizing, carrying Argentina and Napoli to heights few believed possible.",
+      "Then came the modern era, defined by the relentless rivalry between Lionel Messi and Cristiano Ronaldo. For over 15 years, they have pushed each other to superhuman standards, rewriting record books along the way. Messi, the magician, is celebrated for his balance, close control, and vision — a player who makes football look effortless. His record 7 Ballon d’Or titles, multiple Champions League triumphs, and his crowning moment — winning the 2022 World Cup — completed his journey from prodigy to living legend. Ronaldo, the ultimate athlete, is the personification of discipline and ambition. His power, aerial ability, and clutch performances in crucial games have earned him 5 Ballon d’Ors, 5 Champions League titles, and a career that’s seen him succeed across England, Spain, Italy, and Portugal’s national team.",
+      "Yet, the GOAT debate stretches beyond these four giants. Alfredo Di Stéfano, the driving force behind Real Madrid’s dominance in the 1950s, Johan Cruyff, the visionary mind behind “Total Football,” and Zinedine Zidane, whose elegance defined a generation, all deserve their place in the conversation. Every player mentioned didn’t just win — they changed the way football was played and perceived. Their legacies transcend statistics, influencing how future generations interpret greatness.",
+      "Comparing across eras, however, remains inherently complex. Pelé and Maradona played on uneven pitches with minimal protection, while Messi and Ronaldo benefit from advanced sports science, nutrition, and evolving rules that favor attacking play. Context matters — and so do personal values. Some fans prize trophies and longevity, others creativity and influence, and many simply favor the player who made them fall in love with the game.",
+      "In truth, the GOAT debate might never be resolved — and that’s the beauty of it. Football isn’t just about numbers; it’s about emotion, artistry, and inspiration. Rather than choosing one definitive greatest, perhaps it’s more meaningful to celebrate how each of these legends has shaped the game’s history, pushed its limits, and inspired billions to dream. The GOAT debate isn’t a question to be answered — it’s a conversation to be cherished, a reflection of football’s timeless and ever-evolving magic."
     ]
   },
+
   {
     id: 7,
     category: "Football Tactics",
@@ -105,26 +117,34 @@ export const articles = [
     title: "The Rise of Tiki-Taka: Barcelona's Revolutionary Style",
     desc: "How Barcelona's tiki-taka philosophy redefined modern football with possession and precision.",
     paragraphs: [
-      "Tiki-taka, the possession-based style of play, became synonymous with Barcelona's dominance in the late 2000s and early 2010s. Pioneered by manager Pep Guardiola and inspired by Johan Cruyff's Total Football, tiki-taka emphasized short passes, constant movement, and maintaining control of the ball to exhaust opponents.",
-      "The style reached its peak during Barcelona's 2008-2012 era, with players like Xavi, Iniesta, and Messi orchestrating play with unparalleled precision. The 2011 Champions League final against Manchester United showcased tiki-taka at its best, as Barcelona dominated possession and won 3-1. This approach not only won titles but also influenced global football tactics.",
-      "While critics argue tiki-taka can be predictable or overly reliant on exceptional players, its legacy is undeniable. It inspired national teams like Spain, who won the 2010 World Cup using similar principles. Today, variations of tiki-taka continue to influence clubs worldwide, proving that possession can be a powerful weapon in football."
+      "Few footballing philosophies have reshaped the modern game quite like tiki-taka — a tactical revolution that turned FC Barcelona into one of the most dominant teams in history and forever altered how football is played and understood. Rooted in possession, precision, and patience, tiki-taka was more than just a strategy — it was a belief system. It celebrated intelligence over physicality, teamwork over individuality, and control over chaos.",
+      "The origins of tiki-taka trace back to the influence of Johan Cruyff, the Dutch visionary who brought 'Total Football' principles to Barcelona in the late 1980s. Cruyff’s ideology emphasized spatial awareness, fluid movement, and technical mastery — ideas that would later be perfected under one of his greatest disciples: Pep Guardiola. When Guardiola took charge of Barcelona in 2008, he refined those concepts into a seamless, mesmerizing style of play built on short, quick passes, constant off-the-ball movement, and an almost obsessive focus on ball retention.",
+      "Between 2008 and 2012, Barcelona’s tiki-taka era reached its zenith. The team, anchored by the midfield trinity of Xavi Hernández, Andrés Iniesta, and Sergio Busquets, orchestrated play with surgical precision. Up front, Lionel Messi, reimagined as a 'false nine,' thrived in the fluidity of the system, dismantling defenses with his intelligence and flair. Matches often felt like a masterclass in control — opponents would chase shadows as Barcelona completed hundreds of passes, probing patiently before delivering the killer blow.",
+      "The 2011 UEFA Champions League Final at Wembley remains the ultimate showcase of tiki-taka’s brilliance. Facing Manchester United, Barcelona produced a mesmerizing performance that left even Sir Alex Ferguson in awe. The 3–1 victory was not just a win — it was a statement of footballing philosophy at its purest form. Every touch, every triangle, and every movement was synchronized artistry. That night, tiki-taka wasn’t just effective — it was beautiful.",
+      "But like all great revolutions, tiki-taka faced its critics. Some argued it could become predictable, that without players of extraordinary technical ability like Xavi, Iniesta, and Messi, its effectiveness waned. Others felt it sometimes prioritized aesthetics over aggression, control over directness. Yet, even as the tactical pendulum swung toward more dynamic, vertical systems, tiki-taka’s legacy remained unshakable.",
+      "Its influence extended far beyond the Camp Nou. The Spanish national team, built around the same Barcelona core, adopted the style to devastating effect — winning Euro 2008, the 2010 World Cup, and Euro 2012, dominating world football with elegance and precision. Clubs across Europe and South America began adapting elements of the approach — from Bayern Munich under Guardiola to Manchester City’s modern evolution of 'positional play.'",
+      "Today, even though football has evolved, tiki-taka’s fingerprints remain visible everywhere. Modern tactics like gegenpressing, positional play, and build-up from the back all draw from the same philosophy — one that values intelligence, structure, and collective understanding over brute force.",
+      "Tiki-taka wasn’t just a tactical trend; it was a footballing revolution that redefined how the game could be played — and how beauty could coexist with dominance. Barcelona’s golden era proved that football, at its best, is not just about winning, but about how you win — with style, precision, and unity."
     ]
   },
-  {
-    id: 8,
-    category: "Football",
-    image: "/images/womens_football.jpg",
-     authorImage: "/images/testimonial1.png",
-    author: "Emma Davis",
-    date: "15 October 2023",
-    title: "The Growth of Women's Football: A Global Revolution",
-    desc: "Exploring the rapid rise of women's football and its impact on the sport's global landscape.",
-    paragraphs: [
-      "Women's football has seen exponential growth in recent years, with record-breaking viewership and investment. The 2023 FIFA Women's World Cup, co-hosted by Australia and New Zealand, drew over 2 billion viewers, showcasing the sport's growing popularity. Teams like the United States, England, and Spain have led the charge with professional leagues and grassroots development.",
-      "The rise of stars like Alexia Putellas, Sam Kerr, and Ada Hegerberg has brought mainstream attention to the women's game. These players combine technical skill with athleticism, challenging stereotypes and inspiring a new generation. Off the pitch, campaigns for equal pay and better facilities have gained traction, with federations slowly addressing longstanding disparities.",
-      "Clubs like Barcelona and Lyon have set the standard in women's football, dominating the UEFA Women's Champions League. As investment continues to grow, the gap between men's and women's football is narrowing, promising a future where the sport is truly inclusive and celebrated worldwide."
-    ]
-  },
+ {
+  id: 8,
+  category: "Football",
+  image: "/images/champions_league_comeback.jpg",
+  authorImage: "/images/testimonial1.png",
+  author: "Emma Davis",
+  date: "20 April 2023",
+  title: "Epic Comebacks in UEFA Champions League History",
+  desc: "A look at the most unforgettable comeback moments that defined Champions League history.",
+  paragraphs: [
+    "The UEFA Champions League is more than just football’s most prestigious club competition — it’s a stage for miracles, heartbreaks, and unforgettable moments of resilience. Over the decades, the tournament has delivered some of the most astonishing comebacks ever witnessed in sport — stories that prove football’s magic lies not just in victory, but in the sheer drama of the impossible becoming reality.",
+    "Perhaps no comeback is more iconic than Liverpool’s miracle in Istanbul in 2005. Facing the mighty AC Milan in the final, Liverpool trailed 3–0 at halftime, seemingly outclassed and out of hope. But what followed became the stuff of legend. In a six-minute spell of brilliance, the Reds struck back through Gerrard, Smicer, and Xabi Alonso, leveling the score at 3–3. The atmosphere was electric, the belief unstoppable. After a tense penalty shootout, Liverpool completed one of football’s greatest ever turnarounds, lifting the trophy in a night forever etched in Champions League folklore. The “Miracle of Istanbul” remains the ultimate symbol of courage, faith, and determination.",
+    "Fast forward to 2019, and Liverpool once again scripted another unforgettable chapter — this time against Barcelona. After losing 3–0 at Camp Nou in the semifinal first leg, few believed a comeback was even remotely possible. Yet, under the lights of Anfield, fueled by belief and their fans’ thunderous support, Liverpool produced a 4–0 victory that defied all logic. With Divock Origi and Georginio Wijnaldum scoring twice each, the Reds overturned the deficit and advanced to the final. The roar that night wasn’t just celebration — it was a reminder that passion and perseverance can move mountains. That match reaffirmed Anfield’s reputation as a fortress where dreams come alive.",
+    "No list of legendary comebacks would be complete without Manchester United’s 1999 final — a night that redefined the meaning of “never give up.” Facing Bayern Munich at the Camp Nou, United trailed 1–0 as the clock hit 90 minutes. But then came two of the most dramatic minutes in football history. Teddy Sheringham equalized in stoppage time, and seconds later, Ole Gunnar Solskjær scored the winner, sending fans and commentators into utter disbelief. United had snatched victory from the jaws of defeat, completing an unprecedented treble — Premier League, FA Cup, and Champions League — in one glorious season.",
+    "These unforgettable nights are more than just matches; they are testaments to belief, teamwork, and the unpredictable nature of football. They remind us that no lead is safe, no dream too far-fetched, and no moment beyond redemption. The Champions League continues to deliver these spectacles year after year — nights where heroes are born, legends are made, and football’s magic shines brightest under the floodlights of Europe’s grandest stage."
+  ]
+},
+
   {
     id: 9,
     category: "Football History",
@@ -241,10 +261,10 @@ export default function SportsArticleSection() {
 
                 <h3 className="text-md font-semibold text-gray-800 mb-2">{item.title}</h3>
                 <p className="text-sm text-gray-600 mb-4 flex-grow">{item.desc}</p>
-                
+
                 <div className="mt-auto">
-                  <Link 
-                    href={`/articleview?id=${item.id}`} 
+                  <Link
+                    href={`/articleview?id=${item.id}`}
                     className="inline-block text-lime-600 hover:text-lime-700 font-medium text-sm transition-colors"
                   >
                     View More →
@@ -289,11 +309,11 @@ export default function SportsArticleSection() {
               ))}
             </div>
           </div>
-          
+
           <div className="mt-8 md:mt-0 w-full md:w-[55%] relative">
             <div className="relative overflow-hidden h-64">
               {testimonials.map((testimonial, index) => (
-                <div 
+                <div
                   key={testimonial.id}
                   className={`absolute top-0 left-0 w-full transition-all duration-500 ease-in-out ${activeTestimonial === index ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}`}
                 >

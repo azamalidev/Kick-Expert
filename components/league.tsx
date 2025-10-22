@@ -476,7 +476,6 @@ export default function LeaguePage() {
   }, [
     phase,
     quizCompleted,
-    showResult,
     questions.length,
     currentQuestionIndex,
     timerKey
@@ -1468,32 +1467,43 @@ export default function LeaguePage() {
                 transition={{ duration: 0.3 }}
                 className="p-4 sm:p-6"
               >
-                {/* Question Metadata hidden per request */}
-                <div className="hidden"></div>
-
-                {/* Question Text */}
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-6 mb-6 shadow-sm">
-                  <h2 className="text-lg sm:text-xl font-semibold text-gray-800 leading-relaxed">
-                    {questions[currentQuestionIndex]?.question_text}
-                  </h2>
+                {/* Question Metadata */}
+                <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                  <div className="flex items-center space-x-3">
+                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
+                      {questions[currentQuestionIndex]?.category}
+                    </span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                      questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {questions[currentQuestionIndex]?.difficulty}
+                    </span>
+                  </div>
                 </div>
 
+                {/* Question Text */}
+                <h2 className="text-xl font-semibold mb-6 text-gray-800">
+                  {questions[currentQuestionIndex]?.question_text}
+                </h2>
+
                 {/* Answer Choices */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   {questions[currentQuestionIndex]?.choices.map((choice, index) => (
                     <motion.button
                       key={index}
                       whileHover={!showResult ? { scale: 1.02 } : {}}
                       whileTap={!showResult ? { scale: 0.98 } : {}}
                       onClick={() => handleChoiceSelect(choice)}
-                      className={`p-3 sm:p-4 rounded-lg border-2 text-left transition-all ${
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
                         showResult && choice === questions[currentQuestionIndex]?.correct_answer
-                          ? 'border-green-500 bg-green-50 shadow-lg'
+                          ? 'border-green-500 bg-green-50'
                           : showResult && selectedChoice === choice
                             ? 'border-red-500 bg-red-50'
                             : selectedChoice === choice
-                              ? 'border-lime-400 bg-lime-50 shadow-md'
-                              : 'border-gray-200 hover:border-lime-300 bg-white hover:shadow-md'
+                              ? 'border-lime-400 bg-lime-50'
+                              : 'border-gray-200 hover:border-lime-300 bg-white'
                       }`}
                       disabled={showResult || quizCompleted}
                     >
@@ -1525,19 +1535,6 @@ export default function LeaguePage() {
 
                   {showResult && (
                     <>
-                      {questions[currentQuestionIndex]?.explanation && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border-2 border-blue-200 mb-4 shadow-sm"
-                        >
-                          <p className="text-lime-600 font-semibold mb-1 flex items-center gap-2">
-                            <Award className="h-4 w-4" />
-                            Explanation:
-                          </p>
-                          <p className="text-gray-700">{questions[currentQuestionIndex]?.explanation}</p>
-                        </motion.div>
-                      )}
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}

@@ -198,16 +198,49 @@ export default function AdminContacts() {
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Contact Messages</h1>
-        <div className="text-sm text-gray-600">
-          Total: <span className="font-bold">{contacts.length}</span> | New:{' '}
-          <span className="font-bold text-blue-600">{contacts.filter((c) => c.status === 'new').length}</span>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Contact Messages</h1>
+        <p className="text-gray-600 mt-1">Manage and respond to user contact messages</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Messages</p>
+              <p className="text-2xl font-bold text-gray-900">{contacts.length}</p>
+            </div>
+            <MessageSquare size={32} className="text-blue-500 opacity-50" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">New Messages</p>
+              <p className="text-2xl font-bold text-gray-900">{contacts.filter((c) => c.status === 'new').length}</p>
+            </div>
+            <AlertCircle size={32} className="text-yellow-500 opacity-50" />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Resolved</p>
+              <p className="text-2xl font-bold text-gray-900">{contacts.filter((c) => c.status === 'resolved').length}</p>
+            </div>
+            <CheckCircle size={32} className="text-green-500 opacity-50" />
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Main Content */}
+      <div className="bg-gray-50 p-6 rounded-xl">
+        {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div>
           <input
@@ -380,6 +413,7 @@ export default function AdminContacts() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
