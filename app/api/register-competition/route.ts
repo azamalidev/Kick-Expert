@@ -81,7 +81,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     const compName = compNameRow?.name || '';
-  const expectedCost = compName === 'Starter League' ? 10 : compName === 'Pro League' ? 20 : compName === 'Elite League' ? 30 : Number(paid_amount);
+  const expectedCost = compName === 'Starter League' ? 5 : compName === 'Pro League' ? 10 : compName === 'Elite League' ? 20 : Number(paid_amount);
 
     // Use expectedCost as authoritative paid_amount
     const authoritativePaidAmount = expectedCost;

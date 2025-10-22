@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { MapPin, Mail, ChevronDown } from "lucide-react"
+import { MapPin, Mail, ChevronDown, CheckCircle, AlertCircle } from "lucide-react"
+import toast from "react-hot-toast"
 
 export default function ContactSection() {
   const [formData, setFormData] = useState({
@@ -10,6 +11,55 @@ export default function ContactSection() {
     email: "",
     description: "",
   })
+  const [loading, setLoading] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [contactId, setContactId] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Validation
+    if (!formData.topic || !formData.name || !formData.email || !formData.description) {
+      toast.error("Please fill in all fields")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch("/api/contacts/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          topic: formData.topic,
+          message: formData.description,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setContactId(data.contactId)
+        setSubmitted(true)
+        setFormData({ topic: "", name: "", email: "", description: "" })
+        toast.success("Message sent successfully!")
+      } else {
+        toast.error(data.error || "Failed to send message")
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      toast.error("An error occurred. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setSubmitted(false)
+    setContactId(null)
+    setFormData({ topic: "", name: "", email: "", description: "" })
+  }
 
   return (
     <section className="py-10  bg-gray-50">
@@ -91,9 +141,34 @@ export default function ContactSection() {
 
           {/* Right side - Contact Form */}
           <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">Send us a message</h3>
-
-            <form className="space-y-5">
+            {submitted ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center w-12 h-12 mx-auto bg-green-100 rounded-full">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 text-center">Message Received!</h3>
+                <p className="text-gray-600 text-center">
+                  Thank you for reaching out. We've received your message and will get back to you within 24-48 hours.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Reference ID:</strong> {contactId}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    Keep this ID to track your inquiry status.
+                  </p>
+                </div>
+                <button
+                  onClick={resetForm}
+                  className="w-full px-6 py-3.5 bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold rounded-lg hover:from-green-700 hover:to-lime-600 transition-all duration-300 shadow-md hover:shadow-lg mt-6"
+                >
+                  Send Another Message
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Send us a message</h3>
+                <form onSubmit={handleSubmit} className="space-y-5">
               {/* Topic Dropdown */}
               <div className="relative">
                 <select
@@ -146,11 +221,14 @@ export default function ContactSection() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full px-6 py-3.5 bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold rounded-lg hover:from-green-700 hover:to-lime-600 transition-all duration-300 shadow-md hover:shadow-lg"
+                disabled={loading}
+                className="w-full px-6 py-3.5 bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold rounded-lg hover:from-green-700 hover:to-lime-600 transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Send Message
+                {loading ? "Sending..." : "Send Message"}
               </button>
-            </form>
+                </form>
+              </>
+            )}
           </div>
         </div>
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
-import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle } from 'lucide-react';
+import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle, Clock, Shield } from 'lucide-react';
 
 interface CreditBalance {
   purchased_credits: number;
@@ -533,6 +533,15 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
 };
   
   // Withdraw Modal Component
+  interface RefundRequest {
+    id?: string;
+    amount: number;
+    status: 'pending' | 'approved' | 'rejected' | 'completed';
+    created_at?: string;
+    payment_method?: 'stripe' | 'paypal';
+    reason?: string;
+  }
+
   interface WithdrawModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -542,7 +551,134 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
     method: 'stripe' | 'paypal';
   }
 
-  const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20, method }) => {
+const RefundRequestModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  maxAmount: number;
+  onSubmit: (amount: number, reason: string) => Promise<void>;
+}> = ({ isOpen, onClose, maxAmount, onSubmit }) => {
+  const [amount, setAmount] = useState<number | ''>('');
+  const [reason, setReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (amount === '' || Number(amount) <= 0) {
+      toast.error('Enter a valid refund amount');
+      return;
+    }
+
+    const refundAmount = Math.floor(Number(amount));
+    if (refundAmount > maxAmount) {
+      toast.error('Refund amount exceeds available purchased credits');
+      return;
+    }
+
+    if (!reason.trim()) {
+      toast.error('Please provide a reason for refund');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await onSubmit(refundAmount, reason);
+      setAmount('');
+      setReason('');
+      onClose();
+    } catch (err) {
+      console.error('Refund submission error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to submit refund request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
+              <h2 className="text-lg font-bold text-center">Request Refund</h2>
+              <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-lime-200">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Refund Amount (Credits)</label>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">Cr</span>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))}
+                        placeholder="Enter amount"
+                        className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Available purchased: <strong>{maxAmount} credits</strong></p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Refund</label>
+                    <textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Please explain why you need a refund"
+                      rows={3}
+                      className="w-full border border-gray-300 px-3 py-2 rounded-md focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <p className="text-blue-800 text-xs">💡 Your refund will be processed to your original payment method. Admin approval is required.</p>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={onClose}
+                      disabled={isSubmitting}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="flex-1 bg-lime-600 hover:bg-lime-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        'Request Refund'
+                      )}
+                    </button>
+                  </div>
+                </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20, method }) => {
     const [amount, setAmount] = useState<number | ''>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -705,6 +841,7 @@ const CreditManagement: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: Zap },
     { id: 'buy', label: 'Buy Credits', icon: CreditCard },
     { id: 'withdraw', label: 'Withdraw', icon: DollarSign },
+    { id: 'refund', label: 'Refund', icon: RefreshCw },
     { id: 'faq', label: 'FAQ', icon: HelpCircle },
   ];
 
@@ -750,6 +887,10 @@ const CreditManagement: React.FC = () => {
   const [pendingWithdraw, setPendingWithdraw] = useState<any | null>(null);
   const [isWithdrawMethodOpen, setIsWithdrawMethodOpen] = useState(false);
   const [withdrawMethod, setWithdrawMethod] = useState<'stripe' | 'paypal' | null>(null);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundHistory, setRefundHistory] = useState<RefundRequest[]>([]);
+  const [pendingRefund, setPendingRefund] = useState<RefundRequest | null>(null);
+  const [isLoadingRefunds, setIsLoadingRefunds] = useState(false);
 
   const handlePurchaseCredits = async (price: number, credits: number, method: 'stripe' | 'paypal') => {
     try {
@@ -866,6 +1007,63 @@ const CreditManagement: React.FC = () => {
     } catch (err) {
       console.error('Withdraw submit error:', err);
       throw err;
+    }
+  };
+
+  const handleRefundSubmit = async (amount: number, reason: string) => {
+    try {
+      const { data: { session: userSession } } = await supabase.auth.getSession();
+      if (!userSession) {
+        throw new Error('Please sign in to request a refund');
+      }
+
+      const response = await fetch('/api/refunds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userSession.access_token}`
+        },
+        body: JSON.stringify({ amount, reason, userId: userSession.user.id })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create refund request');
+      }
+
+      const refundData = await response.json();
+      setPendingRefund(refundData);
+      setBalance((prev) => {
+        if (!prev) return prev;
+        const current = prev.purchased_credits || 0;
+        return { ...prev, purchased_credits: Math.max(0, current - amount) };
+      });
+      toast.success(`Refund request submitted for ${amount} credits — pending admin approval`);
+      setIsRefundModalOpen(false);
+      fetchBalance();
+    } catch (err) {
+      console.error('Refund submit error:', err);
+      throw err;
+    }
+  };
+
+  const fetchRefundHistory = async () => {
+    try {
+      setIsLoadingRefunds(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/refunds/history', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch refund history');
+      const data = await response.json();
+      setRefundHistory(data);
+    } catch (error) {
+      console.error('Error fetching refund history:', error);
+    } finally {
+      setIsLoadingRefunds(false);
     }
   };
 
@@ -1276,6 +1474,155 @@ const CreditManagement: React.FC = () => {
           </motion.div>
         )}
 
+        {activeTab === 'refund' && (
+          <motion.div
+            key="refund"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <RefreshCw size={48} className="mx-auto text-lime-600 mb-4" />
+                <h3 className="text-2xl font-semibold text-gray-900 mb-2">Request Refund</h3>
+                <p className="text-gray-600">Refund your unused purchased credits to your original payment method</p>
+              </div>
+
+              {/* Refund Info Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-lime-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <DollarSign className="h-6 w-6 text-lime-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Available for Refund</h4>
+                  <p className="text-2xl font-bold text-lime-600">{balance?.purchased_credits || 0}</p>
+                  <p className="text-sm text-gray-600">Purchased Credits</p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-lime-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Shield className="h-6 w-6 text-lime-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">KYC Required</h4>
+                  <p className="text-sm text-gray-600">AML compliance verification</p>
+                  <p className="text-xs text-gray-500 mt-2">Via Stripe/PayPal</p>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                  <div className="w-12 h-12 bg-lime-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock className="h-6 w-6 text-lime-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Processing</h4>
+                  <p className="text-sm text-gray-600">Pending admin approval</p>
+                  <p className="text-xs text-gray-500 mt-2">1-3 business days</p>
+                </div>
+              </div>
+
+              {/* Refund Policy */}
+              <div className="bg-lime-50 rounded-xl p-6 border border-lime-200 mb-8">
+                <h4 className="font-semibold text-lime-900 mb-4 flex items-center">
+                  <HelpCircle size={20} className="mr-2" />
+                  Refund Policy & Requirements
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">Only Purchased Credits are refundable</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">Refunds go to original payment method</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">KYC verification required (AML compliance)</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">Admin review and approval required</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">Winnings & Referral Credits non-refundable</span>
+                    </div>
+                    <div className="flex items-start">
+                      <span className="text-lime-600 mr-2">✓</span>
+                      <span className="text-sm text-lime-700">All transactions logged for audit</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Refund Request Action */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center mb-8">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Ready to Request a Refund?</h4>
+                <p className="text-gray-600 mb-6">
+                  {(balance?.purchased_credits || 0) > 0
+                    ? "You have purchased credits available for refund."
+                    : "You don't have any purchased credits to refund."
+                  }
+                </p>
+                <button
+                  onClick={() => {
+                    const available = balance?.purchased_credits || 0;
+                    if (available <= 0) {
+                      toast.error('No purchased credits available for refund');
+                      return;
+                    }
+                    setIsRefundModalOpen(true);
+                  }}
+                  disabled={(balance?.purchased_credits || 0) <= 0}
+                  className="px-8 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  Request Refund
+                </button>
+              </div>
+
+              {/* Refund History */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-lg font-semibold text-gray-900">Refund History</h4>
+                  <button
+                    onClick={fetchRefundHistory}
+                    disabled={isLoadingRefunds}
+                    className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                  >
+                    {isLoadingRefunds ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+                {refundHistory.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No refund requests yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {refundHistory.map((refund) => (
+                      <div key={refund.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <p className="font-medium text-gray-900">{refund.amount} credits</p>
+                          <p className="text-sm text-gray-600">{new Date(refund.created_at || '').toLocaleDateString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                            refund.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            refund.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                            refund.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'faq' && (
           <motion.div
             key="faq"
@@ -1515,6 +1862,47 @@ const CreditManagement: React.FC = () => {
           }}
         />
       )}
+
+      <RefundRequestModal
+        isOpen={isRefundModalOpen}
+        onClose={() => setIsRefundModalOpen(false)}
+        maxAmount={balance?.purchased_credits || 0}
+        onSubmit={handleRefundSubmit}
+      />
+
+      <AnimatePresence>
+        {pendingRefund && (
+          <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-bold">Refund Requested</h3>
+                  <p className="text-sm text-gray-600">Your refund has been submitted and is pending admin approval.</p>
+                </div>
+                <button onClick={() => setPendingRefund(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              </div>
+
+              <div className="mt-4">
+                <div className="text-sm text-gray-700">Amount:</div>
+                <div className="text-2xl font-bold text-lime-600">{pendingRefund.amount} credits</div>
+                <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <p className="text-sm text-gray-700">What happens next:</p>
+                  <ul className="text-sm text-gray-600 mt-2 space-y-2">
+                    <li>• Admin will review your refund request and verify your KYC status.</li>
+                    <li>• If approved, funds will be sent to your original payment method.</li>
+                    <li>• Processing typically takes 1-3 business days.</li>
+                    <li>• You'll receive a notification when the status changes.</li>
+                  </ul>
+                </div>
+
+                <div className="mt-4 flex space-x-2">
+                  <button onClick={() => { setPendingRefund(null); fetchBalance(); }} className="flex-1 bg-lime-600 text-white py-2 rounded-lg text-sm">Close</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -1132,13 +1132,13 @@ const handleCompetitionEntry = async (competitionId: string) => {
   const getCreditCost = (name: string) => {
     switch (name) {
       case 'Starter League':
-        return 10;
+        return 5;
       case 'Pro League':
-        return 20;
-      case 'Elite League':
-        return 30;
-      default:
         return 10;
+      case 'Elite League':
+        return 20;
+      default:
+        return 5;
     }
   };
 

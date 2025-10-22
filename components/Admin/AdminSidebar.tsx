@@ -23,6 +23,8 @@ const menuItems = [
   // { label: "Competitions", icon: Trophy, href: "/admindashboard/competitions" },
   { label: "Questions", icon: FileQuestion, href: "/admindashboard/question" },
   { label: "Payouts", icon: DollarSign, href: "/admindashboard/payout" },
+  { label: "Refunds", icon: DollarSign, href: "/admindashboard/refunds" },
+  { label: "Contact Messages", icon: MessageSquare, href: "/admindashboard/contacts" },
   { label: "Anti-Cheat", icon: Shield, href: "/admindashboard/cheat-actions" },
   { label: "Support", icon: HelpCircle, href: "/admindashboard/support" },
   { label: "Notification", icon: Bell, href: "/admindashboard/notification" },
