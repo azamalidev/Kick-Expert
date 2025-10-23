@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
       beforeFiles: [
         {
           source: '/favicon.ico',
-          destination: '/logo.png',
+          destination: '/logo.png?v=2',
         },
       ],
     };
