@@ -195,7 +195,7 @@ export default function Navbar() {
         if (newNotifications.length === 1) {
           // toast.success(`New notification: ${newNotifications[0].title}`);
         } else {
-          toast.success(`${newNotifications.length} new notifications`);
+          // toast.success(`${newNotifications.length} new notifications`);
         }
       }
 
