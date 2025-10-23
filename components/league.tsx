@@ -91,7 +91,7 @@ export default function LeaguePage() {
   useEffect(() => {
     const fetchCompetitionDetails = async () => {
       if (!competitionId) return;
-      
+
       try {
         // First, check if user is authenticated
         const authResponse = await supabase.auth.getUser();
@@ -140,7 +140,7 @@ export default function LeaguePage() {
           .select('*')
           .eq('id', competitionId)
           .single();
-        
+
         if (!error && data) {
           console.log('Competition details fetched:', data); // Debug log
           setCompetitionDetails(data);
@@ -149,7 +149,7 @@ export default function LeaguePage() {
             const start = new Date(data.start_time).getTime();
             const now = new Date().getTime();
             const seconds = Math.max(0, Math.floor((start - now) / 1000));
-            
+
             // Only allow entering quiz if competition has actually started (current time >= start time)
             if (now >= start) {
               // Competition has started - go directly to quiz
@@ -170,14 +170,14 @@ export default function LeaguePage() {
         setInitializing(false);
       }
     };
-    
+
     fetchCompetitionDetails();
   }, [competitionId]);
 
   // Fetch actual registered players for this competition
   useEffect(() => {
     if (!competitionId) return;
-    
+
     const fetchPlayers = async () => {
       try {
         const { data: regs, error: regsErr } = await supabase
@@ -210,7 +210,7 @@ export default function LeaguePage() {
         console.error('Error fetching players or profiles:', err);
       }
     };
-    
+
     fetchPlayers();
   }, [competitionId]);
 
@@ -229,7 +229,7 @@ export default function LeaguePage() {
         }
 
         setCountdown((prev) => {
-            if (prev <= 1) {
+          if (prev <= 1) {
             clearInterval(countdownInterval);
             setPhase('quiz');
             return 0;
@@ -237,7 +237,7 @@ export default function LeaguePage() {
           return prev - 1;
         });
       }, 1000);
-      
+
       return () => clearInterval(countdownInterval);
     }
   }, [phase, competitionId]);
@@ -245,11 +245,11 @@ export default function LeaguePage() {
   // Fetch questions and initialize quiz session when entering quiz phase
   useEffect(() => {
     if (phase !== 'quiz' || !competitionId) return;
-    
+
     const initializeQuiz = async () => {
       try {
         setLoading(true);
-        
+
         // Check if competition has ended before starting quiz
         if (hasCompetitionEnded()) {
           setError('This competition has ended. You cannot participate anymore.');
@@ -338,7 +338,7 @@ export default function LeaguePage() {
         setQuestions(selected);
 
 
-        
+
         // Check registration
         const { data: reg, error: regErr } = await supabase
           .from('competition_registrations')
@@ -401,21 +401,21 @@ export default function LeaguePage() {
           })
           .select()
           .single();
-        
+
         if (sessionError) throw sessionError;
-        
-  setSessionId(session.id);
-  // persist registration id for use when saving answers
-  // @ts-ignore
-  (window as any).__currentCompetitionRegistrationId = registrationId;
+
+        setSessionId(session.id);
+        // persist registration id for use when saving answers
+        // @ts-ignore
+        (window as any).__currentCompetitionRegistrationId = registrationId;
         setLoading(false);
       } catch (err) {
         setError('Failed to load quiz');
         setLoading(false);
       }
     };
-    
-    
+
+
     initializeQuiz();
   }, [phase, competitionId]);
 
@@ -430,7 +430,7 @@ export default function LeaguePage() {
         try {
           // Use competition_question_id for competition questions
           const competitionQuestionId = (currentQuestion as any).competition_question_id;
-          
+
           if (competitionQuestionId) {
             await supabase.rpc('mark_question_as_used', {
               p_competition_question_id: competitionQuestionId
@@ -500,7 +500,7 @@ export default function LeaguePage() {
       const fetchLeaderboard = async () => {
         const authData = await supabase.auth.getUser();
         const userId = authData.data.user?.id;
-        
+
         try {
           // Get the latest leaderboard using stored procedure
           const { data: results, error: leaderboardError } = await supabase
@@ -575,8 +575,8 @@ export default function LeaguePage() {
   }, [phase, competitionDetails]);
 
   const handleChoiceSelect = (choice: string) => {
-  // store selection for the currently visible question index
-  setSelectedChoice(choice);
+    // store selection for the currently visible question index
+    setSelectedChoice(choice);
   };
 
   // Keep a ref of the current selection so the timer effect does not restart on select
@@ -609,42 +609,42 @@ export default function LeaguePage() {
     if (questionStartTime.current && selectedChoiceRef.current) {
       latencyMs = answerTime - questionStartTime.current;
       responseLatencies.current.push(latencyMs);
-      
+
       // Log for debugging
       console.log(`Response latency: ${latencyMs}ms`);
-      
+
       // Flag suspicious activity if response is too fast (< 300ms)
       if (latencyMs < 300) {
         console.warn(`⚠️ Suspicious response time detected: ${latencyMs}ms (< 300ms threshold)`);
         setSuspiciousActivity(true);
       }
     }
-    
-    
+
+
     const currentQuestion = questions[currentQuestionIndex];
-    
+
     // Determine if question was skipped (no answer selected)
     const wasSkipped = !selectedChoiceRef.current;
     const isCorrect = selectedChoiceRef.current === currentQuestion?.correct_answer;
-    
-    
+
+
     // Update score
     if (isCorrect) {
       setScore((prev) => prev + 1);
     }
-    
-    
+
+
     // Save answer record
-  if (currentQuestion) {
+    if (currentQuestion) {
       const answerRecord = {
         question_id: currentQuestion.id,
         is_correct: isCorrect,
         difficulty: currentQuestion.difficulty
       };
-      
+
       setAnswers((prev) => [...prev, answerRecord]);
-      
-      
+
+
       // Submit answer to Supabase
       const authData = await supabase.auth.getUser();
       const userId = authData.data.user?.id;
@@ -713,7 +713,7 @@ export default function LeaguePage() {
         }
       }
     }
-    
+
     // Move to next question or complete the quiz
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -729,8 +729,8 @@ export default function LeaguePage() {
         setPhase('results');
       }, 100);
     }
-    
-    
+
+
     setTimeout(() => {
       nextCalled.current = false;
     }, 300);
@@ -788,31 +788,31 @@ export default function LeaguePage() {
       console.warn('🚨 SUSPICIOUS ACTIVITY DETECTED:', patternAnalysis.reasons);
       setSuspiciousActivity(true);
     }
-    
-    
+
+
     // Aggregate answers, update session, calculate results
     try {
       const authData = await supabase.auth.getUser();
       const userId = authData.data.user?.id;
       if (!userId) throw new Error('User not authenticated');
-      
+
       // Update session summary
       const correctAnswers = answers.filter(a => a.is_correct).length;
       const scorePercentage = (correctAnswers / questions.length) * 100;
-      
+
       await supabase.from('competition_sessions').update({
         correct_answers: correctAnswers,
         score_percentage: scorePercentage,
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
-      
+
       // Calculate rank based on score and time (this should be handled by a database function in production)
       const { data: allScores } = await supabase
         .from('competition_sessions')
         .select('user_id, correct_answers, end_time')
         .eq('competition_id', competitionId)
         .not('end_time', 'is', null);
-      
+
       if (allScores) {
         // Sort by correct answers (desc) and end time (asc - faster completion is better)
         const sortedScores = allScores
@@ -825,10 +825,10 @@ export default function LeaguePage() {
             if (b.score !== a.score) return b.score - a.score;
             return a.end_time - b.end_time;
           });
-        
+
         const userRank = sortedScores.findIndex(score => score.user_id === userId) + 1;
         const prizeAmount = calculatePrizeAmount(userRank);
-        
+
         // Insert into competition_results
         await supabase.from('competition_results').insert({
           competition_id: competitionId,
@@ -846,14 +846,14 @@ export default function LeaguePage() {
           try {
             const avgLatency = patternAnalysis.avgLatency || 0;
             const reasonDetails = `Speed anomaly detected: ${patternAnalysis.reasons.join(', ')}. Avg latency: ${avgLatency.toFixed(2)}ms, Fast responses: ${patternAnalysis.fastResponses}/${responseLatencies.current.length}`;
-            
+
             await logCheatAction(
               competitionId,
               userId,
               'flag',
               reasonDetails
             );
-            
+
             console.log('✅ Suspicious speed activity logged to competition_cheat_actions');
           } catch (err) {
             console.warn('Could not log cheat action:', err);
@@ -976,13 +976,13 @@ export default function LeaguePage() {
         } catch (profileErr) {
           console.error('Unexpected error updating profile:', profileErr);
         }
-        
+
         // Award trophies for top 3
         if (userRank <= 3) {
           const trophyType = userRank === 1 ? 'gold' : userRank === 2 ? 'silver' : 'bronze';
           const title = userRank === 1 ? 'Champion' : userRank === 2 ? 'Runner-up' : 'Third Place';
           const description = `Finished ${userRank}${userRank === 1 ? 'st' : userRank === 2 ? 'nd' : 'rd'} in ${competitionDetails?.name}`;
-          
+
           try {
             // The DB table `competition_trophies` uses columns: trophy_title, trophy_rank, earned_at
             // Use upsert on (competition_id, user_id) to avoid unique constraint errors
@@ -1018,10 +1018,10 @@ export default function LeaguePage() {
     // Try to use prize_structure from competition details if available
     if (competitionDetails?.prize_structure) {
       try {
-        const prizeStructure = typeof competitionDetails.prize_structure === 'string' 
+        const prizeStructure = typeof competitionDetails.prize_structure === 'string'
           ? JSON.parse(competitionDetails.prize_structure)
           : competitionDetails.prize_structure;
-        
+
         const structurePrize = prizeStructure[rank];
         if (structurePrize && structurePrize > 0) {
           return structurePrize;
@@ -1034,7 +1034,7 @@ export default function LeaguePage() {
     // Fallback: Calculate based on total prize pool
     // Prize pool = number of players × entry cost
     const totalPool = players.length * getCreditCost();
-    
+
     // Prize distribution: 1st = 50%, 2nd = 30%, 3rd = 20%
     switch (rank) {
       case 1:
@@ -1067,14 +1067,14 @@ export default function LeaguePage() {
   // Helper function to check if competition has ended
   const hasCompetitionEnded = (): boolean => {
     if (!competitionDetails) return false;
-    
+
     // Check if end_time exists and has passed
     if (competitionDetails.end_time) {
       const endTime = new Date(competitionDetails.end_time).getTime();
       const now = new Date().getTime();
       return now >= endTime;
     }
-    
+
     // Fallback: Calculate end time from start_time + duration
     if (competitionDetails.start_time && competitionDetails.duration_minutes) {
       const startTime = new Date(competitionDetails.start_time).getTime();
@@ -1083,7 +1083,7 @@ export default function LeaguePage() {
       const now = new Date().getTime();
       return now >= calculatedEndTime;
     }
-    
+
     // If no end time info available, assume it hasn't ended
     return false;
   };
@@ -1091,9 +1091,9 @@ export default function LeaguePage() {
   // Helper function to get formatted competition end time
   const getCompetitionEndTime = (): { date: string; time: string; timeLeft: string } | null => {
     if (!competitionDetails) return null;
-    
+
     let endTime: Date | null = null;
-    
+
     if (competitionDetails.end_time) {
       endTime = new Date(competitionDetails.end_time);
     } else if (competitionDetails.start_time && competitionDetails.duration_minutes) {
@@ -1101,18 +1101,18 @@ export default function LeaguePage() {
       const durationMs = competitionDetails.duration_minutes * 60 * 1000;
       endTime = new Date(startTime + durationMs);
     }
-    
+
     if (!endTime) return null;
-    
+
     const now = new Date().getTime();
     const timeLeft = endTime.getTime() - now;
-    
+
     let timeLeftStr = '';
     if (timeLeft > 0) {
       const minutes = Math.floor(timeLeft / 1000 / 60);
       const hours = Math.floor(minutes / 60);
       const days = Math.floor(hours / 24);
-      
+
       if (days > 0) {
         timeLeftStr = `${days} day${days > 1 ? 's' : ''} remaining`;
       } else if (hours > 0) {
@@ -1125,7 +1125,7 @@ export default function LeaguePage() {
     } else {
       timeLeftStr = 'Competition has ended';
     }
-    
+
     return {
       date: endTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
       time: endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -1146,7 +1146,7 @@ export default function LeaguePage() {
     setLoading(true);
     setError(null);
     setSessionId(null);
-  setTimer(30);
+    setTimer(30);
     setTimerKey(0);
     setLeaderboard([]);
     setUserRank(null);
@@ -1249,7 +1249,7 @@ export default function LeaguePage() {
             </div>
           </div>
         )}
-        
+
         {phase === 'waiting' && !initializing && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1261,7 +1261,7 @@ export default function LeaguePage() {
               {competitionDetails?.name || 'League Competition'}
             </h1>
             <p className="text-gray-600 mb-6">Get ready! Competition starts soon</p>
-            
+
             {/* Countdown Timer */}
             <div className="relative w-32 h-32 mx-auto mb-8">
               <svg className="w-full h-full" viewBox="0 0 100 100">
@@ -1287,7 +1287,7 @@ export default function LeaguePage() {
                 <defs>
                   <linearGradient id="countdown-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#84cc16" />
-                    <stop offset="100%" stopColor="#22c55e"/>
+                    <stop offset="100%" stopColor="#22c55e" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -1296,15 +1296,15 @@ export default function LeaguePage() {
                 <span className="text-xs text-gray-500 mt-1">minutes</span>
               </div>
             </div>
-            
+
             {/* League Recap */}
             <div className="bg-gradient-to-br from-lime-50 to-lime-100 border-2 border-lime-300 rounded-xl p-6 mb-6 shadow-md">
               <h2 className="text-xl font-bold text-lime-800 mb-4 flex items-center justify-center gap-2">
                 <Trophy className="h-6 w-6" />
                 League Recap
               </h2>
-           
-              
+
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="bg-white rounded-lg p-4 shadow-sm">
                   <div className="flex items-center justify-center gap-2 mb-2">
@@ -1315,7 +1315,7 @@ export default function LeaguePage() {
                     {players.length * getCreditCost()} Credits
                   </p>
                 </div>
-                
+
                 <div className="bg-white rounded-lg p-4 shadow-sm">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Users className="h-5 w-5 text-blue-600" />
@@ -1324,7 +1324,7 @@ export default function LeaguePage() {
                   <p className="text-2xl font-bold text-blue-700">{players.length}</p>
                 </div>
               </div>
-              
+
               {/* Prize Breakdown */}
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Prize Distribution</h3>
@@ -1356,7 +1356,7 @@ export default function LeaguePage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Rules Reminder */}
             {/* <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <h3 className="text-lg font-bold text-blue-800 mb-3 flex items-center justify-center gap-2">
@@ -1382,12 +1382,12 @@ export default function LeaguePage() {
                 </li>
               </ul>
             </div> */}
-            
+
             {/* Players List */}
             <p className="text-lg text-gray-600 mb-4 font-semibold">
               {players.length} players ready to compete
             </p>
-            
+
             <div className="max-h-64 overflow-y-auto px-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <AnimatePresence>
@@ -1431,7 +1431,7 @@ export default function LeaguePage() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Enhanced Timer Bar */}
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-2">
@@ -1447,11 +1447,10 @@ export default function LeaguePage() {
                 </div>
                 <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-hidden relative">
                   <div
-                    className={`h-full transition-all duration-100 ${
-                      timer > 20 ? 'bg-green-400' : 
-                      timer > 10 ? 'bg-yellow-400' : 
-                      'bg-red-400 animate-pulse'
-                    }`}
+                    className={`h-full transition-all duration-100 ${timer > 20 ? 'bg-green-400' :
+                        timer > 10 ? 'bg-yellow-400' :
+                          'bg-red-400 animate-pulse'
+                      }`}
                     style={{ width: `${(timer / 30) * 100}%` }}
                   />
                 </div>
@@ -1473,11 +1472,10 @@ export default function LeaguePage() {
                     <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
                       {questions[currentQuestionIndex]?.category}
                     </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                      questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                        questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                      }`}>
                       {questions[currentQuestionIndex]?.difficulty}
                     </span>
                   </div>
@@ -1496,15 +1494,14 @@ export default function LeaguePage() {
                       whileHover={!showResult ? { scale: 1.02 } : {}}
                       whileTap={!showResult ? { scale: 0.98 } : {}}
                       onClick={() => handleChoiceSelect(choice)}
-                      className={`p-4 rounded-xl border-2 text-left transition-all ${
-                        showResult && choice === questions[currentQuestionIndex]?.correct_answer
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${showResult && choice === questions[currentQuestionIndex]?.correct_answer
                           ? 'border-green-500 bg-green-50'
                           : showResult && selectedChoice === choice
                             ? 'border-red-500 bg-red-50'
                             : selectedChoice === choice
                               ? 'border-lime-400 bg-lime-50'
                               : 'border-gray-200 hover:border-lime-300 bg-white'
-                      }`}
+                        }`}
                       disabled={showResult || quizCompleted}
                     >
                       <div className="flex items-center justify-between">
@@ -1563,7 +1560,7 @@ export default function LeaguePage() {
               <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">
                 Your Performance 🎯
               </h2>
-              
+
               {/* Score Circle */}
               <div className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-6 sm:mb-8">
                 <svg className="w-full h-full" viewBox="0 0 100 100">
@@ -1612,7 +1609,7 @@ export default function LeaguePage() {
                     {Math.round((score / questions.length) * 100)}%
                   </p>
                 </div>
-                
+
                 <div className="bg-gradient-to-br from-lime-50 to-lime-100 border-2 border-lime-200 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Trophy className="h-5 w-5 text-lime-600" />
@@ -1620,7 +1617,7 @@ export default function LeaguePage() {
                   </div>
                   <p className="text-2xl font-bold text-lime-700">{questions.length}</p>
                 </div>
-                
+
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Award className="h-5 w-5 text-purple-600" />
@@ -1677,7 +1674,7 @@ export default function LeaguePage() {
                   {getRecommendation().leagueText}
                 </motion.button>
               </Link>
-             
+
               <Link href="/">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -1702,7 +1699,7 @@ export default function LeaguePage() {
               <Trophy className="h-8 w-8 text-yellow-500" />
               {competitionDetails?.name} Leaderboard
             </h1>
-            
+
             {/* Prize Pool Summary */}
             {competitionDetails && (
               <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-6 mb-6 max-w-2xl mx-auto shadow-md">
@@ -1735,7 +1732,7 @@ export default function LeaguePage() {
                 </div>
               </div>
             )}
-            
+
             {/* User Rank Highlight */}
             {userRank && (
               <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 rounded-lg text-white text-center mb-6 max-w-md mx-auto shadow-md">
@@ -1754,7 +1751,7 @@ export default function LeaguePage() {
                 </div>
               </div>
             )}
-            
+
             {/* Leaderboard Table */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
@@ -1777,23 +1774,22 @@ export default function LeaguePage() {
                 <tbody className="divide-y divide-gray-200">
                   <AnimatePresence>
                     {leaderboard.map((entry, index) => {
-                      const prize = index === 0 
+                      const prize = index === 0
                         ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.5)
                         : index === 1
-                        ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.3)
-                        : index === 2
-                        ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.2)
-                        : 0;
-                      
+                          ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.3)
+                          : index === 2
+                            ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.2)
+                            : 0;
+
                       return (
                         <motion.tr
                           key={entry.id}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: index * 0.05 }}
-                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${
-                            index < 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
-                          }`}
+                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${index < 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
+                            }`}
                         >
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                             <div className="flex items-center gap-2">
@@ -1865,24 +1861,25 @@ export default function LeaguePage() {
       {/* Competition End Time Modal */}
       <AnimatePresence>
         {showCompetitionEndModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ duration: 0.3 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col"
+              style={{ maxHeight: '90vh' }}
             >
               {/* Header */}
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white">
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white flex-shrink-0">
                 <div className="flex items-center justify-center mb-2">
                   <Clock className="h-10 w-10" />
                 </div>
                 <h2 className="text-2xl font-bold text-center">Competition In Progress</h2>
               </div>
 
-              {/* Content */}
-              <div className="p-6 space-y-4">
+              {/* Scrollable Content */}
+              <div className="p-6 space-y-4 overflow-y-auto flex-grow">
                 <div className="text-center">
                   <p className="text-gray-700 text-lg mb-4">
                     The final leaderboard will be revealed when the competition ends.
@@ -1922,7 +1919,7 @@ export default function LeaguePage() {
               </div>
 
               {/* Footer */}
-              <div className="p-6 bg-gray-50 border-t">
+              <div className="p-6 bg-gray-50 border-t flex-shrink-0">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -1936,6 +1933,7 @@ export default function LeaguePage() {
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

@@ -45,23 +45,96 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient purchased credits' }, { status: 400 });
     }
 
-    // Create refund request
+    // ===== NEW: CHECK KYC VERIFICATION STATUS =====
+    // Get user's payment account and KYC status
+    const { data: paymentAccount, error: paymentError } = await supabase
+      .from('user_payment_accounts')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    // Determine KYC status
+    let kycStatus = 'unverified';
+    if (paymentAccount?.kyc_status) {
+      kycStatus = paymentAccount.kyc_status;
+    }
+
+    // If KYC not verified, return error with onboarding link
+    if (kycStatus !== 'verified') {
+      // If no payment account exists, create one and generate onboarding link
+      if (!paymentAccount) {
+        return NextResponse.json(
+          {
+            error: 'KYC verification required',
+            kyc_status: 'unverified',
+            message: 'You must complete KYC verification before requesting a refund. Please set up your payment account.',
+            requires_onboarding: true
+          },
+          { status: 403 }
+        );
+      }
+
+      // If account exists but KYC pending or unverified
+      return NextResponse.json(
+        {
+          error: 'KYC verification required',
+          kyc_status: kycStatus,
+          message: kycStatus === 'pending'
+            ? 'Your KYC verification is still pending. Please complete the verification process.'
+            : 'Your KYC verification is incomplete. Please complete the verification process.',
+          requires_onboarding: true,
+          provider_account_id: paymentAccount?.provider_account_id
+        },
+        { status: 403 }
+      );
+    }
+    // ===== END: KYC CHECK =====
+
+    // ===== NEW: GET ORIGINAL PAYMENT METHOD FROM CREDIT TRANSACTIONS =====
+    // Find the payment method used to purchase these credits
+    const { data: transactions, error: transError } = await supabase
+      .from('credit_transactions')
+      .select('payment_method')
+      .eq('user_id', userId)
+      .eq('credit_type', 'purchased')
+      .eq('transaction_type', 'purchase')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    let paymentMethod = 'stripe'; // Default to stripe
+    if (transactions && transactions.length > 0 && transactions[0].payment_method) {
+      paymentMethod = transactions[0].payment_method;
+    }
+    // ===== END: GET PAYMENT METHOD =====
+
+    // Create refund request with KYC status tracking
+    // Build insert object with only fields that exist in the table
+    const refundInsertData: any = {
+      user_id: userId,
+      amount,
+      reason,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Add optional KYC fields if they exist in the table
+    if (kycStatus) refundInsertData.kyc_status = kycStatus;
+    if (paymentAccount?.provider_account_id) refundInsertData.provider_account_id = paymentAccount.provider_account_id;
+    // Use the actual payment method from purchase history, not the current payment account provider
+    refundInsertData.provider = paymentMethod;
+
     const { data: refund, error: refundError } = await supabase
       .from('refund_requests')
-      .insert({
-        user_id: userId,
-        amount,
-        reason,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .insert(refundInsertData)
       .select()
       .single();
 
     if (refundError) {
       console.error('Refund creation error:', refundError);
-      return NextResponse.json({ error: 'Failed to create refund request' }, { status: 500 });
+      console.error('Refund insert data:', refundInsertData);
+      return NextResponse.json({ error: 'Failed to create refund request', details: refundError.message }, { status: 500 });
     }
 
     // Deduct purchased credits from user's account

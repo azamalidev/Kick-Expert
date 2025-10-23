@@ -1,0 +1,312 @@
+import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function POST(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.slice(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: adminUser, error: adminError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (adminError || adminUser?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    const { refund_id } = await request.json();
+    console.log('\n===== REFUND PROCESSING STARTED =====' );
+    console.log('Refund ID:', refund_id);
+
+    if (!refund_id) {
+      console.error('Refund ID is required');
+      return NextResponse.json({ error: 'Refund ID is required' }, { status: 400 });
+    }
+
+    // Get refund details
+    const { data: refund, error: refundError } = await supabase
+      .from('refund_requests')
+      .select('*')
+      .eq('id', refund_id)
+      .single();
+
+    console.log('Refund details fetched:', refund);
+
+    if (refundError || !refund) {
+      console.error('Refund not found:', refundError);
+      return NextResponse.json({ error: 'Refund not found' }, { status: 404 });
+    }
+
+    if (refund.status !== 'approved') {
+      console.error('Refund status is not approved:', refund.status);
+      return NextResponse.json(
+        { error: 'Refund must be approved before processing' },
+        { status: 400 }
+      );
+    }
+    
+    console.log('Refund status verified as approved');
+
+    // Get the original payment transaction to find the charge ID
+    const { data: originalTransaction, error: transError } = await supabase
+      .from('credit_transactions')
+      .select('payment_id')
+      .eq('user_id', refund.user_id)
+      .eq('credit_type', 'purchased')
+      .eq('transaction_type', 'purchase')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (transError || !originalTransaction?.payment_id) {
+      console.error('Original transaction not found:', transError);
+      return NextResponse.json(
+        { error: 'Original payment transaction not found' },
+        { status: 404 }
+      );
+    }
+
+    const chargeId = originalTransaction.payment_id;
+    console.log('Original charge/capture ID:', chargeId);
+    
+    let refundResult: any = null;
+    let refundStatus = 'failed';
+    let refundProvider = refund.provider || 'stripe';
+    console.log('Refund provider:', refundProvider);
+    console.log('Refund amount:', refund.amount);
+
+    try {
+      // ===== STRIPE REFUND PROCESSING =====
+      if (refundProvider === 'stripe') {
+        console.log(`\n>>> Processing Stripe refund for charge: ${chargeId}`);
+        console.log('Refund amount in cents:', Math.round(refund.amount * 100));
+
+        // Create refund in Stripe
+        const stripeRefund = await stripe.refunds.create({
+          charge: chargeId,
+          amount: Math.round(refund.amount * 100), // Convert to cents
+          reason: 'requested_by_customer'
+        });
+
+        refundResult = {
+          provider: 'stripe',
+          refund_id: stripeRefund.id,
+          charge_id: chargeId,
+          amount: refund.amount,
+          status: stripeRefund.status,
+          created: stripeRefund.created,
+          metadata: {
+            stripe_refund_id: stripeRefund.id,
+            stripe_charge_id: chargeId,
+            reason: 'requested_by_customer'
+          }
+        };
+
+        // Check if refund was successful
+        if (stripeRefund.status === 'succeeded') {
+          refundStatus = 'completed';
+        } else if (stripeRefund.status === 'pending') {
+          refundStatus = 'processing';
+        } else {
+          refundStatus = 'failed';
+        }
+
+        console.log(`Stripe refund result:`, refundResult);
+      }
+      // ===== PAYPAL REFUND PROCESSING =====
+      else if (refundProvider === 'paypal') {
+        console.log(`Processing PayPal refund for transaction: ${chargeId}`);
+
+        // Get PayPal access token
+        const tokenResponse = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(
+              `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+            ).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'grant_type=client_credentials'
+        });
+
+        if (!tokenResponse.ok) {
+          throw new Error('Failed to get PayPal access token');
+        }
+
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        // Create refund in PayPal
+        const paypalRefundResponse = await fetch(
+          `https://api-m.paypal.com/v2/payments/captures/${chargeId}/refund`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              amount: {
+                value: refund.amount.toString(),
+                currency_code: 'USD'
+              },
+              note_to_payer: 'Refund requested by customer'
+            })
+          }
+        );
+
+        if (!paypalRefundResponse.ok) {
+          const errorData = await paypalRefundResponse.json();
+          throw new Error(`PayPal refund failed: ${errorData.message}`);
+        }
+
+        const paypalRefund = await paypalRefundResponse.json();
+
+        refundResult = {
+          provider: 'paypal',
+          refund_id: paypalRefund.id,
+          capture_id: chargeId,
+          amount: refund.amount,
+          status: paypalRefund.status,
+          links: paypalRefund.links,
+          metadata: {
+            paypal_refund_id: paypalRefund.id,
+            paypal_capture_id: chargeId
+          }
+        };
+
+        // Check if refund was successful
+        if (paypalRefund.status === 'COMPLETED') {
+          refundStatus = 'completed';
+        } else if (paypalRefund.status === 'PENDING') {
+          refundStatus = 'processing';
+        } else {
+          refundStatus = 'failed';
+        }
+
+        console.log(`PayPal refund result:`, refundResult);
+      }
+    } catch (paymentError) {
+      console.error('Payment processing error:', paymentError);
+      refundStatus = 'failed';
+      refundResult = {
+        error: paymentError instanceof Error ? paymentError.message : 'Unknown error',
+        provider: refundProvider
+      };
+    }
+
+    // ===== UPDATE REFUND REQUEST STATUS =====
+    console.log('\n>>> Updating refund status to:', refundStatus);
+    const { error: updateError } = await supabase
+      .from('refund_requests')
+      .update({
+        status: refundStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', refund_id);
+
+    if (updateError) {
+      console.error('Failed to update refund status:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to update refund status' },
+        { status: 500 }
+      );
+    }
+    console.log('Refund status updated successfully');
+
+    // ===== CREATE REFUND TRANSACTION RECORD =====
+    const { error: transactionError } = await supabase
+      .from('credit_transactions')
+      .insert({
+        user_id: refund.user_id,
+        amount: refund.amount,
+        credit_type: 'purchased',
+        transaction_type: 'refund',
+        payment_method: refundProvider,
+        payment_id: refundResult?.refund_id || null,
+        status: refundStatus === 'completed' ? 'completed' : 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        completed_at: refundStatus === 'completed' ? new Date().toISOString() : null
+      });
+
+    if (transactionError) {
+      console.error('Failed to create refund transaction:', transactionError);
+    }
+
+    // ===== LOG THE REFUND PROCESSING =====
+    await supabase
+      .from('audit_logs')
+      .insert({
+        action: 'refund_processed',
+        user_id: user.id,
+        details: {
+          refund_id,
+          amount: refund.amount,
+          user_id: refund.user_id,
+          provider: refundProvider,
+          status: refundStatus,
+          refund_result: refundResult
+        },
+        created_at: new Date().toISOString()
+      });
+
+    // ===== NOTIFY USER =====
+    const statusMessages: { [key: string]: string } = {
+      completed: `Your refund of ${refund.amount} credits has been successfully processed and will appear in your ${refundProvider === 'stripe' ? 'bank account' : 'PayPal account'} within 1-3 business days.`,
+      processing: `Your refund of ${refund.amount} credits is being processed. You will receive it within 1-3 business days.`,
+      failed: `Your refund of ${refund.amount} credits could not be processed. Please contact support.`
+    };
+
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: refund.user_id,
+        type: `refund_${refundStatus}`,
+        title: refundStatus === 'completed' ? 'Refund Processed' : 
+               refundStatus === 'processing' ? 'Refund Processing' : 'Refund Failed',
+        message: statusMessages[refundStatus],
+        created_at: new Date().toISOString()
+      });
+
+    console.log('\n===== REFUND PROCESSING COMPLETED =====' );
+    console.log('Final status:', refundStatus);
+    console.log('Refund result:', refundResult);
+    console.log('User notified:', refund.user_id);
+    console.log('=====================================\n');
+
+    return NextResponse.json({
+      success: true,
+      refund_id,
+      status: refundStatus,
+      refund_result: refundResult
+    });
+  } catch (error) {
+    console.error('Refund processing API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}

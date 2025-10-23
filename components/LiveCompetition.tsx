@@ -1431,7 +1431,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
               {/* Trophy Icon at Top */}
               <div className="flex flex-col items-center mt-6 mb-4">
                 <Trophy className={`h-12 w-12 ${getTrophyColor(comp.name)} mb-3`} />
-                <h2 className="text-xl font-extrabold text-gray-800"># {comp.name}</h2>
+                <h2 className="text-xl font-extrabold text-gray-800">{comp.name}</h2>
                 <p className="text-sm text-gray-600">
                   {comp.name === 'Starter League' ? 'Perfect for beginners' :
                     comp.name === 'Pro League' ? 'For serious fans' : 'Expert level only'}

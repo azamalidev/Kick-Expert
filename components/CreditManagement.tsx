@@ -1017,6 +1017,31 @@ const CreditManagement: React.FC = () => {
         throw new Error('Please sign in to request a refund');
       }
 
+      // ===== NEW: CHECK KYC STATUS BEFORE REFUND =====
+      const statusRes = await fetch('/api/payments/stripe/status', {
+        headers: { Authorization: `Bearer ${userSession.access_token}` }
+      });
+      if (!statusRes.ok) throw new Error('Failed to check payment account status');
+      const statusBody = await statusRes.json();
+
+      if (!statusBody.exists || statusBody.kyc_status !== 'verified') {
+        // Trigger onboarding - get a fresh onboarding link
+        const onboardRes = await fetch('/api/payments/stripe/onboard', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${userSession.access_token}` }
+        });
+        if (!onboardRes.ok) throw new Error('Failed to create onboarding link');
+        const onboardBody = await onboardRes.json();
+        if (onboardBody.url) {
+          toast.error('KYC verification required. Redirecting to Stripe onboarding...');
+          // Redirect user to Stripe onboarding
+          window.location.href = onboardBody.url;
+          return;
+        }
+        throw new Error('Could not get onboarding link');
+      }
+      // ===== END: KYC CHECK =====
+
       const response = await fetch('/api/refunds', {
         method: 'POST',
         headers: {
