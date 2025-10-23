@@ -8,42 +8,53 @@ import { metadata } from './metadata';
 
 function ClientWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Update favicon dynamically
+    // Update favicon dynamically only once on mount
     const updateFavicon = () => {
-      // Remove all existing favicon links
-      const existingIcons = document.querySelectorAll('link[rel*="icon"]');
-      existingIcons.forEach(icon => icon.remove());
+      try {
+        // Check if favicon already exists
+        const existingIcon = document.querySelector('link[rel="icon"]');
+        if (existingIcon && existingIcon.getAttribute('href')?.includes('logo.png')) {
+          return; // Favicon already set, don't update
+        }
 
-      // Add new favicon with cache busting
-      const timestamp = new Date().getTime();
-      
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.type = 'image/png';
-      link.href = `/logo.png?v=${timestamp}`;
-      link.sizes = 'any';
-      document.head.appendChild(link);
+        // Remove old favicon links only if they're not our logo
+        const existingIcons = document.querySelectorAll('link[rel*="icon"]');
+        existingIcons.forEach(icon => {
+          const href = icon.getAttribute('href');
+          if (!href?.includes('logo.png')) {
+            icon.remove();
+          }
+        });
 
-      // Add shortcut icon
-      const shortcut = document.createElement('link');
-      shortcut.rel = 'shortcut icon';
-      shortcut.type = 'image/png';
-      shortcut.href = `/logo.png?v=${timestamp}`;
-      document.head.appendChild(shortcut);
+        // Add new favicon with cache busting
+        const timestamp = new Date().getTime();
+        
+        const link = document.createElement('link');
+        link.rel = 'icon';
+        link.type = 'image/png';
+        link.href = `/logo.png?v=${timestamp}`;
+        link.sizes = 'any';
+        document.head.appendChild(link);
 
-      // Add apple touch icon
-      const apple = document.createElement('link');
-      apple.rel = 'apple-touch-icon';
-      apple.href = `/logo.png?v=${timestamp}`;
-      document.head.appendChild(apple);
+        // Add shortcut icon
+        const shortcut = document.createElement('link');
+        shortcut.rel = 'shortcut icon';
+        shortcut.type = 'image/png';
+        shortcut.href = `/logo.png?v=${timestamp}`;
+        document.head.appendChild(shortcut);
+
+        // Add apple touch icon
+        const apple = document.createElement('link');
+        apple.rel = 'apple-touch-icon';
+        apple.href = `/logo.png?v=${timestamp}`;
+        document.head.appendChild(apple);
+      } catch (error) {
+        console.error('Error updating favicon:', error);
+      }
     };
 
-    // Run immediately
+    // Run only once on mount
     updateFavicon();
-    
-    // Also run after a short delay to ensure it overrides any cached favicon
-    const timer = setTimeout(updateFavicon, 100);
-    return () => clearTimeout(timer);
   }, []);
 
   return (
