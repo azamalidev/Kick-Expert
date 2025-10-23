@@ -158,6 +158,11 @@ export const articles = [
       "Football rivalries are the heartbeat of the sport, fueling passion and drama. El Clásico, between Real Madrid and Barcelona, is perhaps the most famous, with political, cultural, and sporting tensions dating back decades. Matches between these giants often decide La Liga titles and showcase stars like Ronaldo and Messi at their peak.",
       "In England, the Manchester Derby between United and City has grown fiercer with City's rise under Pep Guardiola. The North West Derby, pitting Liverpool against Manchester United, carries a historic weight, with both clubs vying for supremacy in English football. These matches are about more than points—they're about pride and identity.",
       "Globally, rivalries like Boca Juniors vs. River Plate in Argentina or Celtic vs. Rangers in Scotland bring cities to a standstill. These contests transcend sport, reflecting deep cultural divides. Whether it's local bragging rights or global attention, football rivalries continue to captivate fans with their intensity and history."
+  ,
+  "Rivalries also shape player legacies. Performances in these high-stakes encounters often become the defining moments of careers — a winning goal, a crucial tackle, or a masterful display of leadership can etch a player into club folklore for generations.",
+  "The atmosphere on derby day is unique: chants, banners, and a sea of colors create an almost theatrical setting. For many supporters, these matches are social rituals that reinforce community identity, handed down through families and friendships.",
+  "While rivalries inspire fierce competition, they also foster respect and storylines that enrich the sport. Heated matches have produced iconic moments and individual heroics that are retold for decades, forming an oral history of the clubs involved.",
+  "Modern football has introduced measures to improve safety and sportsmanship — from stricter disciplinary rules to fan segregation and improved stadium infrastructure — but the raw emotion of a rivalry match remains as powerful as ever, a reminder of football’s enduring ability to move people." 
     ]
   }
 ];
