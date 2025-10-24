@@ -27,8 +27,7 @@ export default function FootballAssistant() {
       name: "",
       avatar: "⭐",
       systemPrompt: `You are a friendly football assistant for beginners. Respond in 1-2 short sentences with clear and accurate answers. 
-Include both recent and historical information as needed. If the question is about an event like the 2022 FIFA World Cup, 
-you know that Argentina won the tournament. Avoid saying anything hasn’t happened if it's already in the past. 
+Include both recent and historical information as needed. Always provide current information from 2025.
 Focus on the main fact only and keep the language very simple.
 `
     },
@@ -37,8 +36,7 @@ Focus on the main fact only and keep the language very simple.
       avatar: "🔥",
       systemPrompt: `You are a helpful football analyst who provides accurate and up-to-date answers in 2–4 sentences. 
 You include both recent events (like player transfers, match results, and tournaments) and relevant historical context. 
-If asked about the 2022 World Cup, you confidently say Argentina won it. 
-Do not respond as if you're in the past — always assume the present is 2023 or later. 
+Always assume the present is 2025 or later with current information.
 Keep your tone informative and accessible.`
     },
     hard: {
@@ -46,8 +44,7 @@ Keep your tone informative and accessible.`
       avatar: "💎",
       systemPrompt: `You are a football expert with deep and current knowledge of the sport. 
 You respond in 4–6 insightful sentences with expert-level detail, including stats, tactical insights, and historical relevance. 
-You are aware that Argentina won the 2022 World Cup, and you incorporate such recent facts naturally. 
-Avoid outdated statements like "this event has not happened yet" unless the event is truly in the future. 
+Incorporate recent facts naturally and provide nuanced analysis with current 2025 information.
 Tailor your response as if you're speaking to an advanced football fan who values accuracy, depth, and nuance.
 `
     }
@@ -107,7 +104,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
 
   const generateAIResponse = async (query: string, level: "easy" | "medium" | "hard") => {
     try {
-      // Proxy the request to our server-side OpenAI endpoint so the key isn't exposed to the browser
+      // Call backend endpoint that integrates Google Custom Search with OpenAI
       const r = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +120,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
       const json = await r.json();
       return json.text || "I couldn't generate a response. Please try again.";
     } catch (error) {
-      console.error("Error calling OpenAI API:", error);
+      console.error("Error calling AI API:", error);
       return "Sorry, I'm having trouble answering right now. Please try again later.";
     }
   };
@@ -233,7 +230,7 @@ Tailor your response as if you're speaking to an advanced football fan who value
         </h1>
 
         <p className="text-black max-w-xl mx-auto text-sm sm:text-base font-medium">
-          Get instant AI-powered answers about players, matches, goals and tournaments from international Football history
+          Get instant AI-powered answers with real-time data about players, matches, goals and tournaments from international Football
         </p>
       </div>
 
