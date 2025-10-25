@@ -502,11 +502,12 @@ export default function LeaguePage() {
         const userId = authData.data.user?.id;
 
         try {
-          // Get the latest leaderboard using stored procedure
+          // Get competition results directly from competition_results table
           const { data: results, error: leaderboardError } = await supabase
-            .rpc('get_competition_leaderboard', {
-              p_competition_id: competitionId
-            });
+            .from('competition_results')
+            .select('*')
+            .eq('competition_id', competitionId)
+            .order('rank', { ascending: true });
 
           if (leaderboardError) throw leaderboardError;
           if (!results || !Array.isArray(results)) {
@@ -522,18 +523,18 @@ export default function LeaguePage() {
             const { data: profilesData } = await supabase
               .from('profiles')
               .select('user_id, username')
-              .in('user_id', userIds as any[]);
+              .in('user_id', userIds);
 
-            (profilesData || []).forEach((p: any) => {
-              profilesMap[p.user_id] = p;
-            });
+            if (profilesData) {
+              profilesMap = Object.fromEntries(profilesData.map(p => [p.user_id, p]));
+            }
           }
 
           const leaderboardData = results.map((entry: any) => ({
             id: entry.user_id,
             name: (profilesMap[entry.user_id] && profilesMap[entry.user_id].username) || `User ${entry.user_id.substring(0, 8)}`,
             score: entry.score,
-            isUser: userId === entry.user_id,
+            isUser: entry.user_id === userId,
             rank: entry.rank
           }));
 
@@ -573,6 +574,18 @@ export default function LeaguePage() {
       return () => clearInterval(endTimeInterval);
     }
   }, [phase, competitionDetails]);
+
+  // Update countdown timer in modal every second
+  useEffect(() => {
+    if (showCompetitionEndModal) {
+      const timerInterval = setInterval(() => {
+        // Force re-render by updating a dummy state
+        setCurrentQuestionIndex(prev => prev);
+      }, 1000);
+
+      return () => clearInterval(timerInterval);
+    }
+  }, [showCompetitionEndModal]);
 
   const handleChoiceSelect = (choice: string) => {
     // store selection for the currently visible question index
@@ -806,6 +819,31 @@ export default function LeaguePage() {
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
 
+      // Save individual answers to competition_answers table
+      try {
+        const answersToSave = answers.map((answer) => ({
+          session_id: sessionId,
+          question_id: answer.question_id,
+          user_answer: null, // Will be populated from quiz component if needed
+          is_correct: answer.is_correct,
+          created_at: new Date().toISOString()
+        }));
+
+        if (answersToSave.length > 0) {
+          const { error: answersError } = await supabase
+            .from('competition_answers')
+            .insert(answersToSave);
+
+          if (answersError) {
+            console.error('Error saving competition answers:', answersError);
+          } else {
+            console.log(`Saved ${answersToSave.length} answers to competition_answers`);
+          }
+        }
+      } catch (answersErr) {
+        console.error('Unexpected error saving competition answers:', answersErr);
+      }
+
       // Calculate rank based on score and time (this should be handled by a database function in production)
       const { data: allScores } = await supabase
         .from('competition_sessions')
@@ -828,6 +866,9 @@ export default function LeaguePage() {
 
         const userRank = sortedScores.findIndex(score => score.user_id === userId) + 1;
         const prizeAmount = calculatePrizeAmount(userRank);
+        const prizeConfig = getPrizePoolConfig(players.length);
+        const xpAwarded = calculateXPAwarded(userRank, correctAnswers);
+        const isTrophyWinner = userRank <= prizeConfig.winnerCount;
 
         // Insert into competition_results
         await supabase.from('competition_results').insert({
@@ -835,8 +876,8 @@ export default function LeaguePage() {
           user_id: userId,
           rank: userRank,
           score: correctAnswers,
-          xp_awarded: correctAnswers * 5,
-          trophy_awarded: userRank <= 3,
+          xp_awarded: xpAwarded,
+          trophy_awarded: isTrophyWinner,
           prize_amount: prizeAmount,
           created_at: new Date().toISOString(),
         });
@@ -861,7 +902,7 @@ export default function LeaguePage() {
         }
 
         // Add winning credits to user's account if they won a prize
-        if (userRank <= 3 && prizeAmount > 0) {
+        if (userRank <= prizeConfig.winnerCount && prizeAmount > 0) {
           try {
             // Check if user_credits record exists
             const { data: existingCredits, error: fetchError } = await supabase
@@ -942,7 +983,7 @@ export default function LeaguePage() {
           }
         }
 
-        // Update user profile - increment games, wins (if top 3), and XP
+        // Update user profile - increment games, wins (if winner), and XP
         try {
           // Fetch current profile data
           const { data: currentProfile, error: profileFetchError } = await supabase
@@ -954,8 +995,7 @@ export default function LeaguePage() {
           if (profileFetchError) {
             console.error('Error fetching profile:', profileFetchError);
           } else if (currentProfile) {
-            const xpAwarded = correctAnswers * 5; // 5 XP per correct answer
-            const isWinner = userRank <= 3; // Top 3 counts as a win
+            const isWinner = userRank <= prizeConfig.winnerCount;
 
             const { error: profileUpdateError } = await supabase
               .from('profiles')
@@ -977,22 +1017,36 @@ export default function LeaguePage() {
           console.error('Unexpected error updating profile:', profileErr);
         }
 
-        // Award trophies for top 3
-        if (userRank <= 3) {
-          const trophyType = userRank === 1 ? 'gold' : userRank === 2 ? 'silver' : 'bronze';
-          const title = userRank === 1 ? 'Champion' : userRank === 2 ? 'Runner-up' : 'Third Place';
-          const description = `Finished ${userRank}${userRank === 1 ? 'st' : userRank === 2 ? 'nd' : 'rd'} in ${competitionDetails?.name}`;
+        // Award trophies for winners
+        if (userRank <= prizeConfig.winnerCount) {
+          const trophyTitles: { [key: number]: string } = {
+            1: 'Champion',
+            2: 'Runner-up',
+            3: 'Third Place',
+            4: 'Fourth Place',
+            5: 'Fifth Place',
+            6: 'Sixth Place',
+            7: 'Seventh Place',
+            8: 'Eighth Place',
+            9: 'Ninth Place',
+            10: 'Tenth Place'
+          };
+          const trophyTitle = trophyTitles[userRank] || `Place ${userRank}`;
+          const rankSuffixes: { [key: number]: string } = {
+            1: 'st',
+            2: 'nd',
+            3: 'rd'
+          };
+          const suffix = rankSuffixes[userRank] || 'th';
 
           try {
-            // The DB table `competition_trophies` uses columns: trophy_title, trophy_rank, earned_at
-            // Use upsert on (competition_id, user_id) to avoid unique constraint errors
             const { error: trophyErr } = await supabase
               .from('competition_trophies')
               .upsert([
                 {
                   competition_id: competitionId,
                   user_id: userId,
-                  trophy_title: title,
+                  trophy_title: trophyTitle,
                   trophy_rank: userRank,
                   earned_at: new Date().toISOString(),
                 }
@@ -1011,9 +1065,70 @@ export default function LeaguePage() {
     }
   };
 
+  // Calculate XP awarded based on rank and competition difficulty
+  const calculateXPAwarded = (rank: number, correctCount: number): number => {
+    const competitionName = competitionDetails?.name || '';
+    const playerCount = players.length;
+    const prizeConfig = getPrizePoolConfig(playerCount);
+    
+    // Winners get XP based on placement
+    if (rank <= prizeConfig.winnerCount) {
+      // Winners get 5 XP per correct answer (existing logic)
+      return correctCount * 5;
+    }
+    
+    // Non-winners get fixed XP based on difficulty
+    if (competitionName.includes('Starter')) {
+      return 10; // Starter: +10 XP
+    } else if (competitionName.includes('Pro')) {
+      return 20; // Pro: +20 XP
+    } else if (competitionName.includes('Elite')) {
+      return 30; // Elite: +30 XP
+    }
+    
+    return 10; // Default fallback
+  };
+
+  // Calculate total revenue from all players
+  const calculateTotalRevenue = (): number => {
+    return players.length * getCreditCost();
+  };
+
+  // Get prize pool percentage and winner count based on player count
+  const getPrizePoolConfig = (playerCount: number): { percentage: number; winnerCount: number; distribution: number[] } => {
+    if (playerCount < 50) {
+      // <50 Players → Top 3 rewarded (100% of total revenue)
+      // Distribution: 20%, 12%, 8% of TOTAL REVENUE
+      return {
+        percentage: 1.0,
+        winnerCount: 3,
+        distribution: [0.2, 0.12, 0.08] // 20%, 12%, 8% of TOTAL REVENUE
+      };
+    } else if (playerCount < 100) {
+      // 50–100 Players → Top 5 rewarded (100% of total revenue)
+      // Distribution: 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
+      return {
+        percentage: 1.0,
+        winnerCount: 5,
+        distribution: [0.2, 0.12, 0.07, 0.03, 0.03] // 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
+      };
+    } else {
+      // 100+ Players → Top 10 rewarded (100% of total revenue)
+      // Distribution: 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
+      return {
+        percentage: 1.0,
+        winnerCount: 10,
+        distribution: [0.2, 0.1, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01] // 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
+      };
+    }
+  };
+
   const calculatePrizeAmount = (rank: number): number => {
-    // Return 0 for ranks beyond 3rd place
-    if (rank > 3) return 0;
+    const playerCount = players.length;
+    const config = getPrizePoolConfig(playerCount);
+
+    // Return 0 if rank exceeds winner count
+    if (rank > config.winnerCount) return 0;
 
     // Try to use prize_structure from competition details if available
     if (competitionDetails?.prize_structure) {
@@ -1031,21 +1146,18 @@ export default function LeaguePage() {
       }
     }
 
-    // Fallback: Calculate based on total prize pool
-    // Prize pool = number of players × entry cost
-    const totalPool = players.length * getCreditCost();
+    // Calculate based on total revenue and distribution
+    // Distribution percentages are applied to the POOL (not total revenue)
+    const totalRevenue = calculateTotalRevenue();
+    const prizePool = Math.floor(totalRevenue * config.percentage);
+    const rankIndex = rank - 1; // Convert to 0-based index
 
-    // Prize distribution: 1st = 50%, 2nd = 30%, 3rd = 20%
-    switch (rank) {
-      case 1:
-        return Math.floor(totalPool * 0.5);
-      case 2:
-        return Math.floor(totalPool * 0.3);
-      case 3:
-        return Math.floor(totalPool * 0.2);
-      default:
-        return 0;
+    if (rankIndex < config.distribution.length) {
+      // Apply distribution percentage to the pool
+      return Math.ceil(prizePool * config.distribution[rankIndex]);
     }
+
+    return 0;
   };
 
   // Helper function to get credit cost with fallback
@@ -1334,7 +1446,7 @@ export default function LeaguePage() {
                       🥇 <span className="font-medium">1st Place</span>
                     </span>
                     <span className="text-sm font-bold text-yellow-600">
-                      {Math.floor(players.length * getCreditCost() * 0.5)} Credits
+                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * 0.2)} Credits
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -1342,7 +1454,7 @@ export default function LeaguePage() {
                       🥈 <span className="font-medium">2nd Place</span>
                     </span>
                     <span className="text-sm font-bold text-gray-600">
-                      {Math.floor(players.length * getCreditCost() * 0.3)} Credits
+                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * (players.length < 50 ? 0.12 : players.length < 100 ? 0.12 : 0.1))} Credits
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -1350,7 +1462,7 @@ export default function LeaguePage() {
                       🥉 <span className="font-medium">3rd Place</span>
                     </span>
                     <span className="text-sm font-bold text-amber-600">
-                      {Math.floor(players.length * getCreditCost() * 0.2)} Credits
+                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * (players.length < 50 ? 0.08 : 0.07))} Credits
                     </span>
                   </div>
                 </div>
@@ -1712,21 +1824,21 @@ export default function LeaguePage() {
                     <div className="text-3xl mb-2">🥇</div>
                     <p className="text-sm font-semibold text-gray-600 mb-1">1st Place</p>
                     <p className="text-xl font-bold text-yellow-600">
-                      {Math.floor(leaderboard.length * getCreditCost() * 0.5)} Credits
+                      {Math.ceil(Math.floor(leaderboard.length * getCreditCost() * getPrizePoolConfig(leaderboard.length).percentage) * 0.2)} Credits
                     </p>
                   </div>
                   <div className="bg-white rounded-lg p-4 text-center shadow-sm border border-gray-200">
                     <div className="text-3xl mb-2">🥈</div>
                     <p className="text-sm font-semibold text-gray-600 mb-1">2nd Place</p>
                     <p className="text-xl font-bold text-gray-600">
-                      {Math.floor(leaderboard.length * getCreditCost() * 0.3)} Credits
+                      {Math.ceil(Math.floor(leaderboard.length * getCreditCost() * getPrizePoolConfig(leaderboard.length).percentage) * (leaderboard.length < 50 ? 0.12 : leaderboard.length < 100 ? 0.12 : 0.1))} Credits
                     </p>
                   </div>
                   <div className="bg-white rounded-lg p-4 text-center shadow-sm border border-amber-200">
                     <div className="text-3xl mb-2">🥉</div>
                     <p className="text-sm font-semibold text-gray-600 mb-1">3rd Place</p>
                     <p className="text-xl font-bold text-amber-600">
-                      {Math.floor(leaderboard.length * getCreditCost() * 0.2)} Credits
+                      {Math.ceil(Math.floor(leaderboard.length * getCreditCost() * getPrizePoolConfig(leaderboard.length).percentage) * (leaderboard.length < 50 ? 0.08 : 0.07))} Credits
                     </p>
                   </div>
                 </div>
@@ -1774,13 +1886,19 @@ export default function LeaguePage() {
                 <tbody className="divide-y divide-gray-200">
                   <AnimatePresence>
                     {leaderboard.map((entry, index) => {
-                      const prize = index === 0
-                        ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.5)
-                        : index === 1
-                          ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.3)
-                          : index === 2
-                            ? Math.floor(leaderboard.length * (competitionDetails?.entry_fee || 0) * 0.2)
-                            : 0;
+                      const config = getPrizePoolConfig(leaderboard.length);
+                      const totalRevenue = leaderboard.length * getCreditCost();
+                      const prizePool = Math.floor(totalRevenue * config.percentage);
+                      
+                      // Apply distribution percentages to the pool
+                      let prize = 0;
+                      if (index === 0) {
+                        prize = Math.ceil(prizePool * 0.2);
+                      } else if (index === 1) {
+                        prize = Math.ceil(prizePool * (leaderboard.length < 50 ? 0.12 : leaderboard.length < 100 ? 0.12 : 0.1));
+                      } else if (index === 2) {
+                        prize = Math.ceil(prizePool * (leaderboard.length < 50 ? 0.08 : 0.07));
+                      }
 
                       return (
                         <motion.tr
@@ -1891,17 +2009,17 @@ export default function LeaguePage() {
 
                 {/* Competition End Time Display */}
                 {getCompetitionEndTime() && (
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200">
-                    <h3 className="text-sm font-semibold text-blue-800 mb-3 text-center">Competition Ends At</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200">
+                      <h3 className="text-sm font-semibold text-blue-800 mb-3 text-center">Competition Ends At</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between bg-white rounded-lg p-3">
                         <span className="text-sm text-gray-600">Date</span>
-                        <span className="text-sm font-bold text-gray-800">{getCompetitionEndTime()!.date}</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                          <span className="text-sm font-bold text-gray-800">{getCompetitionEndTime()!.date}</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white rounded-lg p-3">
                         <span className="text-sm text-gray-600">Time</span>
-                        <span className="text-sm font-bold text-gray-800">{getCompetitionEndTime()!.time}</span>
-                      </div>
+                          <span className="text-sm font-bold text-gray-800">{getCompetitionEndTime()!.time}</span>
+                        </div>
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
                         <p className="text-sm font-semibold text-yellow-800">
                           ⏱️ {getCompetitionEndTime()!.timeLeft}

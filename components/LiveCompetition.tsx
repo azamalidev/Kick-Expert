@@ -1273,19 +1273,23 @@ const handleCompetitionEntry = async (competitionId: string) => {
   // Calculate dynamic prize pool
   const calculateDynamicPrizePool = (competitionId: string, creditCost: number) => {
     const playerCount = playerCounts[competitionId] || 0;
-    const totalPool = playerCount * creditCost;
+    const totalRevenue = playerCount * creditCost;
     
     // If no players yet, show minimum prize pool based on min players
     const minPlayers = 10; // minimum players needed
-    const fallbackPool = minPlayers * creditCost;
-    const displayPool = playerCount > 0 ? totalPool : fallbackPool;
+    const fallbackRevenue = minPlayers * creditCost;
+    const displayRevenue = playerCount > 0 ? totalRevenue : fallbackRevenue;
+    
+    // Prize pool is 100% of total revenue
+    const prizePool = displayRevenue;
     
     return {
-      total: totalPool,
-      totalDisplay: displayPool,
-      first: Math.floor(displayPool * 0.5),
-      second: Math.floor(displayPool * 0.3),
-      third: Math.floor(displayPool * 0.2),
+      total: totalRevenue,
+      totalDisplay: displayRevenue,
+      pool: prizePool, // Full prize pool (100% of revenue)
+      first: Math.ceil(prizePool * 0.2),
+      second: Math.ceil(prizePool * (playerCount < 50 ? 0.12 : playerCount < 100 ? 0.12 : 0.1)),
+      third: Math.ceil(prizePool * (playerCount < 50 ? 0.08 : 0.07)),
       isEstimated: playerCount === 0
     };
   };
@@ -1303,12 +1307,17 @@ const handleCompetitionEntry = async (competitionId: string) => {
       // heuristic: credit_cost * 10 (so Starter:1*10=10, Pro:20*10=200, Elite:30*10=300).
       prizes: (() => {
         const prizePoolRaw = Number(comp.prize_pool || 0);
-        const fallbackPool = getCreditCost(comp.name) * 10;
-        const pool = prizePoolRaw > 0 ? prizePoolRaw : fallbackPool;
+        const fallbackRevenue = getCreditCost(comp.name) * 10;
+        const totalRevenue = prizePoolRaw > 0 ? prizePoolRaw : fallbackRevenue;
+        
+        // Calculate pool percentage (default to 40% for <50 players)
+        const poolPercentage = 0.4;
+        const prizePool = Math.floor(totalRevenue * poolPercentage);
+        
         return [
-          `1st: ${Math.floor(pool * 0.5)} Credits`,
-          `2nd: ${Math.floor(pool * 0.3)} Credits`,
-          `3rd: ${Math.floor(pool * 0.2)} Credits`
+          `1st: ${Math.ceil(prizePool * 0.2)} Credits`,
+          `2nd: ${Math.ceil(prizePool * 0.12)} Credits`,
+          `3rd: ${Math.ceil(prizePool * 0.08)} Credits`
         ];
       })(),
       startTime: new Date(comp.start_time),
@@ -1478,7 +1487,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                   <div className="flex items-center gap-2">
                     <Award className="h-5 w-5 text-yellow-600" />
                     <span className="text-sm font-bold text-yellow-800">
-                      Prize Pool: {prizePool.total > 0 ? prizePool.total : prizePool.totalDisplay} Credits
+                      Prize Pool: {prizePool.pool} Credits
                       {prizePool.isEstimated && <span className="text-xs font-normal ml-1">(Est.)</span>}
                     </span>
                   </div>
@@ -1500,6 +1509,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                       <div className="flex items-center gap-2">
                         <span className="text-lg">🥇</span>
                         <span className="text-sm font-semibold text-gray-700">1st Place</span>
+                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
                       </div>
                       <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
                     </div>
@@ -1507,6 +1517,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                       <div className="flex items-center gap-2">
                         <span className="text-lg">🥈</span>
                         <span className="text-sm font-semibold text-gray-700">2nd Place</span>
+                        <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '12%' : playerCount < 100 ? '12%' : '10%'}</span>
                       </div>
                       <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
                     </div>
@@ -1514,6 +1525,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                       <div className="flex items-center gap-2">
                         <span className="text-lg">🥉</span>
                         <span className="text-sm font-semibold text-gray-700">3rd Place</span>
+                        <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '8%' : playerCount < 100 ? '7%' : '7%'}</span>
                       </div>
                       <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
                     </div>
@@ -1669,6 +1681,66 @@ const handleCompetitionEntry = async (competitionId: string) => {
       <div className="w-full mt-16 p-8 bg-white rounded-xl border-2 border-lime-100 shadow-lg">
         <h2 className="text-4xl font-extrabold mb-8 text-lime-600 text-center">Competition Rules</h2>
         <div className="space-y-5">
+          {/* Dynamic Prize Pool System - FEATURED AT TOP */}
+          <div className="flex items-start p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
+            <div className="p-3 mr-4 bg-yellow-500/30 rounded-lg">
+              <Award className="h-7 w-7 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-2xl font-extrabold text-yellow-800 mb-3">🎯 Dynamic Prize Pool System</h3>
+              <div className="text-gray-700 text-base leading-relaxed space-y-2">
+                <p className="font-semibold">Prize pools scale based on player count:</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                  <div className="bg-white border border-yellow-200 rounded-lg p-3">
+                    <p className="font-bold text-yellow-700">&lt;50 Players</p>
+                    <p className="text-sm text-gray-600">Top 3 Winners</p>
+                    <p className="text-xs text-yellow-600 font-bold">40% Pool</p>
+                  </div>
+                  <div className="bg-white border border-yellow-200 rounded-lg p-3">
+                    <p className="font-bold text-yellow-700">50-100 Players</p>
+                    <p className="text-sm text-gray-600">Top 5 Winners</p>
+                    <p className="text-xs text-yellow-600 font-bold">45% Pool</p>
+                  </div>
+                  <div className="bg-white border border-yellow-200 rounded-lg p-3">
+                    <p className="font-bold text-yellow-700">100+ Players</p>
+                    <p className="text-sm text-gray-600">Top 10 Winners</p>
+                    <p className="text-xs text-yellow-600 font-bold">50% Pool</p>
+                  </div>
+                </div>
+                <p className="text-sm mt-3 bg-yellow-50 p-2 rounded border border-yellow-200"><strong>Distribution:</strong> 1st: 20% | 2nd: 12% | 3rd: 8%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* XP Rewards System - FEATURED AT TOP */}
+          <div className="flex items-start p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
+            <div className="p-3 mr-4 bg-blue-500/30 rounded-lg">
+              <Zap className="h-7 w-7 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-2xl font-extrabold text-blue-800 mb-3">⚡ XP Rewards & Progression</h3>
+              <div className="text-gray-700 text-base leading-relaxed space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-white border border-blue-200 rounded-lg p-3">
+                    <p className="font-bold text-blue-700">🏆 Winners</p>
+                    <p className="text-sm text-gray-600">5 XP per correct answer</p>
+                    <p className="text-xs text-blue-600 mt-1">Ranked in prize pool</p>
+                  </div>
+                  <div className="bg-white border border-blue-200 rounded-lg p-3">
+                    <p className="font-bold text-blue-700">👥 Non-Winners</p>
+                    <p className="text-sm text-gray-600">Still earn XP:</p>
+                    <ul className="text-xs text-gray-600 mt-1 space-y-1">
+                      <li>• Starter: +10 XP</li>
+                      <li>• Pro: +20 XP</li>
+                      <li>• Elite: +30 XP</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="text-sm mt-3 bg-blue-50 p-2 rounded border border-blue-200 italic">✓ All participants earn XP regardless of placement!</p>
+              </div>
+            </div>
+          </div>
+
           {/* Honest Play */}
           <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
             <div className="p-2.5 mr-4 bg-lime-500/20 rounded-lg">

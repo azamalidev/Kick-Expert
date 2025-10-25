@@ -734,7 +734,6 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
         // convert credits to dollars (1:1) for backend amount
         await onSubmit(credits, method, paypalEmail);
         // Show success message from caller; optimistic UI update is handled by parent
-        toast.success('Withdrawal request submitted — pending admin approval');
         onClose();
       } catch (err) {
         console.error('Withdrawal submission error:', err);
