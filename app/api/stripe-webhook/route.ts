@@ -32,6 +32,84 @@ export async function POST(req: NextRequest) {
 
   // Handle payout/transfer events to update withdrawals
   try {
+    // ===== HANDLE REFUND EVENTS =====
+    if (event.type === 'charge.refund.updated') {
+      try {
+        const refund = event.data.object as any;
+        console.log('Refund webhook received:', {
+          refund_id: refund.id,
+          charge_id: refund.charge,
+          amount: refund.amount,
+          status: refund.status,
+          reason: refund.reason
+        });
+
+        // Find the refund request by Stripe refund ID in metadata or by charge ID
+        const { data: refundRequests } = await supabase
+          .from('refund_requests')
+          .select('*')
+          .or(`metadata->>payment_id.eq.${refund.charge}`);
+
+        if (refundRequests && refundRequests.length > 0) {
+          // Update refund status based on Stripe status
+          let dbStatus = 'processing';
+          if (refund.status === 'succeeded') dbStatus = 'completed';
+          else if (refund.status === 'failed') dbStatus = 'failed';
+          else if (refund.status === 'canceled') dbStatus = 'cancelled';
+
+          for (const refundRequest of refundRequests) {
+            // Only update if not already in a terminal state
+            if (!['completed', 'failed', 'cancelled'].includes(refundRequest.status)) {
+              await supabase
+                .from('refund_requests')
+                .update({
+                  status: dbStatus,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', refundRequest.id);
+
+              // Notify user of status change
+              if (dbStatus === 'completed') {
+                await supabase.from('notifications').insert({
+                  user_id: refundRequest.user_id,
+                  type: 'refund_completed',
+                  title: 'Refund Completed',
+                  message: `Your refund of ${refundRequest.amount} credits has been successfully processed by Stripe.`,
+                  created_at: new Date().toISOString()
+                });
+              } else if (dbStatus === 'failed') {
+                await supabase.from('notifications').insert({
+                  user_id: refundRequest.user_id,
+                  type: 'refund_failed',
+                  title: 'Refund Failed',
+                  message: `Your refund of ${refundRequest.amount} credits could not be processed. Please contact support.`,
+                  created_at: new Date().toISOString()
+                });
+              }
+
+              // Log the webhook event
+              await supabase.from('audit_logs').insert({
+                action: 'stripe_refund_webhook',
+                user_id: refundRequest.user_id,
+                details: {
+                  refund_id: refundRequest.id,
+                  stripe_refund_id: refund.id,
+                  old_status: refundRequest.status,
+                  new_status: dbStatus,
+                  stripe_status: refund.status,
+                  webhook_event: event.type
+                },
+                created_at: new Date().toISOString()
+              });
+            }
+          }
+        }
+      } catch (refundErr) {
+        console.error('Failed to process refund webhook:', refundErr);
+      }
+    }
+    // ===== END REFUND EVENTS =====
+
     // Handle account updates to keep KYC status in sync
     if (event.type === 'account.updated') {
       try {
@@ -55,19 +133,109 @@ export async function POST(req: NextRequest) {
     if (event.type && (event.type.startsWith('payout.') || event.type.startsWith('transfer.'))) {
       const obj = event.data.object as any;
 
+      // ===== HANDLE PAYOUT EVENTS (WITHDRAWALS) =====
       // For payouts: look up provider_payouts by provider_payout_id or withdrawals by provider_payout_id
       if (event.type === 'payout.paid') {
         const payoutId = obj.id;
+        console.log('Payout paid webhook received:', {
+          payout_id: payoutId,
+          amount: obj.amount,
+          arrival_date: obj.arrival_date,
+          status: obj.status
+        });
+
         // update provider_payouts and withdrawals
         await supabase.from('provider_payouts').update({ status: 'paid', response: obj, updated_at: new Date().toISOString() }).eq('provider_payout_id', payoutId);
+        
         // update corresponding withdrawal
-        await supabase.from('withdrawals').update({ status: 'paid', provider_payout_id: payoutId, provider_response: obj, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('provider_payout_id', payoutId);
+        const { data: withdrawal, error: withdrawalErr } = await supabase
+          .from('withdrawals')
+          .update({ 
+            status: 'paid', 
+            provider_payout_id: payoutId, 
+            provider_response: obj, 
+            paid_at: new Date().toISOString(), 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('provider_payout_id', payoutId)
+          .select()
+          .single();
+
+        if (!withdrawalErr && withdrawal) {
+          // Notify user that withdrawal was successfully paid
+          await supabase.from('notifications').insert({
+            user_id: withdrawal.user_id,
+            type: 'withdrawal_paid',
+            title: 'Withdrawal Completed',
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'USD'} has been successfully processed and sent to your account.`,
+            created_at: new Date().toISOString()
+          });
+
+          // Log to audit trail
+          await supabase.from('audit_logs').insert({
+            action: 'stripe_payout_webhook_paid',
+            user_id: withdrawal.user_id,
+            details: {
+              withdrawal_id: withdrawal.id,
+              payout_id: payoutId,
+              amount: withdrawal.amount,
+              status: 'paid',
+              webhook_event: event.type
+            },
+            created_at: new Date().toISOString()
+          });
+        }
       }
 
       if (event.type === 'payout.failed') {
         const payoutId = obj.id;
+        console.log('Payout failed webhook received:', {
+          payout_id: payoutId,
+          amount: obj.amount,
+          failure_code: obj.failure_code,
+          failure_message: obj.failure_message
+        });
+
         await supabase.from('provider_payouts').update({ status: 'failed', response: obj, updated_at: new Date().toISOString() }).eq('provider_payout_id', payoutId);
-        await supabase.from('withdrawals').update({ status: 'payout_failed', provider_response: obj, updated_at: new Date().toISOString() }).eq('provider_payout_id', payoutId);
+        
+        // update corresponding withdrawal
+        const { data: withdrawal, error: withdrawalErr } = await supabase
+          .from('withdrawals')
+          .update({ 
+            status: 'payout_failed', 
+            provider_response: obj, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('provider_payout_id', payoutId)
+          .select()
+          .single();
+
+        if (!withdrawalErr && withdrawal) {
+          // Notify user that withdrawal failed
+          await supabase.from('notifications').insert({
+            user_id: withdrawal.user_id,
+            type: 'withdrawal_failed',
+            title: 'Withdrawal Failed',
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'USD'} could not be processed. Reason: ${obj.failure_message || 'Unknown error'}. Please contact support.`,
+            created_at: new Date().toISOString()
+          });
+
+          // Log to audit trail
+          await supabase.from('audit_logs').insert({
+            action: 'stripe_payout_webhook_failed',
+            user_id: withdrawal.user_id,
+            details: {
+              withdrawal_id: withdrawal.id,
+              payout_id: payoutId,
+              amount: withdrawal.amount,
+              status: 'failed',
+              failure_code: obj.failure_code,
+              failure_message: obj.failure_message,
+              webhook_event: event.type
+            },
+            created_at: new Date().toISOString()
+          });
+        }
       }
 
       const evType = String(event.type);

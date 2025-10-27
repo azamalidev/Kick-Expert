@@ -85,9 +85,32 @@ export async function POST(req: Request) {
         // Note: many Connect setups auto-handle payouts; adjust to your account type.
         const payout = await stripe.payouts.create({ amount: amountCents, currency: w.currency || 'usd' }, { stripeAccount: w.provider_account });
 
-        await supabaseAdmin.from('withdrawals').update({ status: 'paid', provider: 'stripe', provider_payout_id: payout.id, provider_response: payout, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', withdrawalId);
-        await supabaseAdmin.from('withdrawal_audit_logs').insert([{ withdrawal_id: withdrawalId, admin_id: user.id, action: 'payout_initiated', data: payout }]);
-        return NextResponse.json({ ok: true, paid: true, payout_id: payout.id });
+        // ===== WEBHOOK-BASED STATUS =====
+        // Mark as 'approved' with payout_id, let webhook update to 'paid' or 'payout_failed'
+        // This ensures accurate tracking via Stripe's async payout processing
+        await supabaseAdmin.from('withdrawals').update({ 
+          status: 'approved',  // Webhook will update to 'paid' when complete
+          provider: 'stripe', 
+          provider_payout_id: payout.id, 
+          provider_response: payout, 
+          updated_at: new Date().toISOString() 
+        }).eq('id', withdrawalId);
+        
+        await supabaseAdmin.from('withdrawal_audit_logs').insert([{ 
+          withdrawal_id: withdrawalId, 
+          admin_id: user.id, 
+          action: 'payout_initiated', 
+          data: payout 
+        }]);
+        
+        console.log('✅ Stripe payout created:', payout.id, '- Status will be updated via webhook');
+        return NextResponse.json({ 
+          ok: true, 
+          paid: false,  // Not yet paid, waiting for webhook
+          processing: true,
+          payout_id: payout.id,
+          message: 'Payout initiated - webhook will confirm completion' 
+        });
       } catch (stripeErr: any) {
         console.error('Stripe payout error', stripeErr);
         const code = stripeErr?.code || (stripeErr?.raw && stripeErr.raw.code) || null;
@@ -167,9 +190,31 @@ export async function POST(req: Request) {
         const payoutData = await payoutRes.json();
         const payoutBatchId = payoutData.batch_header.payout_batch_id;
 
-        await supabaseAdmin.from('withdrawals').update({ status: 'paid', provider: 'paypal', provider_payout_id: payoutBatchId, provider_response: payoutData, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', withdrawalId);
-        await supabaseAdmin.from('withdrawal_audit_logs').insert([{ withdrawal_id: withdrawalId, admin_id: user.id, action: 'payout_initiated', data: payoutData }]);
-        return NextResponse.json({ ok: true, paid: true, payout_batch_id: payoutBatchId });
+        // ===== WEBHOOK-BASED STATUS (PayPal) =====
+        // Mark as 'approved' with batch_id, PayPal may send webhook updates
+        await supabaseAdmin.from('withdrawals').update({ 
+          status: 'approved',  // Can be updated via PayPal webhook if configured
+          provider: 'paypal', 
+          provider_payout_id: payoutBatchId, 
+          provider_response: payoutData, 
+          updated_at: new Date().toISOString() 
+        }).eq('id', withdrawalId);
+        
+        await supabaseAdmin.from('withdrawal_audit_logs').insert([{ 
+          withdrawal_id: withdrawalId, 
+          admin_id: user.id, 
+          action: 'payout_initiated', 
+          data: payoutData 
+        }]);
+        
+        console.log('✅ PayPal payout created:', payoutBatchId);
+        return NextResponse.json({ 
+          ok: true, 
+          paid: false,  // Not yet confirmed, may update via webhook
+          processing: true,
+          payout_batch_id: payoutBatchId,
+          message: 'PayPal payout initiated - may update via webhook' 
+        });
       } catch (paypalErr: any) {
         console.error('PayPal payout error', paypalErr);
         // Persist a provider_payouts row with failed status for later inspection/retry

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { amount, reason, userId } = await request.json();
+    const { amount, reason, userId, purchaseId } = await request.json();
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: 'Invalid refund amount' }, { status: 400 });
@@ -31,7 +31,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Reason is required' }, { status: 400 });
     }
 
-    // Check user's purchased credits
+    if (!purchaseId) {
+      return NextResponse.json({ error: 'Purchase ID is required' }, { status: 400 });
+    }
+
+    // Verify purchase exists and belongs to user
+    const { data: purchase, error: purchaseError } = await supabase
+      .from('credit_purchases')
+      .select('*')
+      .eq('id', purchaseId)
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .single();
+
+    if (purchaseError || !purchase) {
+      return NextResponse.json({ error: 'Purchase not found' }, { status: 404 });
+    }
+
+    // Check if purchase is within 7 days
+    const purchaseDate = new Date(purchase.created_at);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    if (purchaseDate < sevenDaysAgo) {
+      return NextResponse.json({ error: 'Refunds are only available within 7 days of purchase' }, { status: 400 });
+    }
+
+    // Calculate already refunded amount for this purchase
+    const { data: existingRefunds } = await supabase
+      .from('refund_requests')
+      .select('amount')
+      .eq('purchase_id', purchaseId)
+      .in('status', ['pending', 'approved', 'completed']);
+
+    const refundedAmount = existingRefunds?.reduce((sum, r) => sum + r.amount, 0) || 0;
+    const remainingRefundable = purchase.credits - refundedAmount;
+
+    if (amount > remainingRefundable) {
+      return NextResponse.json({ 
+        error: `Only ${remainingRefundable} credits are refundable from this transaction` 
+      }, { status: 400 });
+    }
+
+    // Check user's purchased credits (total available)
     const { data: credits, error: creditsError } = await supabase
       .from('user_credits')
       .select('purchased_credits')
@@ -46,7 +88,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient purchased credits' }, { status: 400 });
     }
 
-    // ===== NEW: VERIFY KYC WITH REAL-TIME STRIPE SYNC =====
+    // ===== VERIFY KYC WITH REAL-TIME STRIPE SYNC =====
     const kycVerification = await verifyKycBeforeTransaction(userId, 'refund');
     if (!kycVerification.verified) {
       return NextResponse.json(
@@ -61,24 +103,6 @@ export async function POST(request: NextRequest) {
     }
     // ===== END: KYC VERIFICATION =====
 
-    // ===== NEW: GET ORIGINAL PAYMENT METHOD FROM CREDIT TRANSACTIONS =====
-    // Find the payment method used to purchase these credits
-    const { data: transactions, error: transError } = await supabase
-      .from('credit_transactions')
-      .select('payment_method')
-      .eq('user_id', userId)
-      .eq('credit_type', 'purchased')
-      .eq('transaction_type', 'purchase')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    let paymentMethod = 'stripe'; // Default to stripe
-    if (transactions && transactions.length > 0 && transactions[0].payment_method) {
-      paymentMethod = transactions[0].payment_method;
-    }
-    // ===== END: GET PAYMENT METHOD =====
-
     // Create refund request with KYC status tracking
     // Build insert object with only fields that exist in the table
     const refundInsertData: any = {
@@ -92,8 +116,17 @@ export async function POST(request: NextRequest) {
 
     // Add optional KYC fields if they exist in the table
     if (kycVerification.kyc_status) refundInsertData.kyc_status = kycVerification.kyc_status;
-    // Use the actual payment method from purchase history, not the current payment account provider
-    refundInsertData.provider = paymentMethod;
+    // Use the payment provider from the purchase record
+    refundInsertData.provider = purchase.payment_provider;
+    
+    // Store purchase_id and payment_id in metadata field (JSON) to track the relationship
+    // This avoids adding new columns while maintaining the link
+    refundInsertData.metadata = {
+      purchase_id: purchaseId,
+      payment_id: purchase.payment_id,
+      credits_purchased: purchase.credits,
+      purchase_date: purchase.created_at
+    };
 
     const { data: refund, error: refundError } = await supabase
       .from('refund_requests')

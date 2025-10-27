@@ -67,27 +67,65 @@ export async function POST(request: NextRequest) {
     
     console.log('Refund status verified as approved');
 
-    // Get the original payment transaction to find the charge ID
-    const { data: originalTransaction, error: transError } = await supabase
-      .from('credit_transactions')
-      .select('payment_id')
-      .eq('user_id', refund.user_id)
-      .eq('credit_type', 'purchased')
-      .eq('transaction_type', 'purchase')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (transError || !originalTransaction?.payment_id) {
-      console.error('Original transaction not found:', transError);
-      return NextResponse.json(
-        { error: 'Original payment transaction not found' },
-        { status: 404 }
-      );
+    // Get the original payment transaction - now from metadata or purchase lookup
+    let chargeId = null;
+    
+    // First try to get from metadata (new approach without schema changes)
+    try {
+      const metadata = typeof refund.metadata === 'string' 
+        ? JSON.parse(refund.metadata) 
+        : refund.metadata;
+      
+      if (metadata?.payment_id) {
+        chargeId = metadata.payment_id;
+        console.log('Found payment_id from metadata:', chargeId);
+      }
+      
+      // If metadata has purchase_id, try to get payment details from purchase
+      if (!chargeId && metadata?.purchase_id) {
+        const { data: purchase } = await supabase
+          .from('credit_purchases')
+          .select('payment_id, payment_data')
+          .eq('id', metadata.purchase_id)
+          .single();
+        
+        if (purchase?.payment_id) {
+          chargeId = purchase.payment_id;
+          console.log('Found payment_id from purchase:', chargeId);
+          
+          // For Stripe, we need the actual charge ID from the session
+          if (purchase.payment_data?.payment_intent) {
+            chargeId = purchase.payment_data.payment_intent;
+          }
+        }
+      }
+    } catch (metadataError) {
+      console.error('Error parsing metadata:', metadataError);
     }
+    
+    // Fallback to old method if still no charge ID
+    if (!chargeId) {
+      console.log('Falling back to credit_transactions lookup');
+      const { data: originalTransaction, error: transError } = await supabase
+        .from('credit_transactions')
+        .select('payment_id')
+        .eq('user_id', refund.user_id)
+        .eq('credit_type', 'purchased')
+        .eq('transaction_type', 'purchase')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-    const chargeId = originalTransaction.payment_id;
+      if (transError || !originalTransaction?.payment_id) {
+        console.error('Original transaction not found:', transError);
+        return NextResponse.json(
+          { error: 'Original payment transaction not found' },
+          { status: 404 }
+        );
+      }
+      chargeId = originalTransaction.payment_id;
+    }
     console.log('Original charge/capture ID:', chargeId);
     
     let refundResult: any = null;
@@ -123,13 +161,23 @@ export async function POST(request: NextRequest) {
           }
         };
 
-        // Check if refund was successful
+        // ===== WEBHOOK-BASED STATUS =====
+        // Mark as 'processing' and let webhook update to 'completed' or 'failed'
+        // This ensures accurate tracking via Stripe's async processing
         if (stripeRefund.status === 'succeeded') {
-          refundStatus = 'completed';
+          // Even if Stripe reports immediate success, use 'processing'
+          // Webhook will confirm actual completion
+          refundStatus = 'processing';
+          console.log('⚠️  Stripe refund succeeded immediately, but marking as processing for webhook confirmation');
         } else if (stripeRefund.status === 'pending') {
           refundStatus = 'processing';
-        } else {
+          console.log('✅ Stripe refund pending, marked as processing - waiting for webhook');
+        } else if (stripeRefund.status === 'failed') {
           refundStatus = 'failed';
+          console.log('❌ Stripe refund failed immediately');
+        } else {
+          refundStatus = 'processing';
+          console.log('⚠️  Unknown Stripe status, defaulting to processing');
         }
 
         console.log(`Stripe refund result:`, refundResult);
@@ -222,6 +270,12 @@ export async function POST(request: NextRequest) {
       .from('refund_requests')
       .update({
         status: refundStatus,
+        metadata: {
+          ...refund.metadata,
+          stripe_refund_id: refundResult?.refund_id,
+          refund_provider: refundProvider,
+          refund_result: refundResult
+        },
         updated_at: new Date().toISOString()
       })
       .eq('id', refund_id);
@@ -274,21 +328,37 @@ export async function POST(request: NextRequest) {
 
     // ===== NOTIFY USER =====
     const statusMessages: { [key: string]: string } = {
-      completed: `Your refund of ${refund.amount} credits has been successfully processed and will appear in your ${refundProvider === 'stripe' ? 'bank account' : 'PayPal account'} within 1-3 business days.`,
-      processing: `Your refund of ${refund.amount} credits is being processed. You will receive it within 1-3 business days.`,
-      failed: `Your refund of ${refund.amount} credits could not be processed. Please contact support.`
+      completed: `Your refund of ${refund.amount} credits has been successfully processed and will appear in your ${refundProvider === 'stripe' ? 'bank account' : 'PayPal account'} within 5-10 business days.`,
+      processing: `Your refund of ${refund.amount} credits is being processed by ${refundProvider === 'stripe' ? 'Stripe' : 'PayPal'}. You will be notified when it's completed (typically 5-10 business days).`,
+      failed: `Your refund of ${refund.amount} credits could not be processed. Please contact support for assistance.`
     };
 
-    await supabase
-      .from('notifications')
-      .insert({
-        user_id: refund.user_id,
-        type: `refund_${refundStatus}`,
-        title: refundStatus === 'completed' ? 'Refund Processed' : 
-               refundStatus === 'processing' ? 'Refund Processing' : 'Refund Failed',
-        message: statusMessages[refundStatus],
-        created_at: new Date().toISOString()
-      });
+    // Only send notification for processing state (webhook will send completion notification)
+    if (refundStatus === 'processing') {
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: refund.user_id,
+          type: 'refund_processing',
+          title: 'Refund Processing',
+          message: statusMessages[refundStatus],
+          created_at: new Date().toISOString()
+        });
+      console.log('✉️  User notified: Refund is processing');
+    } else if (refundStatus === 'failed') {
+      // Send immediate notification for failures
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: refund.user_id,
+          type: 'refund_failed',
+          title: 'Refund Failed',
+          message: statusMessages[refundStatus],
+          created_at: new Date().toISOString()
+        });
+      console.log('✉️  User notified: Refund failed');
+    }
+    // For 'completed' status, webhook will send the notification
 
     console.log('\n===== REFUND PROCESSING COMPLETED =====' );
     console.log('Final status:', refundStatus);

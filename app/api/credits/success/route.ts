@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const sessionId = searchParams.get('session_id');
+    const purchaseIdFromUrl = searchParams.get('purchaseId');
+
+    console.log('Credit success route called:', { sessionId, purchaseId: purchaseIdFromUrl });
 
     if (!sessionId) {
       return NextResponse.redirect(new URL('/credits?error=missing_session', req.url));
@@ -86,7 +89,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Update transaction status
+    // Update transaction status (legacy credit_transactions table)
     const { error: transactionError } = await supabase
       .from('credit_transactions')
       .update({
@@ -101,6 +104,44 @@ export async function GET(req: NextRequest) {
     if (transactionError) {
       console.error('Error updating transaction:', transactionError);
       // Don't return error since credits were added successfully
+    }
+
+    // Update credit purchase status
+    const purchaseId = session.metadata?.purchaseId || purchaseIdFromUrl;
+    if (purchaseId) {
+      console.log('Updating credit_purchases with purchaseId:', purchaseId);
+      const { error: purchaseError } = await supabase
+        .from('credit_purchases')
+        .update({
+          status: 'completed',
+          payment_data: session,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', purchaseId);
+
+      if (purchaseError) {
+        console.error('Error updating credit purchase:', purchaseError);
+      } else {
+        console.log('Successfully updated credit_purchases status to completed');
+      }
+    } else {
+      console.log('No purchaseId found, trying fallback by payment_id:', sessionId);
+      // Fallback: try to find purchase by payment_id
+      const { error: purchaseError } = await supabase
+        .from('credit_purchases')
+        .update({
+          status: 'completed',
+          payment_data: session,
+          updated_at: new Date().toISOString()
+        })
+        .eq('payment_id', sessionId)
+        .eq('user_id', userId);
+
+      if (purchaseError) {
+        console.error('Error updating credit purchase (fallback):', purchaseError);
+      } else {
+        console.log('Successfully updated credit_purchases via fallback');
+      }
     }
 
     return NextResponse.json({

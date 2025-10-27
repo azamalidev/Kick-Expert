@@ -451,10 +451,10 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       <span className="absolute left-3 top-3 text-gray-400">$</span>
                       <input
                         type="number"
-                        min={1}
+                        min={20}
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value === '' ? '' : Math.max(1, Math.floor(Number(e.target.value))))}
-                        placeholder="Enter Credits To Buy"
+                        placeholder="Enter Credits To Buy (min 20)"
                         className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 outline-none"
                       />
                     </div>
@@ -462,6 +462,13 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       onClick={() => {
                         if (!customAmount || Number(customAmount) < 1) {
                           toast.error('Enter an amount of at least $1');
+                          return;
+                        }
+                        if (Number(customAmount) < 20) {
+                          toast.error('Minimum purchase amount is 20 credits ($20)', {
+                            duration: 4000,
+                            icon: '⚠️'
+                          });
                           return;
                         }
                         const pkg = { id: 'custom', credits: Number(customAmount), price: Number(customAmount), description: 'Custom amount' };
@@ -474,7 +481,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       Buy
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Fees are determined by Stripe/PayPal and are not collected by KickExpert. Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips.</p>
+                  <p className="text-xs text-gray-500 mt-2">Minimum purchase: 20 credits. Fees are determined by Stripe/PayPal and are not collected by KickExpert. Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips.</p>
                 </div>
 
                 {/* Info Section */}
@@ -533,6 +540,18 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
 };
   
   // Withdraw Modal Component
+  interface CreditPurchase {
+    id: string;
+    amount: number;
+    credits: number;
+    payment_provider: string;
+    payment_id: string;
+    created_at: string;
+    refunded_credits: number;
+    refundable_credits: number;
+    has_pending_refund: boolean;
+  }
+
   interface RefundRequest {
     id?: string;
     amount: number;
@@ -554,12 +573,19 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
 const RefundRequestModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  maxAmount: number;
-  onSubmit: (amount: number, reason: string) => Promise<void>;
-}> = ({ isOpen, onClose, maxAmount, onSubmit }) => {
+  purchase: CreditPurchase;
+  onSubmit: (purchaseId: string, amount: number, reason: string) => Promise<void>;
+}> = ({ isOpen, onClose, purchase, onSubmit }) => {
   const [amount, setAmount] = useState<number | ''>('');
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setAmount('');
+      setReason('');
+    }
+  }, [isOpen]);
 
   const handleSubmit = async () => {
     if (amount === '' || Number(amount) <= 0) {
@@ -568,8 +594,8 @@ const RefundRequestModal: React.FC<{
     }
 
     const refundAmount = Math.floor(Number(amount));
-    if (refundAmount > maxAmount) {
-      toast.error('Refund amount exceeds available purchased credits');
+    if (refundAmount > purchase.refundable_credits) {
+      toast.error(`Only ${purchase.refundable_credits} credits are refundable from this transaction`);
       return;
     }
 
@@ -580,7 +606,7 @@ const RefundRequestModal: React.FC<{
 
     try {
       setIsSubmitting(true);
-      await onSubmit(refundAmount, reason);
+      await onSubmit(purchase.id, refundAmount, reason);
       setAmount('');
       setReason('');
       onClose();
@@ -592,90 +618,148 @@ const RefundRequestModal: React.FC<{
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
-          >
-            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
-              <h2 className="text-lg font-bold text-center">Request Refund</h2>
-              <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-lime-200">
-                <X size={18} />
-              </button>
-            </div>
 
-            <div className="p-6">
-              <div className="space-y-4">
+ return (
+  <AnimatePresence>
+    {isOpen && (
+      <div className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.98 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
+            <h2 className="text-lg font-bold text-center">Refund Transaction</h2>
+            <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-lime-200">
+              <X size={18} />
+            </button>
+          </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Refund Amount (Credits)</label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">Cr</span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))))}
-                        placeholder="Enter amount"
-                        className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Available purchased: <strong>{maxAmount} credits</strong></p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Refund</label>
-                    <textarea
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Please explain why you need a refund"
-                      rows={3}
-                      className="w-full border border-gray-300 px-3 py-2 rounded-md focus:ring-2 focus:ring-purple-500 outline-none text-sm"
-                    />
-                  </div>
-
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <p className="text-blue-800 text-xs">💡 Your refund will be processed to your original payment method. Admin approval is required.</p>
-                  </div>
-
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={onClose}
-                      disabled={isSubmitting}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="flex-1 bg-lime-600 hover:bg-lime-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Submitting...
-                        </>
-                      ) : (
-                        'Request Refund'
-                      )}
-                    </button>
-                  </div>
+          {/* Scrollable Body */}
+          <div className="p-6 overflow-y-auto max-h-[70vh]">
+            {/* Transaction Details */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Transaction Details</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Purchase Date:</span>
+                  <span className="font-medium text-gray-900">{formatDate(purchase.created_at)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Credits Purchased:</span>
+                  <span className="font-medium text-gray-900">{purchase.credits}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Amount Paid:</span>
+                  <span className="font-medium text-gray-900">${purchase.amount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Already Refunded:</span>
+                  <span className="font-medium text-orange-600">{purchase.refunded_credits} credits</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-300 pt-2 mt-2">
+                  <span className="text-gray-700 font-semibold">Refundable:</span>
+                  <span className="font-bold text-lime-600">{purchase.refundable_credits} credits</span>
+                </div>
+              </div>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
+
+            {/* Refund Input Fields */}
+            <div className="space-y-4">
+              {/* Refund Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Refund Amount (Credits)</label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
+                    Cr
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={purchase.refundable_credits}
+                    step={1}
+                    value={amount}
+                    onChange={(e) =>
+                      setAmount(
+                        e.target.value === ''
+                          ? ''
+                          : Math.max(0, Math.min(purchase.refundable_credits, Math.floor(Number(e.target.value))))
+                      )
+                    }
+                    placeholder="Enter amount"
+                    className="flex-1 block w-full rounded-r-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-lime-500 outline-none"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Maximum refundable: <strong>{purchase.refundable_credits} credits</strong>
+                </p>
+              </div>
+
+              {/* Refund Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Refund</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Please explain why you need a refund"
+                  rows={3}
+                  className="w-full border border-gray-300 px-3 py-2 rounded-md focus:ring-2 focus:ring-lime-500 outline-none text-sm"
+                />
+              </div>
+
+              {/* Info Note */}
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <p className="text-blue-800 text-xs">
+                  💡 Your refund will be processed to your original payment method. Admin approval is required. Refunds
+                  are only available within 7 days of purchase.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Buttons (Fixed) */}
+          <div className="p-4 border-t bg-gray-50 flex space-x-3">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || purchase.refundable_credits === 0}
+              className="flex-1 bg-lime-600 hover:bg-lime-700 text-white font-semibold py-2 rounded-lg transition-colors flex items-center justify-center disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                'Request Refund'
+              )}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
+);
+
 };
 
 const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmount, onSubmit, minAmount = 20, method }) => {
@@ -848,6 +932,15 @@ const CreditManagement: React.FC = () => {
     fetchBalance();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'refund') {
+      setPurchasesPage(1); // Reset to first page
+      setRefundsPage(1);
+      fetchCreditPurchases();
+      fetchRefundHistory();
+    }
+  }, [activeTab]);
+
   const fetchBalance = async () => {
     try {
       setIsRefreshing(true);
@@ -887,9 +980,17 @@ const CreditManagement: React.FC = () => {
   const [isWithdrawMethodOpen, setIsWithdrawMethodOpen] = useState(false);
   const [withdrawMethod, setWithdrawMethod] = useState<'stripe' | 'paypal' | null>(null);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<CreditPurchase | null>(null);
+  const [creditPurchases, setCreditPurchases] = useState<CreditPurchase[]>([]);
   const [refundHistory, setRefundHistory] = useState<RefundRequest[]>([]);
   const [pendingRefund, setPendingRefund] = useState<RefundRequest | null>(null);
   const [isLoadingRefunds, setIsLoadingRefunds] = useState(false);
+  
+  // Pagination state
+  const [purchasesPage, setPurchasesPage] = useState(1);
+  const [refundsPage, setRefundsPage] = useState(1);
+  const PURCHASES_PER_PAGE = 3;
+  const REFUNDS_PER_PAGE = 5;
 
   const handlePurchaseCredits = async (price: number, credits: number, method: 'stripe' | 'paypal') => {
     try {
@@ -1009,14 +1110,14 @@ const CreditManagement: React.FC = () => {
     }
   };
 
-  const handleRefundSubmit = async (amount: number, reason: string) => {
+  const handleRefundSubmit = async (purchaseId: string, amount: number, reason: string) => {
     try {
       const { data: { session: userSession } } = await supabase.auth.getSession();
       if (!userSession) {
         throw new Error('Please sign in to request a refund');
       }
 
-      // ===== NEW: CHECK KYC STATUS BEFORE REFUND =====
+      // ===== CHECK KYC STATUS BEFORE REFUND =====
       const statusRes = await fetch('/api/payments/stripe/status', {
         headers: { Authorization: `Bearer ${userSession.access_token}` }
       });
@@ -1047,7 +1148,7 @@ const CreditManagement: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userSession.access_token}`
         },
-        body: JSON.stringify({ amount, reason, userId: userSession.user.id })
+        body: JSON.stringify({ amount, reason, userId: userSession.user.id, purchaseId })
       });
 
       if (!response.ok) {
@@ -1064,7 +1165,10 @@ const CreditManagement: React.FC = () => {
       });
       toast.success(`Refund request submitted for ${amount} credits — pending admin approval`);
       setIsRefundModalOpen(false);
+      setSelectedPurchase(null);
+      // Refresh both balance and purchases
       fetchBalance();
+      fetchCreditPurchases();
     } catch (err) {
       console.error('Refund submit error:', err);
       throw err;
@@ -1088,6 +1192,24 @@ const CreditManagement: React.FC = () => {
       console.error('Error fetching refund history:', error);
     } finally {
       setIsLoadingRefunds(false);
+    }
+  };
+
+  const fetchCreditPurchases = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/credits/purchases', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch credit purchases');
+      const data = await response.json();
+      setCreditPurchases(data);
+    } catch (error) {
+      console.error('Error fetching credit purchases:', error);
+      toast.error('Failed to fetch credit purchases');
     }
   };
 
@@ -1581,29 +1703,154 @@ const CreditManagement: React.FC = () => {
                 </div>
               </div>
 
-              {/* Refund Request Action */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center mb-8">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Ready to Request a Refund?</h4>
-                <p className="text-gray-600 mb-6">
-                  {(balance?.purchased_credits || 0) > 0
-                    ? "You have purchased credits available for refund."
-                    : "You don't have any purchased credits to refund."
-                  }
-                </p>
-                <button
-                  onClick={() => {
-                    const available = balance?.purchased_credits || 0;
-                    if (available <= 0) {
-                      toast.error('No purchased credits available for refund');
-                      return;
-                    }
-                    setIsRefundModalOpen(true);
-                  }}
-                  disabled={(balance?.purchased_credits || 0) <= 0}
-                  className="px-8 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  Request Refund
-                </button>
+              {/* Refund Transactions - Last 7 Days */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900">Your Recent Purchases</h4>
+                    <p className="text-sm text-gray-600 mt-1">Purchases from the last 7 days are eligible for refund</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      fetchCreditPurchases();
+                      fetchRefundHistory();
+                    }}
+                    className="px-4 py-2 text-sm bg-lime-50 text-lime-700 rounded-lg hover:bg-lime-100 transition-colors flex items-center"
+                  >
+                    <RefreshCw size={16} className="mr-2" />
+                    Refresh
+                  </button>
+                </div>
+
+                {creditPurchases.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <DollarSign size={32} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 font-medium">No eligible purchases found</p>
+                    <p className="text-sm text-gray-400 mt-1">Only purchases from the last 7 days are shown here</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-4">
+                      {creditPurchases
+                        .slice((purchasesPage - 1) * PURCHASES_PER_PAGE, purchasesPage * PURCHASES_PER_PAGE)
+                        .map((purchase) => {
+                      const purchaseDate = new Date(purchase.created_at);
+                      const daysAgo = Math.floor((Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <motion.div
+                          key={purchase.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="border-2 border-gray-200 rounded-xl p-5 hover:border-lime-400 hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="px-2 py-1 bg-lime-100 text-lime-700 text-xs font-semibold rounded">
+                                  {purchase.payment_provider.toUpperCase()}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {daysAgo === 0 ? 'Today' : daysAgo === 1 ? 'Yesterday' : `${daysAgo} days ago`}
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {purchaseDate.toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-gray-900">{purchase.credits}</p>
+                              <p className="text-xs text-gray-500">Credits</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b border-gray-200">
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">Amount Paid</p>
+                              <p className="text-sm font-semibold text-gray-900">${purchase.amount}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">Refunded</p>
+                              <p className="text-sm font-semibold text-orange-600">{purchase.refunded_credits} credits</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 mb-1">Refundable</p>
+                              <p className="text-sm font-semibold text-lime-600">{purchase.refundable_credits} credits</p>
+                            </div>
+                          </div>
+
+                          {purchase.has_pending_refund ? (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                              <div className="flex items-center">
+                                <Clock size={16} className="text-yellow-600 mr-2" />
+                                <span className="text-sm font-medium text-yellow-800">Refund pending approval</span>
+                              </div>
+                            </div>
+                          ) : purchase.refundable_credits === 0 ? (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                              <span className="text-sm text-gray-600">No refundable credits remaining</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedPurchase(purchase);
+                                setIsRefundModalOpen(true);
+                              }}
+                              className="w-full bg-lime-600 hover:bg-lime-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
+                            >
+                              <RefreshCw size={16} className="mr-2" />
+                              Request Refund for This Transaction
+                            </button>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Pagination for Purchases */}
+                  {creditPurchases.length > PURCHASES_PER_PAGE && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => setPurchasesPage(prev => Math.max(1, prev - 1))}
+                        disabled={purchasesPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(creditPurchases.length / PURCHASES_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setPurchasesPage(page)}
+                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                              purchasesPage === page
+                                ? 'bg-lime-600 text-white'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setPurchasesPage(prev => Math.min(Math.ceil(creditPurchases.length / PURCHASES_PER_PAGE), prev + 1))}
+                        disabled={purchasesPage === Math.ceil(creditPurchases.length / PURCHASES_PER_PAGE)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                  </>
+                )}
               </div>
 
               {/* Refund History */}
@@ -1621,8 +1868,11 @@ const CreditManagement: React.FC = () => {
                 {refundHistory.length === 0 ? (
                   <p className="text-gray-500 text-center py-8">No refund requests yet</p>
                 ) : (
-                  <div className="space-y-3">
-                    {refundHistory.map((refund) => (
+                  <>
+                    <div className="space-y-3">
+                      {refundHistory
+                        .slice((refundsPage - 1) * REFUNDS_PER_PAGE, refundsPage * REFUNDS_PER_PAGE)
+                        .map((refund) => (
                       <div key={refund.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                         <div>
                           <p className="font-medium text-gray-900">{refund.amount} credits</p>
@@ -1641,6 +1891,42 @@ const CreditManagement: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  
+                  {/* Pagination for Refund History */}
+                  {refundHistory.length > REFUNDS_PER_PAGE && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => setRefundsPage(prev => Math.max(1, prev - 1))}
+                        disabled={refundsPage === 1}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(refundHistory.length / REFUNDS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                          <button
+                            key={page}
+                            onClick={() => setRefundsPage(page)}
+                            className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                              refundsPage === page
+                                ? 'bg-purple-600 text-white'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setRefundsPage(prev => Math.min(Math.ceil(refundHistory.length / REFUNDS_PER_PAGE), prev + 1))}
+                        disabled={refundsPage === Math.ceil(refundHistory.length / REFUNDS_PER_PAGE)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             </div>
@@ -1887,12 +2173,17 @@ const CreditManagement: React.FC = () => {
         />
       )}
 
-      <RefundRequestModal
-        isOpen={isRefundModalOpen}
-        onClose={() => setIsRefundModalOpen(false)}
-        maxAmount={balance?.purchased_credits || 0}
-        onSubmit={handleRefundSubmit}
-      />
+      {selectedPurchase && (
+        <RefundRequestModal
+          isOpen={isRefundModalOpen}
+          onClose={() => {
+            setIsRefundModalOpen(false);
+            setSelectedPurchase(null);
+          }}
+          purchase={selectedPurchase}
+          onSubmit={handleRefundSubmit}
+        />
+      )}
 
       <AnimatePresence>
         {pendingRefund && (
