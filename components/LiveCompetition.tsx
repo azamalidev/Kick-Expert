@@ -1238,6 +1238,21 @@ const handleCompetitionEntry = async (competitionId: string) => {
     }
   };
 
+  // Map league name to an image path in the public folder.
+  // Files in the project's `public` folder are served from the web root — e.g. '/images/Starter.png'
+  const getLeagueImage = (name: string) => {
+    switch (name) {
+      case 'Starter League':
+        return '/images/Starter.png';
+      case 'Pro League':
+        return '/images/Pro.png';
+      case 'Elite League':
+        return '/images/Elite.png';
+      default:
+        return '/images/Starter.png';
+    }
+  };
+
   // Get status badge info
   const getStatusBadge = (comp: any) => {
     const now = new Date();
@@ -1437,9 +1452,13 @@ const handleCompetitionEntry = async (competitionId: string) => {
                 {status.text}
               </span>
               
-              {/* Trophy Icon at Top */}
+              {/* Trophy Icon at Top - use designer images from public/ipublic/images */}
               <div className="flex flex-col items-center mt-6 mb-4">
-                <Trophy className={`h-12 w-12 ${getTrophyColor(comp.name)} mb-3`} />
+                <img
+                  src={getLeagueImage(comp.name)}
+                  alt={`${comp.name} trophy`}
+                  className="h-12 w-12 mb-3 object-contain"
+                />
                 <h2 className="text-xl font-extrabold text-gray-800">{comp.name}</h2>
                 <p className="text-sm text-gray-600">
                   {comp.name === 'Starter League' ? 'Perfect for beginners' :

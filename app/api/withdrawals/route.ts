@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyKycBeforeTransaction } from '../utils/kyc-sync';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -56,11 +57,27 @@ export async function POST(req: NextRequest) {
 		const { data: { user }, error: userErr } = await supabaseAdmin.auth.getUser(token as string);
 		if (userErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-				// For PayPal: prefer server-side saved paypal_email. If client supplied paypal_email, validate and upsert it.
-				let providerAccount: string | null = null;
-				if (method === 'paypal') {
-					const emailFromClient = (paypalEmail || '').toString().trim() || null;
+		// ===== NEW: VERIFY KYC WITH REAL-TIME STRIPE SYNC =====
+		if (method === 'stripe') {
+			const kycVerification = await verifyKycBeforeTransaction(user.id, 'withdrawal');
+			if (!kycVerification.verified) {
+				return NextResponse.json(
+					{
+						error: kycVerification.error,
+						kyc_status: kycVerification.kyc_status,
+						message: kycVerification.message,
+						requires_onboarding: true
+					},
+					{ status: 403 }
+				);
+			}
+		}
+		// ===== END: KYC VERIFICATION =====
 
+		// For PayPal: prefer server-side saved paypal_email. If client supplied paypal_email, validate and upsert it.
+		let providerAccount: string | null = null;
+		if (method === 'paypal') {
+			const emailFromClient = (paypalEmail || '').toString().trim() || null;
 					// basic email regex (server-side validation)
 					const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyKycBeforeTransaction } from '../utils/kyc-sync';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,50 +46,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient purchased credits' }, { status: 400 });
     }
 
-    // ===== NEW: CHECK KYC VERIFICATION STATUS =====
-    // Get user's payment account and KYC status
-    const { data: paymentAccount, error: paymentError } = await supabase
-      .from('user_payment_accounts')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    // Determine KYC status
-    let kycStatus = 'unverified';
-    if (paymentAccount?.kyc_status) {
-      kycStatus = paymentAccount.kyc_status;
-    }
-
-    // If KYC not verified, return error with onboarding link
-    if (kycStatus !== 'verified') {
-      // If no payment account exists, create one and generate onboarding link
-      if (!paymentAccount) {
-        return NextResponse.json(
-          {
-            error: 'KYC verification required',
-            kyc_status: 'unverified',
-            message: 'You must complete KYC verification before requesting a refund. Please set up your payment account.',
-            requires_onboarding: true
-          },
-          { status: 403 }
-        );
-      }
-
-      // If account exists but KYC pending or unverified
+    // ===== NEW: VERIFY KYC WITH REAL-TIME STRIPE SYNC =====
+    const kycVerification = await verifyKycBeforeTransaction(userId, 'refund');
+    if (!kycVerification.verified) {
       return NextResponse.json(
         {
-          error: 'KYC verification required',
-          kyc_status: kycStatus,
-          message: kycStatus === 'pending'
-            ? 'Your KYC verification is still pending. Please complete the verification process.'
-            : 'Your KYC verification is incomplete. Please complete the verification process.',
-          requires_onboarding: true,
-          provider_account_id: paymentAccount?.provider_account_id
+          error: kycVerification.error,
+          kyc_status: kycVerification.kyc_status,
+          message: kycVerification.message,
+          requires_onboarding: true
         },
         { status: 403 }
       );
     }
-    // ===== END: KYC CHECK =====
+    // ===== END: KYC VERIFICATION =====
 
     // ===== NEW: GET ORIGINAL PAYMENT METHOD FROM CREDIT TRANSACTIONS =====
     // Find the payment method used to purchase these credits
@@ -120,8 +91,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Add optional KYC fields if they exist in the table
-    if (kycStatus) refundInsertData.kyc_status = kycStatus;
-    if (paymentAccount?.provider_account_id) refundInsertData.provider_account_id = paymentAccount.provider_account_id;
+    if (kycVerification.kyc_status) refundInsertData.kyc_status = kycVerification.kyc_status;
     // Use the actual payment method from purchase history, not the current payment account provider
     refundInsertData.provider = paymentMethod;
 
