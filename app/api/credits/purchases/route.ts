@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
               ? JSON.parse(refund.metadata) 
               : refund.metadata;
             const matchesPurchase = metadata?.purchase_id === purchase.id;
-            const isActiveRefund = ['pending', 'approved', 'completed'].includes(refund.status);
+            // Treat these statuses as "active": they either block new refund
+            // requests (pending/processing/approved) or represent completed refunds
+            // that should reduce refundable credits.
+            const activeStatuses = ['pending', 'approved', 'processing', 'completed'];
+            const isActiveRefund = activeStatuses.includes(refund.status);
             
             if (matchesPurchase) {
               console.log(`  - Refund amount: ${refund.amount}, status: ${refund.status}, active: ${isActiveRefund}`);
@@ -91,11 +95,20 @@ export async function GET(request: NextRequest) {
 
         console.log(`Purchase ${purchase.id}: Credits=${purchase.credits}, Refunded=${refundedAmount}, Refundable=${refundableCredits}`);
 
+        // Determine a single active refund status to surface to the UI. Prefer
+        // processing -> approved -> pending order so the UI can show a more
+        // specific message (e.g. "Refund processing").
+        const activeRefund = purchaseRefunds.find(r => ['processing', 'approved', 'pending'].includes(r.status));
+        const pending_refund_status = activeRefund ? activeRefund.status : null;
+
         return {
           ...purchase,
           refunded_credits: refundedAmount,
           refundable_credits: Math.max(0, refundableCredits),
-          has_pending_refund: purchaseRefunds.some(r => r.status === 'pending')
+          has_pending_refund: Boolean(pending_refund_status),
+          pending_refund_status,
+          pending_refund_id: (activeRefund as any)?.id || null,
+          pending_refund_amount: (activeRefund as any)?.amount || null
         };
       })
     );

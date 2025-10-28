@@ -30,6 +30,7 @@ export default function Navbar() {
   const [role, setRole] = useState<string>("");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -272,6 +273,7 @@ export default function Navbar() {
     } catch (err) {
       // ignore
     }
+    
     const fetchUserData = async (userId: string) => {
       try {
         const { data, error } = await supabase
@@ -311,19 +313,36 @@ export default function Navbar() {
         }
         // Fetch notifications for the user
         fetchNotifications(userId);
+        setIsLoading(false);
 
       } catch (error) {
         console.error("Error fetching user data:", error);
         toast.error("Failed to fetch user data");
+        setIsLoading(false);
       }
     };
+
+    // Check initial session
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+      if (currentUser) {
+        await fetchUserData(currentUser.id);
+      } else {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       console.debug('onAuthStateChange event', { event, session });
       const currentUser = session?.user || null;
       setUser(currentUser);
-      if (currentUser) fetchUserData(currentUser.id);
-      else {
+      if (currentUser) {
+        fetchUserData(currentUser.id);
+      } else {
         setUserName("");
         setRole("");
         setUserProfile(null);
@@ -331,13 +350,14 @@ export default function Navbar() {
         setNotifications([]);
         setUnreadCount(0);
         setNewNotificationAlert(false);
+        setIsLoading(false);
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [pathname, router]);
+  }, []);
 
   // Set up real-time subscription for notifications
   useEffect(() => {
@@ -777,7 +797,12 @@ export default function Navbar() {
             </div>
           )}
 
-          {user ? (
+          {isLoading ? (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-lime-100 animate-pulse"></div>
+              <div className="h-4 w-20 bg-lime-100 rounded animate-pulse"></div>
+            </div>
+          ) : user ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -1153,7 +1178,15 @@ export default function Navbar() {
           </div>
 
           <div className="px-4 py-3 border-t border-gray-200">
-            {user ? (
+            {isLoading ? (
+              <div className="flex flex-col gap-2">
+                <div className="h-10 bg-lime-100 rounded-lg animate-pulse"></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="h-12 bg-lime-100 rounded-lg animate-pulse"></div>
+                  <div className="h-12 bg-lime-100 rounded-lg animate-pulse"></div>
+                </div>
+              </div>
+            ) : user ? (
               <>
                 <div className="flex items-center justify-between py-3 px-2">
                   <span className="text-gray-700 font-bold">Welcome, {userName || "User"}</span>

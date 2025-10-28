@@ -76,11 +76,25 @@ export async function POST(request: NextRequest) {
         ? JSON.parse(refund.metadata) 
         : refund.metadata;
       
-      if (metadata?.payment_id) {
-        chargeId = metadata.payment_id;
-        console.log('Found payment_id from metadata:', chargeId);
+      // Prefer explicit charge/payment identifiers when present
+      if (metadata?.stripe_charge_id) {
+        chargeId = metadata.stripe_charge_id;
+        console.log('Found stripe_charge_id from metadata:', chargeId);
+      } else if (metadata?.payment_intent) {
+        chargeId = metadata.payment_intent;
+        console.log('Found payment_intent from metadata:', chargeId);
+      } else if (metadata?.payment_id) {
+        // Avoid using a Checkout Session id (cs_...) as a charge id; if
+        // payment_id appears to be a session id, defer to purchase.payment_data
+        const pid = String(metadata.payment_id);
+        if (!pid.startsWith('cs_') && !pid.startsWith('sess_')) {
+          chargeId = pid;
+          console.log('Found payment_id from metadata (used as charge):', chargeId);
+        } else {
+          console.log('metadata.payment_id looks like a checkout session id; will attempt purchase.payment_data lookup');
+        }
       }
-      
+
       // If metadata has purchase_id, try to get payment details from purchase
       if (!chargeId && metadata?.purchase_id) {
         const { data: purchase } = await supabase
@@ -140,12 +154,23 @@ export async function POST(request: NextRequest) {
         console.log(`\n>>> Processing Stripe refund for charge: ${chargeId}`);
         console.log('Refund amount in cents:', Math.round(refund.amount * 100));
 
-        // Create refund in Stripe
-        const stripeRefund = await stripe.refunds.create({
-          charge: chargeId,
+        // Create refund in Stripe. Use the correct parameter depending on the
+        // identifier we have: if we have a payment_intent (pi_...) pass
+        // `payment_intent`, otherwise pass `charge` for a charge id (ch_...).
+        const refundParams: any = {
           amount: Math.round(refund.amount * 100), // Convert to cents
           reason: 'requested_by_customer'
-        });
+        };
+
+        if (String(chargeId).startsWith('pi_')) {
+          // Refund by payment_intent
+          refundParams.payment_intent = chargeId;
+        } else {
+          // Assume it's a charge id
+          refundParams.charge = chargeId;
+        }
+
+        const stripeRefund = await stripe.refunds.create(refundParams);
 
         refundResult = {
           provider: 'stripe',
@@ -290,23 +315,30 @@ export async function POST(request: NextRequest) {
     console.log('Refund status updated successfully');
 
     // ===== CREATE REFUND TRANSACTION RECORD =====
-    const { error: transactionError } = await supabase
-      .from('credit_transactions')
-      .insert({
-        user_id: refund.user_id,
-        amount: refund.amount,
-        credit_type: 'purchased',
-        transaction_type: 'refund',
-        payment_method: refundProvider,
-        payment_id: refundResult?.refund_id || null,
-        status: refundStatus === 'completed' ? 'completed' : 'pending',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        completed_at: refundStatus === 'completed' ? new Date().toISOString() : null
-      });
+    // Insert refund transaction record. Some deployments may not have a
+    // `completed_at` column in the `credit_transactions` table, so avoid
+    // writing it to prevent schema cache errors; other code paths update
+    // completion time when status becomes completed.
+    try {
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: refund.user_id,
+          amount: refund.amount,
+          credit_type: 'purchased',
+          transaction_type: 'refund',
+          payment_method: refundProvider,
+          payment_id: refundResult?.refund_id || null,
+          status: refundStatus === 'completed' ? 'completed' : 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
 
-    if (transactionError) {
-      console.error('Failed to create refund transaction:', transactionError);
+      if (transactionError) {
+        console.error('Failed to create refund transaction:', transactionError);
+      }
+    } catch (txErr) {
+      console.error('Unexpected error creating refund transaction:', txErr);
     }
 
     // ===== LOG THE REFUND PROCESSING =====

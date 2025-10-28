@@ -110,13 +110,32 @@ export async function GET(req: NextRequest) {
     const purchaseId = session.metadata?.purchaseId || purchaseIdFromUrl;
     if (purchaseId) {
       console.log('Updating credit_purchases with purchaseId:', purchaseId);
+      // Try to set payment_id to a value Stripe can use for refunds: prefer
+      // payment_intent or the charge id when available, otherwise keep
+      // the checkout session id as a fallback.
+      const updatePayload: any = {
+        status: 'completed',
+        payment_data: session,
+        updated_at: new Date().toISOString()
+      };
+
+      try {
+        if ((session as any).payment_intent) {
+          updatePayload.payment_id = (session as any).payment_intent;
+        } else if ((session as any).charges && (session as any).charges.data && (session as any).charges.data[0] && (session as any).charges.data[0].id) {
+          updatePayload.payment_id = (session as any).charges.data[0].id;
+        } else {
+          // keep the session id fallback (e.g., cs_...)
+          updatePayload.payment_id = session.id;
+        }
+      } catch (err) {
+        console.error('Error extracting payment identifiers from session:', err);
+        updatePayload.payment_id = session.id;
+      }
+
       const { error: purchaseError } = await supabase
         .from('credit_purchases')
-        .update({
-          status: 'completed',
-          payment_data: session,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', purchaseId);
 
       if (purchaseError) {

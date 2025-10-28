@@ -541,6 +541,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
   
   // Withdraw Modal Component
   interface CreditPurchase {
+    pending_refund_status: string;
     id: string;
     amount: number;
     credits: number;
@@ -1791,7 +1792,11 @@ const CreditManagement: React.FC = () => {
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
                               <div className="flex items-center">
                                 <Clock size={16} className="text-yellow-600 mr-2" />
-                                <span className="text-sm font-medium text-yellow-800">Refund pending approval</span>
+                                <span className="text-sm font-medium text-yellow-800">
+                                  {purchase.pending_refund_status === 'processing' ? 'Refund processing' :
+                                   purchase.pending_refund_status === 'approved' ? 'Refund approved (processing)' :
+                                   'Refund pending approval'}
+                                </span>
                               </div>
                             </div>
                           ) : purchase.refundable_credits === 0 ? (

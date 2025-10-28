@@ -57,14 +57,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Refunds are only available within 7 days of purchase' }, { status: 400 });
     }
 
-    // Calculate already refunded amount for this purchase
-    const { data: existingRefunds } = await supabase
+    // Calculate already refunded amount for this purchase using the new
+    // `purchase_id` column (more reliable than JSON metadata parsing).
+    const { data: existingRefunds, error: existingRefundsError } = await supabase
       .from('refund_requests')
       .select('amount')
       .eq('purchase_id', purchaseId)
       .in('status', ['pending', 'approved', 'completed']);
 
-    const refundedAmount = existingRefunds?.reduce((sum, r) => sum + r.amount, 0) || 0;
+    if (existingRefundsError) {
+      console.error('Error fetching existing refunds by purchase_id:', existingRefundsError);
+      return NextResponse.json({ error: 'Failed to verify existing refunds' }, { status: 500 });
+    }
+
+    const refundedAmount = (existingRefunds || []).reduce((sum, r) => sum + (r.amount || 0), 0);
     const remainingRefundable = purchase.credits - refundedAmount;
 
     if (amount > remainingRefundable) {
@@ -121,12 +127,30 @@ export async function POST(request: NextRequest) {
     
     // Store purchase_id and payment_id in metadata field (JSON) to track the relationship
     // This avoids adding new columns while maintaining the link
-    refundInsertData.metadata = {
+    // Enrich metadata with payment identifiers we can use to match webhooks
+    const metadata: any = {
       purchase_id: purchaseId,
       payment_id: purchase.payment_id,
       credits_purchased: purchase.credits,
       purchase_date: purchase.created_at
     };
+
+    try {
+      const pd = purchase.payment_data;
+      if (pd) {
+        // Checkout session often contains payment_intent and may include charges
+        if (pd.payment_intent) metadata.payment_intent = pd.payment_intent;
+        if (pd.charges && pd.charges.data && pd.charges.data[0] && pd.charges.data[0].id) {
+          metadata.stripe_charge_id = pd.charges.data[0].id;
+        }
+      }
+    } catch (err) {
+      console.error('Error reading payment_data for metadata enrichment:', err);
+    }
+
+  // Also write a proper purchase_id column to avoid JSON-only linkage
+  refundInsertData.purchase_id = purchaseId;
+  refundInsertData.metadata = metadata;
 
     const { data: refund, error: refundError } = await supabase
       .from('refund_requests')
