@@ -33,9 +33,61 @@ export async function GET(req: NextRequest) {
     // Get user ID and credits from session metadata
     const userId = session.metadata?.userId;
     const credits = parseInt(session.metadata?.credits || '0');
+    const purchaseId = session.metadata?.purchaseId || purchaseIdFromUrl;
 
     if (!userId || !credits) {
       return NextResponse.redirect(new URL('/credits?error=missing_metadata', req.url));
+    }
+
+    // Get the purchase record to get the original amount
+    let originalAmount = 0;
+    if (purchaseId) {
+      const { data: purchaseData, error: purchaseFetchError } = await supabase
+        .from('credit_purchases')
+        .select('amount, credits')
+        .eq('id', purchaseId)
+        .single();
+
+      if (!purchaseFetchError && purchaseData) {
+        originalAmount = purchaseData.amount;
+      }
+    }
+
+    // Calculate net credits after Stripe fees
+    let creditsToAdd = credits;
+    if (originalAmount > 0) {
+      if (!session.livemode) {
+        // In test mode, Stripe doesn't deduct fees, so simulate them
+        const estimatedFee = originalAmount * 0.029 + 0.30; // 2.9% + $0.30
+        const netAmountDollars = originalAmount - estimatedFee;
+        creditsToAdd = Math.max(1, Math.floor((netAmountDollars / originalAmount) * credits));
+        console.log(`Test mode: Original $${originalAmount}, Estimated fee $${estimatedFee.toFixed(2)}, Net $${netAmountDollars.toFixed(2)}, Credits: ${credits} -> ${creditsToAdd}`);
+      } else if (session.payment_intent) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string, { expand: ['charges'] });
+          console.log('PaymentIntent:', (paymentIntent as any).id, 'Charges count:', (paymentIntent as any).charges?.data?.length);
+          if ((paymentIntent as any).charges && (paymentIntent as any).charges.data && (paymentIntent as any).charges.data.length > 0) {
+            const charge = (paymentIntent as any).charges.data[0];
+            console.log('Charge:', charge.id, 'Balance transaction:', charge.balance_transaction);
+            if (charge.balance_transaction) {
+              const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
+              const netAmountCents = balanceTransaction.net;
+              const netAmountDollars = netAmountCents / 100;
+              creditsToAdd = Math.floor((netAmountDollars / originalAmount) * credits);
+              console.log(`Live mode: Original amount: $${originalAmount}, Net amount: $${netAmountDollars}, Credits: ${credits} -> ${creditsToAdd}`);
+            } else {
+              console.log('No balance_transaction on charge');
+            }
+          } else {
+            console.log('No charges on payment intent');
+          }
+        } catch (feeError) {
+          console.error('Error calculating net credits:', feeError);
+          // Fall back to original credits if fee calculation fails
+        }
+      }
+    } else {
+      console.log('No originalAmount:', { originalAmount });
     }
 
     // First check if user has a credit account
@@ -59,7 +111,7 @@ export async function GET(req: NextRequest) {
         .from('user_credits')
         .insert([{
           user_id: userId,
-          purchased_credits: credits,
+          purchased_credits: creditsToAdd,
           winnings_credits: 0,
           referral_credits: 0
         }]);
@@ -76,7 +128,7 @@ export async function GET(req: NextRequest) {
       const { error: updateError } = await supabase
         .from('user_credits')
         .update({
-          purchased_credits: creditAccount.purchased_credits + credits
+          purchased_credits: creditAccount.purchased_credits + creditsToAdd
         })
         .eq('user_id', userId);
 
@@ -107,7 +159,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Update credit purchase status
-    const purchaseId = session.metadata?.purchaseId || purchaseIdFromUrl;
     if (purchaseId) {
       console.log('Updating credit_purchases with purchaseId:', purchaseId);
       // Try to set payment_id to a value Stripe can use for refunds: prefer
@@ -165,7 +216,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      credits,
+      credits: creditsToAdd,
       userId,
       sessionId
     });
