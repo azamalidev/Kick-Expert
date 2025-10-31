@@ -41,17 +41,30 @@ const mapCategoryToValid = (aiCategory: string): string => {
   
   // Direct matches (case-sensitive)
   const validCategories = [
+    'World Cup History',
+    'UEFA Champions League',
+    'UEFA Europa League',
     'Premier League',
     'La Liga',
     'Serie A',
     'Bundesliga',
-    'Champions League',
-    'World Cup',
-    'World Cup History',
-    'European Championship',
-    'Player Trivia',
-    'Team History',
-    'Records & Statistics',
+    'Ligue 1',
+    'Copa América',
+    'African Cup of Nations',
+    'Asian Cup',
+    'CONCACAF Gold Cup',
+    'FIFA Club World Cup',
+    'Transfer History',
+    'Player Statistics',
+    'Coach and Manager Facts',
+    'Stadium Trivia',
+    'Historical Records',
+    'Famous Matches',
+    'National Team Records',
+    'Referee Decisions',
+    'Match Rules and Regulations',
+    'Youth Competitions (U17, U20)',
+    'Miscellaneous Football Facts',
   ];
   
   if (validCategories.includes(normalized)) {
@@ -60,26 +73,63 @@ const mapCategoryToValid = (aiCategory: string): string => {
   
   // Fuzzy matching for common AI variations
   const categoryMap: Record<string, string> = {
-    'UEFA Champions League': 'Champions League',
-    'UCL': 'Champions League',
-    'FIFA World Cup': 'World Cup',
-    'World Cup Finals': 'World Cup',
-    'Euro': 'European Championship',
-    'Euros': 'European Championship',
-    'European Championships': 'European Championship',
-    'UEFA European Championship': 'European Championship',
-    'EPL': 'Premier League',
+    'UEFA Champions League': 'UEFA Champions League',
+    'Champions League': 'UEFA Champions League',
+    'UCL': 'UEFA Champions League',
+    'UEFA Europa League': 'UEFA Europa League',
+    'Europa League': 'UEFA Europa League',
+    'UEL': 'UEFA Europa League',
+    'Premier League': 'Premier League',
     'English Premier League': 'Premier League',
+    'EPL': 'Premier League',
+    'La Liga': 'La Liga',
     'Spanish La Liga': 'La Liga',
+    'Serie A': 'Serie A',
     'Italian Serie A': 'Serie A',
+    'Bundesliga': 'Bundesliga',
     'German Bundesliga': 'Bundesliga',
-    'Players': 'Player Trivia',
-    'Player Stats': 'Player Trivia',
-    'Teams': 'Team History',
-    'Club History': 'Team History',
-    'Records': 'Records & Statistics',
-    'Statistics': 'Records & Statistics',
-    'Stats': 'Records & Statistics',
+    'Ligue 1': 'Ligue 1',
+    'French Ligue 1': 'Ligue 1',
+    'World Cup': 'World Cup History',
+    'FIFA World Cup': 'World Cup History',
+    'World Cup Finals': 'World Cup History',
+    'Copa América': 'Copa América',
+    'African Cup of Nations': 'African Cup of Nations',
+    'AFCON': 'African Cup of Nations',
+    'Asian Cup': 'Asian Cup',
+    'AFC Asian Cup': 'Asian Cup',
+    'CONCACAF Gold Cup': 'CONCACAF Gold Cup',
+    'Gold Cup': 'CONCACAF Gold Cup',
+    'FIFA Club World Cup': 'FIFA Club World Cup',
+    'Club World Cup': 'FIFA Club World Cup',
+    'Transfer History': 'Transfer History',
+    'Transfers': 'Transfer History',
+    'Player Statistics': 'Player Statistics',
+    'Player Stats': 'Player Statistics',
+    'Players': 'Player Statistics',
+    'Coach and Manager Facts': 'Coach and Manager Facts',
+    'Coaches': 'Coach and Manager Facts',
+    'Managers': 'Coach and Manager Facts',
+    'Stadium Trivia': 'Stadium Trivia',
+    'Stadiums': 'Stadium Trivia',
+    'Historical Records': 'Historical Records',
+    'Records': 'Historical Records',
+    'Famous Matches': 'Famous Matches',
+    'Classic Matches': 'Famous Matches',
+    'National Team Records': 'National Team Records',
+    'National Teams': 'National Team Records',
+    'Referee Decisions': 'Referee Decisions',
+    'Referees': 'Referee Decisions',
+    'Match Rules and Regulations': 'Match Rules and Regulations',
+    'Rules': 'Match Rules and Regulations',
+    'Regulations': 'Match Rules and Regulations',
+    'Youth Competitions (U17, U20)': 'Youth Competitions (U17, U20)',
+    'Youth Competitions': 'Youth Competitions (U17, U20)',
+    'U17': 'Youth Competitions (U17, U20)',
+    'U20': 'Youth Competitions (U17, U20)',
+    'Miscellaneous Football Facts': 'Miscellaneous Football Facts',
+    'Miscellaneous': 'Miscellaneous Football Facts',
+    'Football Facts': 'Miscellaneous Football Facts',
   };
   
   // Check fuzzy matches
@@ -338,17 +388,30 @@ export default function AIGeneratePanel() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Categories</option>
+              <option value="World Cup History">World Cup History</option>
+              <option value="UEFA Champions League">UEFA Champions League</option>
+              <option value="UEFA Europa League">UEFA Europa League</option>
               <option value="Premier League">Premier League</option>
               <option value="La Liga">La Liga</option>
               <option value="Serie A">Serie A</option>
               <option value="Bundesliga">Bundesliga</option>
-              <option value="Champions League">Champions League</option>
-              <option value="World Cup">World Cup</option>
-              <option value="World Cup History">World Cup History</option>
-              <option value="European Championship">European Championship</option>
-              <option value="Player Trivia">Player Trivia</option>
-              <option value="Team History">Team History</option>
-              <option value="Records & Statistics">Records & Statistics</option>
+              <option value="Ligue 1">Ligue 1</option>
+              <option value="Copa América">Copa América</option>
+              <option value="African Cup of Nations">African Cup of Nations</option>
+              <option value="Asian Cup">Asian Cup</option>
+              <option value="CONCACAF Gold Cup">CONCACAF Gold Cup</option>
+              <option value="FIFA Club World Cup">FIFA Club World Cup</option>
+              <option value="Transfer History">Transfer History</option>
+              <option value="Player Statistics">Player Statistics</option>
+              <option value="Coach and Manager Facts">Coach and Manager Facts</option>
+              <option value="Stadium Trivia">Stadium Trivia</option>
+              <option value="Historical Records">Historical Records</option>
+              <option value="Famous Matches">Famous Matches</option>
+              <option value="National Team Records">National Team Records</option>
+              <option value="Referee Decisions">Referee Decisions</option>
+              <option value="Match Rules and Regulations">Match Rules and Regulations</option>
+              <option value="Youth Competitions (U17, U20)">Youth Competitions (U17, U20)</option>
+              <option value="Miscellaneous Football Facts">Miscellaneous Football Facts</option>
             </select>
           </div>
 

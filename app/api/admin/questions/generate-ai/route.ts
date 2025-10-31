@@ -96,19 +96,37 @@ IMPORTANT RULES:
 8. Include a mix of topics: players, teams, tournaments, history, records, tactics, etc.
 9. NEVER use phrases like "As of 2023", "As of [year]", or similar time qualifiers in explanations
 10. Write explanations as definitive facts without temporal disclaimers
+11. ENSURE ALL QUESTIONS ARE COMPLETELY UNIQUE - no repetition of similar questions
+12. Vary question types: who/what/when/where/how many questions, true/false style, etc.
+13. Use different players, teams, tournaments, and time periods for each question
+14. Avoid asking about the same player/team/tournament multiple times
+15. Each question must be distinct and not similar to any other generated question
 
 AVAILABLE CATEGORIES (use these exact names):
+- World Cup History
+- UEFA Champions League
+- UEFA Europa League
 - Premier League
 - La Liga
 - Serie A
 - Bundesliga
-- Champions League
-- World Cup
-- World Cup History
-- European Championship
-- Player Trivia
-- Team History
-- Records & Statistics
+- Ligue 1
+- Copa América
+- African Cup of Nations
+- Asian Cup
+- CONCACAF Gold Cup
+- FIFA Club World Cup
+- Transfer History
+- Player Statistics
+- Coach and Manager Facts
+- Stadium Trivia
+- Historical Records
+- Famous Matches
+- National Team Records
+- Referee Decisions
+- Match Rules and Regulations
+- Youth Competitions (U17, U20)
+- Miscellaneous Football Facts
 
 Assign appropriate categories based on the question content using ONLY the categories listed above.`;
 
@@ -121,6 +139,21 @@ DIFFICULTY DISTRIBUTION:
 - ${easyCount} EASY questions (basic football knowledge, famous players/teams, major tournaments)
 - ${mediumCount} MEDIUM questions (more specific knowledge, statistics, historical events)
 - ${hardCount} HARD questions (detailed knowledge, lesser-known facts, specific records)
+
+${!category ? `CATEGORY DISTRIBUTION REQUIREMENT:
+- Since no specific category was selected, distribute questions ACROSS ALL available categories
+- Ensure each of the 24 categories gets at least one question if possible
+- Cover as many different categories as feasible given the total question count
+- Balance the distribution across: leagues, tournaments, player topics, historical aspects, etc.` : ''}
+
+CRITICAL UNIQUENESS REQUIREMENTS:
+- Each question must be completely unique and different from all others
+- No repetition of the same players, teams, tournaments, or topics
+- Vary the question types: who, what, when, where, how many, which team, etc.
+- Use different historical periods, different competitions, different players
+- Avoid asking about the same person/team/event multiple times
+- Ensure maximum variety in question content and structure
+- Each question should cover a different aspect of football
 
 Return ONLY a valid JSON array with this exact structure:
 [
@@ -142,8 +175,9 @@ CRITICAL REQUIREMENTS:
 - Ensure "correct_answer" exactly matches one of the four choices
 - Distribute difficulties: ${easyCount} easy, ${mediumCount} medium, ${hardCount} hard
 - Each question must have all required fields
-- Use EXACT category names from the list above (Premier League, La Liga, Serie A, Bundesliga, Champions League, World Cup, World Cup History, European Championship, Player Trivia, Team History, Records & Statistics)
-- Do NOT use variations like "UEFA Champions League" or "FIFA World Cup" - use the exact names listed`;
+- Use EXACT category names from the list above (World Cup History, UEFA Champions League, UEFA Europa League, Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Copa América, African Cup of Nations, Asian Cup, CONCACAF Gold Cup, FIFA Club World Cup, Transfer History, Player Statistics, Coach and Manager Facts, Stadium Trivia, Historical Records, Famous Matches, National Team Records, Referee Decisions, Match Rules and Regulations, Youth Competitions (U17, U20), Miscellaneous Football Facts)
+- Do NOT use variations like "UEFA Champions League" or "FIFA World Cup" - use the exact names listed
+- ENSURE ZERO REPETITION: Every question must be unique with different content, players, teams, and topics${!category ? '\n- DISTRIBUTE ACROSS ALL CATEGORIES: Cover multiple categories when no specific category is selected' : ''}`;
 
     console.log('Calling OpenAI API...');
 
@@ -387,7 +421,7 @@ export async function GET() {
       category: {
         type: 'string',
         required: false,
-        description: 'Optional category for questions (e.g., "Premier League", "World Cup")',
+        description: 'Optional category for questions (e.g., "UEFA Champions League", "World Cup History")',
       },
       topic: {
         type: 'string',
@@ -402,21 +436,34 @@ export async function GET() {
         medium: 40,
         hard: 20,
       },
-      category: 'World Cup',
-      topic: '2022 Qatar',
+      category: 'UEFA Champions League',
+      topic: '2022 Final',
     },
     validCategories: [
+      'World Cup History',
+      'UEFA Champions League',
+      'UEFA Europa League',
       'Premier League',
       'La Liga',
       'Serie A',
       'Bundesliga',
-      'Champions League',
-      'World Cup',
-      'World Cup History',
-      'European Championship',
-      'Player Trivia',
-      'Team History',
-      'Records & Statistics',
+      'Ligue 1',
+      'Copa América',
+      'African Cup of Nations',
+      'Asian Cup',
+      'CONCACAF Gold Cup',
+      'FIFA Club World Cup',
+      'Transfer History',
+      'Player Statistics',
+      'Coach and Manager Facts',
+      'Stadium Trivia',
+      'Historical Records',
+      'Famous Matches',
+      'National Team Records',
+      'Referee Decisions',
+      'Match Rules and Regulations',
+      'Youth Competitions (U17, U20)',
+      'Miscellaneous Football Facts',
     ],
   });
 }
