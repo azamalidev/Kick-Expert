@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
-import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle, Clock, Shield } from 'lucide-react';
+import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle, Clock, Shield, CheckCircle2, Lightbulb, Lock } from 'lucide-react';
 
 interface CreditBalance {
   purchased_credits: number;
@@ -179,8 +179,8 @@ const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClo
   const [amount, setAmount] = useState<number | ''>('');
   const [paypalEmail, setPaypalEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const MIN_WITHDRAW = 20;
-  const MAX_WITHDRAW = 50;
+  const MIN_WITHDRAW = 50;
+  const MAX_WITHDRAW = 100;
 
   useEffect(() => {
     if (!isOpen) {
@@ -723,9 +723,9 @@ const RefundRequestModal: React.FC<{
 
               {/* Info Note */}
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="text-blue-800 text-xs">
-                  💡 Your refund will be processed to your original payment method. Admin approval is required. Refunds
-                  are only available within 7 days of purchase.
+                <p className="text-blue-800 text-xs flex items-start gap-2">
+                  <Lightbulb size={16} className="flex-shrink-0 mt-0.5" />
+                  <span>Your refund will be processed to your original payment method. Admin approval is required. Refunds are only available within 7 days of purchase.</span>
                 </p>
               </div>
             </div>
@@ -767,7 +767,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
     const [amount, setAmount] = useState<number | ''>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
-    const MAX_WITHDRAW_PER_REQUEST = 50;
+    const MAX_WITHDRAW_PER_REQUEST = 100;
     const [paypalEmail, setPaypalEmail] = useState<string>('');
 
     useEffect(() => {
@@ -847,7 +847,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
               </div>
 
               <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>20 credits</strong>. Maximum per request: <strong>50 credits</strong>. <strong>Withdrawals are available only from Winnings Credits.</strong></p>
+                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>50 credits</strong>. Maximum per request: <strong>100 credits</strong>. <strong>Withdrawals are available only from Winnings Credits.</strong></p>
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Credits)</label>
@@ -1365,15 +1365,15 @@ const CreditManagement: React.FC = () => {
                   </h3>
                   <ul className="space-y-4 text-gray-700">
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">✅</span>
+                      <CheckCircle2 size={20} className="text-lime-600 mr-3 flex-shrink-0 mt-0.5" />
                       Enter competitions using any type of credits
                     </li>
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">✅</span>
+                      <CheckCircle2 size={20} className="text-lime-600 mr-3 flex-shrink-0 mt-0.5" />
                       Credits are deducted in order: Referral → Winnings → Purchased
                     </li>
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">✅</span>
+                      <CheckCircle2 size={20} className="text-lime-600 mr-3 flex-shrink-0 mt-0.5" />
                       Win competitions to earn more credits
                     </li>
                   </ul>
@@ -1386,15 +1386,15 @@ const CreditManagement: React.FC = () => {
                   </h3>
                   <ul className="space-y-4 text-gray-700">
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">💳</span>
+                      <CreditCard size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span><strong>Purchased Credits:</strong> Refundable to original payment method</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">🏆</span>
+                      <Trophy size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span><strong>Winnings Credits:</strong> Can be withdrawn to your account</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-lime-600 mr-3">🎁</span>
+                      <Gift size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <span><strong>Referral Credits:</strong> Use for competition entry only</span>
                     </li>
                   </ul>
@@ -1470,14 +1470,14 @@ const CreditManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-3 mt-0.5">💳</span>
+                      <CreditCard size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-medium text-gray-900">Purchased Credits</p>
                         <p className="text-sm text-gray-700">Refundable to original payment method</p>
                       </div>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-3 mt-0.5">⚡</span>
+                      <Zap size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-medium text-gray-900">Instant Access</p>
                         <p className="text-sm text-gray-700">Credits available immediately after purchase</p>
@@ -1486,14 +1486,14 @@ const CreditManagement: React.FC = () => {
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-3 mt-0.5">🔒</span>
+                      <Lock size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-medium text-gray-900">Secure Payment</p>
                         <p className="text-sm text-gray-700">Protected by Stripe/PayPal security</p>
                       </div>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-3 mt-0.5">🎯</span>
+                      <Trophy size={20} className="text-lime-600 mr-3 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="font-medium text-gray-900">Competition Ready</p>
                         <p className="text-sm text-gray-700">Use credits to enter any competition</p>
@@ -1526,7 +1526,7 @@ const CreditManagement: React.FC = () => {
               <div className="text-center mb-8">
                 <DollarSign size={48} className="mx-auto text-lime-600 mb-4" />
                 <h3 className="text-2xl font-semibold text-gray-900 mb-2">Withdraw Winnings</h3>
-                <p className="text-gray-600">Cash out your competition winnings securely</p>
+                <p className="text-gray-600">Withdraw your winnings securely</p>
               </div>
 
               {/* Withdrawal Info Cards */}
@@ -1545,7 +1545,7 @@ const CreditManagement: React.FC = () => {
                     <DollarSign className="h-6 w-6 text-blue-600" />
                   </div>
                   <h4 className="font-semibold text-gray-900 mb-2">Minimum Withdrawal</h4>
-                  <p className="text-2xl font-bold text-blue-600">20</p>
+                  <p className="text-2xl font-bold text-blue-600">50</p>
                   <p className="text-sm text-gray-600">Credits</p>
                 </div>
 
@@ -1554,7 +1554,7 @@ const CreditManagement: React.FC = () => {
                     <RefreshCw className="h-6 w-6 text-orange-600" />
                   </div>
                   <h4 className="font-semibold text-gray-900 mb-2">Maximum Per Request</h4>
-                  <p className="text-2xl font-bold text-orange-600">50</p>
+                  <p className="text-2xl font-bold text-orange-600">100</p>
                   <p className="text-sm text-gray-600">Credits</p>
                 </div>
               </div>
@@ -1573,11 +1573,11 @@ const CreditManagement: React.FC = () => {
                     </div>
                     <div className="flex items-start">
                       <span className="text-amber-600 mr-2">•</span>
-                      <span className="text-sm text-amber-700">Minimum withdrawal: 20 credits</span>
+                      <span className="text-sm text-amber-700">Minimum withdrawal: 50 credits</span>
                     </div>
                     <div className="flex items-start">
                       <span className="text-amber-600 mr-2">•</span>
-                      <span className="text-sm text-amber-700">Maximum per request: 50 credits</span>
+                      <span className="text-sm text-amber-700">Maximum per request: 100 credits</span>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -1675,29 +1675,29 @@ const CreditManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">Only Purchased Credits are refundable</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">Refunds go to original payment method</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">KYC verification required (AML compliance)</span>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">Admin review and approval required</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">Winnings & Referral Credits non-refundable</span>
                     </div>
                     <div className="flex items-start">
-                      <span className="text-lime-600 mr-2">✓</span>
+                      <CheckCircle2 size={18} className="text-lime-600 mr-2 flex-shrink-0 mt-0.5" />
                       <span className="text-sm text-lime-700">All transactions logged for audit</span>
                     </div>
                   </div>
@@ -1963,7 +1963,7 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border border-blue-100">
                       <h5 className="font-medium text-blue-900 mb-2">What is KickExpert?</h5>
-                      <p className="text-blue-800 text-sm">KickExpert is a skill-based competition platform where participants use credits to enter football prediction competitions. Unlike gambling, success depends on knowledge and research, not chance.</p>
+                      <p className="text-blue-800 text-sm">KickExpert is a skill-based competition platform where participants use credits to enter football competitions. Unlike gambling, success depends on knowledge and research, not chance.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-blue-100">
                       <h5 className="font-medium text-blue-900 mb-2">Are credits real money?</h5>
@@ -2029,7 +2029,7 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border border-orange-100">
                       <h5 className="font-medium text-orange-900 mb-2">Withdrawal Requirements</h5>
-                      <p className="text-orange-800 text-sm">Only Winnings Credits can be withdrawn. Minimum withdrawal is 20 credits, maximum 50 credits per request. All withdrawals require admin approval.</p>
+                      <p className="text-orange-800 text-sm">Only Winnings Credits can be withdrawn. Minimum withdrawal is 50 credits, maximum 100 credits per request. All withdrawals require admin approval.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-orange-100">
                       <h5 className="font-medium text-orange-900 mb-2">Payment Methods</h5>

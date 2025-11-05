@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import confetti from 'canvas-confetti'; 
 import { supabase } from '@/lib/supabaseClient';
+import { BookOpen, Layers, MousePointer, Trophy, Clock, Sparkles, Shield, RefreshCcw, RotateCcw, ShieldCheck, Star, BarChart, SkipForward, CheckCircle, BarChart3, ListChecks } from "lucide-react";
 
 interface Question {
   id: number;
@@ -307,6 +308,7 @@ export default function QuizDashboard() {
   }
 
   return (
+    <>
     <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
         <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-4 sm:p-6">
@@ -524,5 +526,139 @@ export default function QuizDashboard() {
         </div>
       </div>
     </div>
+      
+{/* Quiz Rules Section */}
+<div className="w-full mt-16 p-8 bg-white rounded-xl border border-lime-100 shadow-md">
+  <h2 className="text-3xl font-bold mb-6 text-lime-600 text-center">Quiz Rules</h2>
+  <div className="space-y-5 text-gray-700">
+
+    {/* Total Questions */}
+    <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+      <div className="p-2.5 mr-4 bg-lime-500/20 rounded-lg">
+        <ListChecks className="h-6 w-6 text-lime-600" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Total Questions</h3>
+        <p className="text-sm leading-relaxed">
+          Each quiz contains <strong>20 questions</strong> — <strong>10 Easy</strong>, <strong>6 Medium</strong>, and <strong>4 Hard</strong>.
+          Questions are randomly selected each time you play.
+        </p>
+      </div>
+    </div>
+
+    {/* Question Difficulty */}
+    <div className="flex items-start p-5 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors border border-blue-200">
+      <div className="p-2.5 mr-4 bg-blue-500/20 rounded-lg">
+        <BarChart3 className="h-6 w-6 text-blue-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Difficulty Levels</h3>
+        <p className="text-sm leading-relaxed">
+          Questions are categorized by difficulty. Each difficulty level affects your score tracking and final performance rating.
+        </p>
+      </div>
+    </div>
+
+    {/* Answering Questions */}
+    <div className="flex items-start p-5 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors border border-yellow-200">
+      <div className="p-2.5 mr-4 bg-yellow-500/20 rounded-lg">
+        <CheckCircle className="h-6 w-6 text-yellow-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Answering Questions</h3>
+        <p className="text-sm leading-relaxed">
+          Choose your answer and click <strong>Submit Answer</strong>. Once submitted, it cannot be changed.
+          The correct answer will be highlighted in green, with an explanation shown below.
+        </p>
+      </div>
+    </div>
+
+    {/* Skipping Questions */}
+    <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+      <div className="p-2.5 mr-4 bg-orange-500/20 rounded-lg">
+        <SkipForward className="h-6 w-6 text-orange-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Skipping Questions</h3>
+        <p className="text-sm leading-relaxed">
+          You can skip questions, but unanswered or skipped ones are counted as incorrect and give no score.
+        </p>
+      </div>
+    </div>
+
+    {/* Scoring System */}
+    <div className="flex items-start p-5 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors border border-blue-200">
+      <div className="p-2.5 mr-4 bg-blue-500/20 rounded-lg">
+        <Trophy className="h-6 w-6 text-blue-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Scoring System</h3>
+        <p className="text-sm leading-relaxed">
+          Each correct answer awards <strong>1 point</strong>. Incorrect or skipped questions give <strong>0 points</strong>.
+          Your score and progress are displayed at the top throughout the quiz.
+        </p>
+      </div>
+    </div>
+
+    {/* Timing */}
+    <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+      <div className="p-2.5 mr-4 bg-purple-500/20 rounded-lg">
+        <Clock className="h-6 w-6 text-purple-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Timing</h3>
+        <p className="text-sm leading-relaxed">
+          While the free quiz has no strict time limit, your response time is recorded for performance analytics.
+          In competitions, each question allows <strong>20 seconds</strong>.
+        </p>
+      </div>
+    </div>
+
+    {/* Completion & Results */}
+    <div className="flex items-start p-5 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors border border-yellow-200">
+      <div className="p-2.5 mr-4 bg-yellow-500/20 rounded-lg">
+        <BarChart className="h-6 w-6 text-yellow-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Quiz Completion</h3>
+        <p className="text-sm leading-relaxed">
+          Once all 20 questions are answered, your total score and performance breakdown are displayed along with a recommended league level.
+        </p>
+      </div>
+    </div>
+
+
+    {/* Fair Play */}
+    <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+      <div className="p-2.5 mr-4 bg-red-500/20 rounded-lg">
+        <ShieldCheck className="h-6 w-6 text-red-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Fair Play</h3>
+        <p className="text-sm leading-relaxed">
+          Do not use unfair means, bots, or external help. Violations may lead to disqualification or account restrictions.
+        </p>
+      </div>
+    </div>
+
+    {/* Retry Option */}
+    <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+      <div className="p-2.5 mr-4 bg-teal-500/20 rounded-lg">
+        <RotateCcw className="h-6 w-6 text-teal-500" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">Retry Option</h3>
+        <p className="text-sm leading-relaxed">
+          You can retry the quiz anytime using the <strong>“Try Again”</strong> button to challenge a new random set of questions.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+
+    </>
   );
 }

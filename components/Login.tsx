@@ -558,7 +558,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full py-3 px-6 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {loading ? (
                   <div className="flex items-center justify-center">

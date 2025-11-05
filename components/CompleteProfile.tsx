@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import toast, { Toaster } from 'react-hot-toast';
+import Link from "next/link";
 import ReactCountryFlag from "react-country-flag";
 
 const countries = [
@@ -105,6 +106,11 @@ export default function CompleteProfile() {
   const [user, setUser] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    // Set page title
+    document.title = "KickExpert - Complete Your Profile";
+  }, []);
 
   useEffect(() => {
     // Get current user and check if they need to complete profile
@@ -321,46 +327,50 @@ export default function CompleteProfile() {
         const r = await fetch('/api/profile/complete', { method: 'POST', body: form });
         if (!r.ok) throw new Error('Server profile completion failed');
 
-        toast.success('Profile saved! Welcome to KickExpert!', { id: toastId });
-        // Try to auto-login the user if we have stored signup credentials (signup flow)
+        // After successful profile completion, auto-login the user
         try {
-          if (typeof window !== 'undefined') {
-            const storedEmail = sessionStorage.getItem('signup_email');
-            const storedPassword = sessionStorage.getItem('signup_password');
-            if (storedEmail && storedPassword) {
-              console.debug('Attempting auto-login with stored credentials for', storedEmail);
-              const { data, error } = await supabase.auth.signInWithPassword({ email: storedEmail, password: storedPassword });
-              console.debug('Auto-login result', { data, error });
-              if (error) {
-                console.warn('Auto-login after profile complete failed', error);
-                toast.error('Auto-login failed. Please sign in manually.', { id: toastId });
-                // fallback: go to login page with prefilled email
-                router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
-              } else if (data?.session) {
-                // Successfully signed in — clear stored creds and redirect to dashboard
-                try { sessionStorage.removeItem('signup_email'); sessionStorage.removeItem('signup_password'); } catch (e) { /* ignore */ }
-                toast.success('Signed in successfully. Redirecting...', { id: toastId });
-                // Do a full navigation to ensure Supabase client reads persisted session and Navbar picks it up
-                try {
-                  window.location.assign('/');
-                } catch (e) {
-                  // Fallback to SPA navigation + reload
-                  router.replace('/');
-                  setTimeout(() => { try { window.location.reload(); } catch (e) { /* ignore */ } }, 300);
-                }
-              } else {
-                toast('Unable to sign you in automatically. Please log in.', { id: toastId });
-                router.replace(`/login?email=${encodeURIComponent(user.email || storedEmail)}`);
-              }
+          const storedEmail = sessionStorage.getItem('signup_email');
+          const storedPassword = sessionStorage.getItem('signup_password');
+
+          if (storedEmail && storedPassword) {
+            console.log('Attempting auto-login after profile completion...');
+
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+              email: storedEmail,
+              password: storedPassword
+            });
+
+            if (authError) {
+              console.error('Auto-login failed:', authError);
+              toast.error('Profile completed but login failed. Please sign in manually.', { id: toastId });
+              router.replace(`/login?email=${encodeURIComponent(storedEmail)}`);
+              return;
+            }
+
+            if (authData?.session) {
+              // Successfully logged in - clear stored credentials
+              sessionStorage.removeItem('signup_email');
+              sessionStorage.removeItem('signup_password');
+
+              toast.success('Profile completed and logged in successfully! Welcome to KickExpert!', { id: toastId });
+
+              // Redirect to dashboard with full page reload to ensure session is picked up
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 1500);
               return;
             }
           }
-        } catch (e) {
-          console.warn('Auto-login attempt failed', e);
-        }
 
-        // Default redirect if auto-login not possible
-        router.replace('/');
+          // If no stored credentials or login failed, redirect to login
+          toast.success('Profile completed! Please sign in to continue.', { id: toastId });
+          router.replace('/login');
+
+        } catch (autoLoginError) {
+          console.error('Auto-login error:', autoLoginError);
+          toast.error('Profile completed but automatic login failed. Please sign in manually.', { id: toastId });
+          router.replace('/login');
+        }
       }
     } catch (error: any) {
       console.error('Profile setup error:', error);
@@ -415,19 +425,20 @@ export default function CompleteProfile() {
       />
 
       {/* Left side - Image */}
-      <div className="hidden lg:flex w-1/2 relative overflow-hidden h-[80vh] self-center">
-        <div className="relative rounded-2xl w-full h-full">
+      <div className="hidden lg:flex w-1/2 relative">
+        <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
           <Image
             src="/images/slide1.jpg"
             alt="Complete Profile Background"
             fill
-            className="object-contain"
+            className="object-cover"
             priority
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20"></div>
           <div className="absolute bottom-10 left-0 right-0">
-            <div className="max-w-md mx-auto text-center text-white">
-              <h2 className="text-2xl font-bold">Complete Your Profile</h2>
-              <p className="text-lg mb-4">Add your details to get started</p>
+            <div className="max-w-md mx-auto text-center text-white px-4">
+              <h2 className="text-3xl font-bold mb-2">Complete Your Profile</h2>
+              <p className="text-lg">Add your details to get started with KickExpert</p>
             </div>
           </div>
         </div>
@@ -437,24 +448,27 @@ export default function CompleteProfile() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-            <div className="flex items-center justify-center mb-6">
-              <div className="p-3 mr-4 bg-lime-100 rounded-full">
-                <svg
-                  className="w-6 h-6 text-lime-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <Link href="/" className="flex items-center">
+                <div className="flex items-center">
+                  <Image
+                    src="/logo.png"
+                    alt="KickExpert Logo"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12"
                   />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">Complete Profile</h2>
+                  <span className="ml-2 text-lime-500 font-bold text-2xl">
+                    Kick<span className="text-gray-800">Expert</span>
+                  </span>
+                </div>
+              </Link>
+            </div>
+
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-800">Complete Your Profile</h1>
+              <p className="text-gray-600 mt-2">Add your details to get started</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">

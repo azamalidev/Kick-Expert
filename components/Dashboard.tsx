@@ -12,6 +12,15 @@ import {
 import { Trophy, TrophyStats } from "../types/trophy";
 import Link from "next/link";
 
+// Rank definitions
+const ranks = [
+  { label: 'Beginner', minXP: 0, maxXP: 499, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
+  { label: 'Novice', minXP: 500, maxXP: 999, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
+  { label: 'Competent', minXP: 1000, maxXP: 1999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
+  { label: 'Proficient', minXP: 2000, maxXP: 4999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
+  { label: 'Expert', minXP: 5000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
+];
+
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,6 +96,7 @@ export default function Dashboard() {
   // Fallback states for when data is loading
   const [username, setUsername] = useState<string>("Loading...");
   const [userEmail, setUserEmail] = useState<string>("Loading...");
+  const [rankLabel, setRankLabel] = useState<string>("Beginner");
   const [entryCredits, setEntryCredits] = useState<number>(2);
   const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(0);
   const [winPercentage, setWinPercentage] = useState<number>(0);
@@ -157,6 +167,7 @@ export default function Dashboard() {
         // Update state variables
         setUsername(profile.username || "User");
         setUserEmail(user.email || "");
+        setRankLabel(profile.rank_label || "Beginner");
         setCompetitionsPlayed(profile.total_games || 0);
 
         // Calculate win percentage
@@ -840,8 +851,60 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Rank Ladder & XP Progression Section */}
+            <div className="bg-white rounded-2xl p-6 mb-8 shadow-md border border-gray-100">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                    <svg
+                      className="w-6 h-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                  </div>
+                  Rank Ladder & XP Progression
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Progress through ranks by earning XP from games, wins, and referrals. Each rank requires a specific XP threshold.
+              </p>
+              <div className="space-y-3">
+                {ranks.map((rank, index) => (
+                  <div
+                    key={rank.label}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${rankLabel === rank.label ? 'border-lime-500 bg-lime-50' : 'border-gray-200 bg-white'}`}
+                  >
+                    <div className="flex items-center">
+                      <div className={`p-2 ${rank.bgColor} rounded-full mr-3`}>
+                        <span className="text-xl">{rank.icon}</span>
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${rank.color}`}>{rank.label}</p>
+                        <p className="text-xs text-gray-500">
+                          {rank.minXP} - {rank.maxXP === Infinity ? '∞' : rank.maxXP} XP
+                        </p>
+                      </div>
+                    </div>
+                    {rankLabel === rank.label && (
+                      <span className="text-xs font-medium text-lime-600 bg-lime-100 px-2 py-1 rounded-full">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Action Buttons */}
-            <Link href="/credits/manage">
+            {/* <Link href="/credits/manage">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               <button
                 
@@ -862,7 +925,7 @@ export default function Dashboard() {
                 </svg>
                 Withdraw Credits
               </button>
-            </div></Link>
+            </div></Link> */}
 
             {/* Leaderboard Section */}
             {/* <div className="bg-white rounded-2xl p-6 my-8 shadow-md border border-gray-100">

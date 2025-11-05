@@ -69,19 +69,20 @@ export default function ForgotPassword() {
           loading: { duration: Infinity },
         }}
       />
-      <div className="hidden lg:flex w-1/2 relative overflow-hidden h-[80vh] self-center">
-        <div className="relative rounded-2xl w-full h-full">
+      <div className="hidden lg:flex w-1/2 relative">
+        <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
           <Image
             src="/images/slide1.jpg"
             alt="Password Reset Background"
             fill
-            className="object-contain"
+            className="object-cover"
             priority
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20"></div>
           <div className="absolute bottom-10 left-0 right-0">
-            <div className="max-w-md mx-auto text-center text-white">
-              <h2 className="text-2xl font-bold">Reset Your Password</h2>
-              <p className="text-lg mb-4">Enter your email to receive a reset link</p>
+            <div className="max-w-md mx-auto text-center text-white px-4">
+              <h2 className="text-3xl font-bold mb-2">Reset Your Password</h2>
+              <p className="text-lg">Enter your email to receive a reset link</p>
             </div>
           </div>
         </div>
@@ -89,24 +90,27 @@ export default function ForgotPassword() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-            <div className="flex items-center justify-center mb-6">
-              <div className="p-3 mr-4 bg-lime-100 rounded-full">
-                <svg
-                  className="w-6 h-6 text-lime-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            {/* Logo */}
+            <div className="flex justify-center mb-6">
+              <Link href="/" className="flex items-center">
+                <div className="flex items-center">
+                  <Image
+                    src="/logo.png"
+                    alt="KickExpert Logo"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12"
                   />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">Forgot Password</h2>
+                  <span className="ml-2 text-lime-500 font-bold text-2xl">
+                    Kick<span className="text-gray-800">Expert</span>
+                  </span>
+                </div>
+              </Link>
+            </div>
+
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-800">Forgot Password</h1>
+              <p className="text-gray-600 mt-2">Enter your email to reset your password</p>
             </div>
             
             

@@ -75,6 +75,7 @@ interface CompetitionModalProps {
   onJoinCompetition: (competitionId: string) => void;
   startTime: Date;
   isRegistering?: boolean;
+  competitionImagePath?: string;
 }
 
 interface AlreadyRegisteredModalProps {
@@ -83,6 +84,7 @@ interface AlreadyRegisteredModalProps {
   competitionName: string;
   paidAmount: number;
   startTime?: string | Date | null;
+  competitionImagePath?: string;
 }
 
 const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
@@ -302,7 +304,8 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
   onClose,
   competitionName,
   paidAmount,
-  startTime
+  startTime,
+  competitionImagePath
 }) => {
   return (
     <AnimatePresence>
@@ -315,12 +318,20 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
             transition={{ duration: 0.2 }}
             className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]"
           >
-            {/* Header with Success Icon */}
+            {/* Header with Competition Trophy Image */}
             <div className="bg-gradient-to-br from-lime-500 via-lime-600 to-green-600 p-6 text-white relative flex-shrink-0">
               <div className="flex items-center justify-center mb-2">
-                <div className=" bg-opacity-20 rounded-full p-3">
-                  <CheckCircle className="h-8 w-8 text-white" />
-                </div>
+                {competitionImagePath ? (
+                  <img
+                    src={competitionImagePath}
+                    alt={`${competitionName} trophy`}
+                    className="h-12 w-12 object-contain"
+                  />
+                ) : (
+                  <div className=" bg-opacity-20 rounded-full p-3">
+                    <CheckCircle className="h-8 w-8 text-white" />
+                  </div>
+                )}
               </div>
               <h2 className="text-2xl font-bold text-center mb-1">Already Registered!</h2>
               <p className="text-center text-lime-100 text-sm">You're all set for this competition</p>
@@ -425,8 +436,9 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
   onClose,
   competition,
   onJoinCompetition,
-  startTime
-  , isRegistering = false
+  startTime,
+  isRegistering = false,
+  competitionImagePath
 }) => {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -480,10 +492,18 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
             transition={{ duration: 0.2 }}
             className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]"
           >
-            {/* Header with Trophy Icon */}
+            {/* Header with Trophy Image */}
             <div className="bg-gradient-to-br from-lime-500 via-lime-600 to-green-600 p-6 text-white relative flex-shrink-0">
               <div className="flex items-center justify-center mb-2">
-                <Trophy className="h-8 w-8 text-yellow-300" />
+                {competitionImagePath ? (
+                  <img
+                    src={competitionImagePath}
+                    alt={`${competition.name} trophy`}
+                    className="h-12 w-12 object-contain"
+                  />
+                ) : (
+                  <Trophy className="h-8 w-8 text-yellow-300" />
+                )}
               </div>
               <h2 className="text-2xl font-bold text-center mb-1">Join {competition.name}</h2>
               <p className="text-center text-lime-100 text-sm">Compete for prizes and glory!</p>
@@ -543,13 +563,13 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   <p className="text-center font-bold text-blue-600">{competition.credit_cost} Credits</p>
                 </div>
                 
-                <div className="bg-white rounded-lg border border-lime-200 p-3 shadow-sm">
+                {/* <div className="bg-white rounded-lg border border-lime-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Star className="h-4 w-4 text-lime-600" />
                     <span className="text-xs text-gray-600">Difficulty</span>
                   </div>
                   <p className="text-center font-bold text-lime-600">{competition.difficulty}</p>
-                </div>
+                </div> */}
                 
                 <div className="bg-white rounded-lg border border-purple-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
@@ -559,13 +579,13 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   <p className="text-center font-bold text-purple-600">{competition.questions}</p>
                 </div>
                 
-                <div className="bg-white rounded-lg border border-orange-200 p-3 shadow-sm">
+                {/* <div className="bg-white rounded-lg border border-orange-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Users className="h-4 w-4 text-orange-600" />
                     <span className="text-xs text-gray-600">Min Players</span>
                   </div>
                   <p className="text-center font-bold text-orange-600">{competition.minPlayers}</p>
-                </div>
+                </div> */}
               </div>
 
               {/* Prize Pool Card */}
@@ -730,7 +750,8 @@ const LiveCompetition = () => {
     competitionName: string;
     paidAmount: number;
     startTime: Date | null;
-  }>({ competitionName: '', paidAmount: 0, startTime: null });
+    competitionImagePath: string;
+  }>({ competitionName: '', paidAmount: 0, startTime: null, competitionImagePath: '' });
   const [expandedPrizes, setExpandedPrizes] = useState<{ [key: string]: boolean }>({});
   const [playerCounts, setPlayerCounts] = useState<{ [key: string]: number }>({});
 
@@ -953,7 +974,8 @@ const handleCompetitionEntry = async (competitionId: string) => {
     setAlreadyRegisteredData({
       competitionName: competition.name,
       paidAmount: registration.paid_amount,
-      startTime: new Date(competition.start_time)
+      startTime: new Date(competition.start_time),
+      competitionImagePath: getLeagueImage(competition.name)
     });
     setModalOpen(false);
     setAlreadyRegisteredModalOpen(true);
@@ -1399,6 +1421,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
           onJoinCompetition={handleCompetitionEntry}
           isRegistering={isRegistering}
           startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
+          competitionImagePath={getLeagueImage(selectedCompetition.name)}
         />
       )}
 
@@ -1418,6 +1441,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
         competitionName={alreadyRegisteredData.competitionName}
         paidAmount={alreadyRegisteredData.paidAmount}
         startTime={alreadyRegisteredData.startTime}
+        competitionImagePath={alreadyRegisteredData.competitionImagePath}
       />
 
       {/* Header section */}
@@ -1669,7 +1693,8 @@ const handleCompetitionEntry = async (competitionId: string) => {
                         setAlreadyRegisteredData({
                           competitionName: comp.name,
                           paidAmount: reg ? reg.paid_amount : 0,
-                          startTime: comp.startTime || null
+                          startTime: comp.startTime || null,
+                          competitionImagePath: getLeagueImage(comp.name)
                         });
                         setAlreadyRegisteredModalOpen(true);
                       }}
@@ -1706,7 +1731,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
               <Award className="h-7 w-7 text-yellow-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-2xl font-extrabold text-yellow-800 mb-3">🎯 Dynamic Prize Pool System</h3>
+              <h3 className="text-2xl font-extrabold text-yellow-800 mb-3">Dynamic Prize Pool System</h3>
               <div className="text-gray-700 text-base leading-relaxed space-y-2">
                 <p className="font-semibold">Prize pools scale based on player count:</p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
@@ -1737,7 +1762,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
               <Zap className="h-7 w-7 text-blue-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-2xl font-extrabold text-blue-800 mb-3">⚡ XP Rewards & Progression</h3>
+              <h3 className="text-2xl font-extrabold text-blue-800 mb-3">XP Rewards & Progression</h3>
               <div className="text-gray-700 text-base leading-relaxed space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="bg-white border border-blue-200 rounded-lg p-3">

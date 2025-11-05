@@ -1205,62 +1205,12 @@ export default function Profile() {
                 </div>
               </div>
 
-                 {/* Rank Ladder Card */}
-              <div className="bg-white mt-6 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-lime-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                    Rank Ladder & XP Progression
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Progress through ranks by earning XP from games, wins, and referrals. Each rank requires a specific XP threshold.
-                  </p>
-                  <div className="space-y-3">
-                    {ranks.map((rank, index) => (
-                      <div
-                        key={rank.label}
-                        className={`flex items-center justify-between p-4 rounded-lg border ${rankLabel === rank.label ? 'border-lime-500 bg-lime-50' : 'border-gray-200 bg-white'}`}
-                      >
-                        <div className="flex items-center">
-                          <div className={`p-2 ${rank.bgColor} rounded-full mr-3`}>
-                            <span className="text-xl">{rank.icon}</span>
-                          </div>
-                          <div>
-                            <p className={`font-semibold ${rank.color}`}>{rank.label}</p>
-                            <p className="text-xs text-gray-500">
-                              {rank.minXP} - {rank.maxXP === Infinity ? '∞' : rank.maxXP} XP
-                            </p>
-                          </div>
-                        </div>
-                        {rankLabel === rank.label && (
-                          <span className="text-xs font-medium text-lime-600 bg-lime-100 px-2 py-1 rounded-full">
-                            Current
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
             </div>
-            {/* Right Column - Trophies, Rank Ladder & Password Security */}
+            {/* Right Column - Trophies & Password Security */}
             <div className="w-full lg:w-1/2 space-y-6">
 
                {/* Game Statistics Card */}
-              <div className=" bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              {/* <div className=" bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <svg
@@ -1378,32 +1328,9 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-                    {/* <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-indigo-700">Credits</p>
-                          <p className="text-2xl font-bold text-indigo-800">{credits}</p>
-                        </div>
-                        <div className="p-2 bg-indigo-200 rounded-full">
-                          <svg
-                            className="w-5 h-5 text-indigo-700"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8c-1.657 0-3 1.79-3 4s1.343 4 3 4 3-1.79 3-4-1.343-4-3-4zM12 4v4"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div> */}
+                    
                   </div>
-                  {/* Rank Display */}
+             
                   <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
@@ -1422,7 +1349,7 @@ export default function Profile() {
                         <p className="text-lg font-bold text-yellow-800">{xp} XP</p>
                       </div>
                     </div>
-                    {/* Progress Bar to Next Rank */}
+                 
                     {(() => {
                       const nextRankInfo = getNextRank(xp);
                       if (nextRankInfo) {
@@ -1457,9 +1384,13 @@ export default function Profile() {
                     })()}
                   </div>
                 </div>
-              </div>
+              </div> */}
+
+
+
+              
               {/* Trophies Card */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                     <svg
@@ -1493,7 +1424,6 @@ export default function Profile() {
                     </div>
                   ) : (
                     <>
-                      {/* Trophy Statistics Summary */}
                       <div className="grid grid-cols-3 gap-3 mb-6">
                         <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-3 rounded-lg text-center">
                           <div className="text-2xl font-bold text-amber-700">
@@ -1520,7 +1450,6 @@ export default function Profile() {
                           </div>
                         </div>
                       </div>
-                      {/* Trophy List */}
                       <div className="space-y-3 max-h-80 overflow-y-auto">
                         {userTrophies.map((trophy, index) => {
                           const colors = TrophyService.getTrophyColors(trophy.trophy_type);
@@ -1600,7 +1529,6 @@ export default function Profile() {
                           );
                         })}
                       </div>
-                      {/* Next Milestone */}
                       {(() => {
                         const nextMilestone = TrophyService.getNextMilestone(xp);
                         if (nextMilestone) {
@@ -1634,7 +1562,7 @@ export default function Profile() {
                     </>
                   )}
                 </div>
-              </div>
+              </div> */}
            
               {/* Password Security */}
               <div className="bg-white h-fit p-4 sm:p-6 md:p-8 rounded-2xl shadow-md border border-gray-100">

@@ -663,12 +663,11 @@ export default function Navbar() {
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isActive("/livecompetition")
                   ? "bg-lime-100 text-lime-700 shadow-inner"
-                  : "bg-lime-50 text-lime-600 hover:bg-lime-100"
+                  : "text-gray-600 hover:bg-lime-50 hover:text-lime-600"
                   }`}
               >
                 <Trophy className="w-5 h-5" />
                 <span>Competitions</span>
-                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-red-500 text-white animate-pulse">Live</span>
               </button>
             </Link>
 
@@ -1038,9 +1037,6 @@ export default function Navbar() {
                     <div className="flex items-center gap-3">
                       <Trophy className="w-5 h-5" />
                       <span>Competitions</span>
-                      <span className="ml-auto px-2 py-0.5 text-xs rounded-full bg-red-500 text-white animate-pulse">
-                        Live
-                      </span>
                     </div>
                   </button>
                 </Link>
