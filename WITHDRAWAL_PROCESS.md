@@ -25,13 +25,13 @@ This document outlines the complete withdrawal flow in the Kick Expert platform,
 
 **User Actions**:
 1. User clicks "Request Withdrawal" button
-2. User enters withdrawal amount (minimum $20 USD)
+2. User enters withdrawal amount (minimum €50 EUR)
 3. User selects payment method:
    - **Stripe** (default, uses connected Stripe account)
    - **PayPal** (requires PayPal email)
 
 **Validation**:
-- Amount must be ≥ $20
+- Amount must be ≥ €50
 - Amount must not exceed user's available winnings credits
 - User must have winnings credits (not purchased credits)
 
@@ -112,7 +112,7 @@ WHERE user_id = '<user_id>';
 
 1. **Validate Request**:
    - Check authorization token
-   - Validate amount (≥ $20)
+   - Validate amount (≥ €50)
    - Validate payment method
 
 2. **Verify KYC Status**:
@@ -169,7 +169,7 @@ INSERT INTO withdrawals (
   id, user_id, amount, currency, status, 
   provider, provider_account, requested_at, updated_at
 ) VALUES (
-  'uuid', '<user_id>', 50, 'USD', 'pending',
+  'uuid', '<user_id>', 50, 'EUR', 'pending',
   'stripe', '<provider_account>', now(), now()
 );
 
@@ -259,7 +259,7 @@ CREATE TABLE user_payment_accounts (
       "id": "withdrawal-uuid",
       "user_id": "user-uuid",
       "amount": 50,
-      "currency": "USD",
+      "currency": "EUR",
       "status": "pending",
       "provider": "stripe",
       "provider_account": "acct_xxxxx",
@@ -475,7 +475,7 @@ CREATE TABLE user_payment_accounts (
 // Create Stripe payout
 const payout = await stripe.payouts.create({
   amount: withdrawal.amount * 100,  // Convert to cents
-  currency: 'usd',
+  currency: 'eur',
   destination: paymentAccount.provider_account_id,
   statement_descriptor: 'Kick Expert Withdrawal'
 });
@@ -488,7 +488,7 @@ await supabase
     provider: 'stripe',
     provider_payout_id: payout.id,
     amount: withdrawal.amount,
-    currency: 'USD',
+    currency: 'EUR',
     status: 'initiated',
     response: payout
   });
@@ -506,7 +506,7 @@ const payout = await paypal.payouts.create({
     recipient_type: 'EMAIL',
     amount: {
       value: withdrawal.amount.toString(),
-      currency: 'USD'
+      currency: 'EUR'
     },
     receiver: paymentAccount.paypal_email,
     note: 'Kick Expert Withdrawal'
@@ -620,7 +620,7 @@ CREATE TABLE provider_payouts (
   provider text NOT NULL,  -- 'stripe' or 'paypal'
   provider_payout_id text,  -- Payout ID from provider
   amount numeric(10,2) NOT NULL,
-  currency text DEFAULT 'USD',
+  currency text DEFAULT 'EUR',
   status text DEFAULT 'initiated',  -- initiated, processing, completed, failed
   response jsonb,  -- Full response from provider
   created_at timestamptz DEFAULT now(),
@@ -693,7 +693,7 @@ Response:
     {
       "id": "uuid",
       "amount": 50,
-      "currency": "USD",
+      "currency": "EUR",
       "status": "completed",
       "provider": "stripe",
       "requested_at": "2025-10-25T10:00:00Z",
@@ -797,7 +797,7 @@ Response:
 |-------|--------|-------|----------|
 | `KYC verification required` | 403 | User not KYC verified | Redirect to KYC page |
 | `Insufficient winnings credits` | 400 | Not enough balance | Show available balance |
-| `Invalid amount` | 400 | Amount < $20 or invalid | Show minimum amount |
+| `Invalid amount` | 400 | Amount < €50 or invalid | Show minimum amount |
 | `Unauthorized` | 401 | Invalid/expired token | Re-authenticate |
 | `Admin access required` | 403 | User is not admin | Deny access |
 | `Withdrawal not found` | 404 | Invalid withdrawal ID | Check withdrawal ID |
@@ -914,7 +914,7 @@ Final State:
 **Check**:
 1. Does user have winnings credits? (Check `user_credits.winnings_credits`)
 2. Is KYC verified? (Check `user_payment_accounts.kyc_status`)
-3. Is amount ≥ $20?
+3. Is amount ≥ €50?
 4. Is user authenticated?
 
 ### Withdrawal Stuck in "Pending"

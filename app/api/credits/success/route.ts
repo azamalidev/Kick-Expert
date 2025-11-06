@@ -58,10 +58,10 @@ export async function GET(req: NextRequest) {
     if (originalAmount > 0) {
       if (!session.livemode) {
         // In test mode, Stripe doesn't deduct fees, so simulate them
-        const estimatedFee = originalAmount * 0.029 + 0.30; // 2.9% + $0.30
-        const netAmountDollars = originalAmount - estimatedFee;
-        creditsToAdd = Math.max(1, Math.floor((netAmountDollars / originalAmount) * credits));
-        console.log(`Test mode: Original $${originalAmount}, Estimated fee $${estimatedFee.toFixed(2)}, Net $${netAmountDollars.toFixed(2)}, Credits: ${credits} -> ${creditsToAdd}`);
+        const estimatedFee = originalAmount * 0.029 + 0.30; // 2.9% + €0.30
+        const netAmountEuros = originalAmount - estimatedFee;
+        creditsToAdd = Math.max(1, Math.floor((netAmountEuros / originalAmount) * credits));
+        console.log(`Test mode: Original €${originalAmount}, Estimated fee €${estimatedFee.toFixed(2)}, Net €${netAmountEuros.toFixed(2)}, Credits: ${credits} -> ${creditsToAdd}`);
       } else if (session.payment_intent) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string, { expand: ['charges'] });
@@ -72,9 +72,9 @@ export async function GET(req: NextRequest) {
             if (charge.balance_transaction) {
               const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
               const netAmountCents = balanceTransaction.net;
-              const netAmountDollars = netAmountCents / 100;
-              creditsToAdd = Math.floor((netAmountDollars / originalAmount) * credits);
-              console.log(`Live mode: Original amount: $${originalAmount}, Net amount: $${netAmountDollars}, Credits: ${credits} -> ${creditsToAdd}`);
+              const netAmountEuros = netAmountCents / 100;
+              creditsToAdd = Math.floor((netAmountEuros / originalAmount) * credits);
+              console.log(`Live mode: Original amount: €${originalAmount}, Net amount: €${netAmountEuros}, Credits: ${credits} -> ${creditsToAdd}`);
             } else {
               console.log('No balance_transaction on charge');
             }

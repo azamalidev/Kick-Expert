@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       alerts: [
         {
           type: 'info',
-          message: `You have earned $${450} this year. Tax reporting required when winnings exceed $600.`
+          message: `You have earned €${450} this year. Tax reporting required when winnings exceed €600.`
         }
       ]
     };

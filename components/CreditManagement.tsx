@@ -369,7 +369,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
   } | null>(null);
   const [customAmount, setCustomAmount] = useState<number | ''>('');
 
-  // Preset packages — 1 credit = $1 (platform does not mark up fees)
+  // Preset packages — 1 credit = €1 (platform does not mark up fees)
   const creditPackages = [
     { id: 'starter', credits: 10, price: 10, popular: false, description: 'Small starter pack' },
     { id: 'popular', credits: 20, price: 20, popular: true, description: 'Most popular choice' },
@@ -396,7 +396,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                   <X size={24} />
                 </button>
                 <h2 className="text-2xl font-bold mb-2">Buy Credits</h2>
-                <p className="text-lime-100">Select a credit package to get started - 1 Credit = $1</p>
+                <p className="text-lime-100">Select a credit package to get started - 1 Credit = €1</p>
               </div>
 
               {/* Body Section */}
@@ -424,7 +424,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                         <div className="text-4xl font-bold text-lime-600 mb-2">{pkg.credits}</div>
                         <div className="text-gray-600 font-medium mb-2">Credits</div>
                         <div className="text-sm text-gray-500 mb-4">{pkg.description}</div>
-                        <div className="text-2xl font-bold text-gray-900 mb-4">${pkg.price}</div>
+                        <div className="text-2xl font-bold text-gray-900 mb-4">€{pkg.price}</div>
                         <button
                           onClick={() => {
                             setSelectedPackage(pkg);
@@ -448,7 +448,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                   <label className="block text-sm font-semibold mb-2 text-gray-600">Or enter a custom amount</label>
                   <div className="flex space-x-2">
                     <div className="relative flex-1">
-                      <span className="absolute left-3 top-3 text-gray-400">$</span>
+                      <span className="absolute left-3 top-3 text-gray-400">€</span>
                       <input
                         type="number"
                         min={20}
@@ -461,11 +461,11 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                     <button
                       onClick={() => {
                         if (!customAmount || Number(customAmount) < 1) {
-                          toast.error('Enter an amount of at least $1');
+                          toast.error('Enter an amount of at least €1');
                           return;
                         }
                         if (Number(customAmount) < 20) {
-                          toast.error('Minimum purchase amount is 20 credits ($20)', {
+                          toast.error('Minimum purchase amount is 20 credits (€20)', {
                             duration: 4000,
                             icon: '⚠️'
                           });
@@ -493,7 +493,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                   <ul className="text-sm text-lime-700 space-y-2">
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
-                      Each credit is worth $1 USD
+                      Each credit is worth €1 EUR
                     </li>
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
@@ -780,7 +780,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
     }, [isOpen]);
 
     const handleSubmit = async () => {
-      // amount entered in credits (1 credit = $1)
+      // amount entered in credits (1 credit = €1)
       if (amount === '' || Number(amount) <= 0) {
         toast.error('Enter a valid number of credits');
         return;
@@ -816,7 +816,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
       try {
         setIsSubmitting(true);
         setValidationError(null);
-        // convert credits to dollars (1:1) for backend amount
+        // convert credits to euros (1:1) for backend amount
         await onSubmit(credits, method, paypalEmail);
         // Show success message from caller; optimistic UI update is handled by parent
         onClose();
@@ -1437,7 +1437,7 @@ const CreditManagement: React.FC = () => {
                   <div className="text-4xl font-bold text-lime-600 mb-2">10</div>
                   <div className="text-gray-600 font-medium mb-2">Credits</div>
                   <div className="text-sm text-gray-500 mb-4">Perfect for trying out competitions</div>
-                  <div className="text-2xl font-bold text-gray-900">$10</div>
+                  <div className="text-2xl font-bold text-gray-900">€10</div>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-md p-6 border-2 border-lime-500 text-center relative">
@@ -1447,14 +1447,14 @@ const CreditManagement: React.FC = () => {
                   <div className="text-4xl font-bold text-lime-600 mb-2">20</div>
                   <div className="text-gray-600 font-medium mb-2">Credits</div>
                   <div className="text-sm text-gray-500 mb-4">Most popular choice for regular players</div>
-                  <div className="text-2xl font-bold text-gray-900">$20</div>
+                  <div className="text-2xl font-bold text-gray-900">€20</div>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-md p-6 border-2 border-gray-200 text-center">
                   <div className="text-4xl font-bold text-lime-600 mb-2">50</div>
                   <div className="text-gray-600 font-medium mb-2">Credits</div>
                   <div className="text-sm text-gray-500 mb-4">Best value for serious competitors</div>
-                  <div className="text-2xl font-bold text-gray-900">$50</div>
+                  <div className="text-2xl font-bold text-gray-900">€50</div>
                 </div>
               </div>
 
@@ -2065,7 +2065,7 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border border-red-100">
                       <h5 className="font-medium text-red-900 mb-2">Tax Reporting</h5>
-                      <p className="text-red-800 text-sm">If you win more than $600 in a calendar year, we are required to report this to the IRS (Form 1099-MISC). We track your annual winnings for compliance.</p>
+                      <p className="text-red-800 text-sm">If you win more than €600 in a calendar year, we are required to report this to the IRS (Form 1099-MISC). We track your annual winnings for compliance.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-red-100">
                       <h5 className="font-medium text-red-900 mb-2">AML Compliance</h5>

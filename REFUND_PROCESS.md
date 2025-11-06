@@ -396,7 +396,7 @@ await supabase
     provider: 'stripe',
     provider_payout_id: refund_stripe.id,
     amount: refund.amount,
-    currency: 'USD',
+    currency: 'EUR',
     status: 'initiated',
     response: refund_stripe
   });
@@ -407,7 +407,7 @@ await supabase
 // Create PayPal refund
 const refund_paypal = await paypal.sales.refund(original_transaction_id, {
   amount: {
-    currency: 'USD',
+    currency: 'EUR',
     total: refund.amount.toString()
   }
 });
@@ -420,7 +420,7 @@ await supabase
     provider: 'paypal',
     provider_payout_id: refund_paypal.id,
     amount: refund.amount,
-    currency: 'USD',
+    currency: 'EUR',
     status: 'initiated',
     response: refund_paypal
   });

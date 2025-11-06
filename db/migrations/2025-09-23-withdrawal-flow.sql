@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.provider_payouts (
   provider text NOT NULL,
   provider_payout_id text NULL,
   amount numeric(10,2) NOT NULL,
-  currency text NOT NULL DEFAULT 'USD',
+  currency text NOT NULL DEFAULT 'EUR',
   status text NOT NULL DEFAULT 'initiated',
   response jsonb NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -89,7 +89,7 @@ BEGIN
 
   -- Insert withdrawal (pending)
   INSERT INTO public.withdrawals (id, user_id, amount, currency, status, requested_at, updated_at)
-  VALUES (w_id, p_user_id, p_amount, 'USD', 'pending', now(), now());
+  VALUES (w_id, p_user_id, p_amount, 'EUR', 'pending', now(), now());
 
   -- Insert credit transaction (pending)
   INSERT INTO public.credit_transactions (id, user_id, amount, credit_type, transaction_type, payment_method, status, created_at, updated_at)

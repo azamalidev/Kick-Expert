@@ -40,7 +40,7 @@ const FAQMain = () => {
     },
     {
       question: "How do I get paid if I win?",
-      answer: "Winners receive prize money into their wallet. You can request a payout once your balance reaches at least $10. Withdrawals are processed securely through Stripe or PayPal, and may require ID verification.",
+      answer: "Winners receive prize money into their wallet. You can request a payout once your balance reaches at least €10. Withdrawals are processed securely through Stripe or PayPal, and may require ID verification.",
       icon: <Wallet className="w-5 h-5 text-lime-400" />
     },
     {

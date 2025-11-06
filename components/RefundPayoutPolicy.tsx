@@ -213,7 +213,7 @@ const RefundPayoutPolicy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    You may request a payout once your wallet balance reaches $10 or more.
+                    You may request a payout once your wallet balance reaches €10 or more.
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -276,7 +276,7 @@ const RefundPayoutPolicy = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    If you earn $600 or more in a calendar year, you may be required to submit a completed IRS Form W-9.
+                    If you earn €600 or more in a calendar year, you may be required to submit a completed IRS Form W-9.
                   </span>
                 </li>
                 <li className="flex items-start">

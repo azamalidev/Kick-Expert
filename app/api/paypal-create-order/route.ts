@@ -139,7 +139,7 @@ export async function POST(req: Request) {
           reference_id: purchaseData.id,
           description: `${credits} Credits Purchase`,
           amount: {
-            currency_code: 'USD',
+            currency_code: 'EUR',
             value: Number(amount).toFixed(2),
           },
         },

@@ -37,7 +37,7 @@ export default function LiveCompetition() {
             </div>
             <div className="bg-gray-800 flex gap-4 md:gap-16 px-2 py-1 md:px-6 md:py-3 rounded-lg">
               <p className="text-gray-400 text-xs md:text-base">Prize Pool</p>
-              <p className="text-white font-bold text-xs md:text-base">$50</p>
+              <p className="text-white font-bold text-xs md:text-base">€50</p>
             </div>
           </div>
           <div className="flex flex-col gap-5 items-center space-x-2 md:space-x-4 md:flex-row lg:space-x-34">
@@ -57,9 +57,9 @@ export default function LiveCompetition() {
             <div className="flex flex-col gap-1 md:gap-2">
               <div className="flex gap-1 md:gap-3 flex-col">
                 <div className="bg-lime-400 font-bold rounded-lg text-black px-2 py-1 md:px-4 md:py-2 text-xs md:text-lg">
-                  <p>Join Challenge ($5) <span className="font-bold text-xs md:text-lg">→</span></p>
+                  <p>Join Challenge (€5) <span className="font-bold text-xs md:text-lg">→</span></p>
                 </div>
-                <p className="text-xs md:text-sm">Winners: $25 • $15 • $10</p>
+                <p className="text-xs md:text-sm">Winners: €25 • €15 • €10</p>
               </div>
             </div>
           </div>

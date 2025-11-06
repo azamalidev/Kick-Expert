@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({
               amount: {
                 value: refund.amount.toString(),
-                currency_code: 'USD'
+                currency_code: 'EUR'
               },
               note_to_payer: 'Refund requested by customer'
             })

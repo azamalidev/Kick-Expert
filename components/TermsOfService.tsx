@@ -324,7 +324,7 @@ const TermsOfService = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    Minimum payout is $10
+                    Minimum payout is €10
                   </span>
                 </li>
                 <li className="flex items-start">
@@ -348,7 +348,7 @@ const TermsOfService = () => {
                     <div className="w-3 h-3 rounded-full bg-lime-500"></div>
                   </div>
                   <span className="text-base font-medium">
-                    U.S.-based users earning $600 or more in a calendar year will receive a Form 1099-MISC for tax reporting
+                    U.S.-based users earning €600 or more in a calendar year will receive a Form 1099-MISC for tax reporting
                   </span>
                 </li>
               </ul>

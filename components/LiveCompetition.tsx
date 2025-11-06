@@ -156,7 +156,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{competition.name}</span></p>
-                <p className="text-2xl font-bold text-blue-600">${competition.entry_fee}</p>
+                <p className="text-2xl font-bold text-blue-600">€{competition.entry_fee}</p>
               </div>
 
               {isProcessing ? (
@@ -239,7 +239,7 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{competitionName}</span></p>
-                <p className="text-2xl font-bold text-lime-600">${entryFee}</p>
+                <p className="text-2xl font-bold text-lime-600">€{entryFee}</p>
               </div>
 
               <div className="space-y-4">
@@ -1210,13 +1210,13 @@ const handleCompetitionEntry = async (competitionId: string) => {
   const getPrizes = (name: string, entryFee: number) => {
     switch (name) {
       case 'Starter League':
-        return [`1st: $${Math.floor(entryFee * 5)}`, `2nd: $${Math.floor(entryFee * 2.5)}`, `3rd: $${entryFee}`];
+        return [`1st: €${Math.floor(entryFee * 5)}`, `2nd: €${Math.floor(entryFee * 2.5)}`, `3rd: €${entryFee}`];
       case 'Pro League':
-        return [`1st: $${Math.floor(entryFee * 2.5)}`, `2nd: $${Math.floor(entryFee * 1.25)}`, `3rd: $${Math.floor(entryFee * 0.5)}`];
+        return [`1st: €${Math.floor(entryFee * 2.5)}`, `2nd: €${Math.floor(entryFee * 1.25)}`, `3rd: €${Math.floor(entryFee * 0.5)}`];
       case 'Elite League':
-        return [`1st: $${Math.floor(entryFee * 4)}`, `2nd: $${Math.floor(entryFee * 2)}`, `3rd: $${entryFee}`];
+        return [`1st: €${Math.floor(entryFee * 4)}`, `2nd: €${Math.floor(entryFee * 2)}`, `3rd: €${entryFee}`];
       default:
-        return [`1st: $${Math.floor(entryFee * 5)}`, `2nd: $${Math.floor(entryFee * 2.5)}`, `3rd: $${entryFee}`];
+        return [`1st: €${Math.floor(entryFee * 5)}`, `2nd: €${Math.floor(entryFee * 2.5)}`, `3rd: €${entryFee}`];
     }
   };
 

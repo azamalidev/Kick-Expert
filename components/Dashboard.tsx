@@ -1453,7 +1453,7 @@ export default function Dashboard() {
                         <div>
                           <p className="font-medium">Withdrawal processed</p>
                           <p className="text-sm text-gray-500">
-                            $20.00 has been sent to your account
+                            €20.00 has been sent to your account
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
                             1 day ago

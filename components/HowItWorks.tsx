@@ -48,7 +48,7 @@ const HowItWorks = () => {
       description: "Withdraw winnings through secure payment methods.",
       highlights: [
         "Automatic prize crediting",
-        "Minimum $10 payout",
+        "Minimum €10 payout",
         "2-7 day processing"
       ]
     },

@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
 				}
 
 				// Insert withdrawal record
-				const { data: insData, error: insErr } = await supabaseAdmin.from('withdrawals').insert([{ user_id: user.id, amount, currency: 'USD', status: 'pending', provider: method, provider_account: providerAccount, requested_at: new Date().toISOString(), updated_at: new Date().toISOString() }]).select('id').maybeSingle();
+				const { data: insData, error: insErr } = await supabaseAdmin.from('withdrawals').insert([{ user_id: user.id, amount, currency: 'EUR', status: 'pending', provider: method, provider_account: providerAccount, requested_at: new Date().toISOString(), updated_at: new Date().toISOString() }]).select('id').maybeSingle();
 				if (insErr || !insData) {
 					console.error('Failed inserting withdrawal', insErr);
 					return NextResponse.json({ error: 'Failed to create withdrawal' }, { status: 500 });

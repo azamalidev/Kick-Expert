@@ -5,9 +5,9 @@ import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { CreditBalance, CreditPackage } from '@/types/credits';
 
 const creditPackages: CreditPackage[] = [
-  { id: 'basic', name: 'Basic Pack', credits: 100, price: 10, currency: 'USD' },
-  { id: 'popular', name: 'Popular Pack', credits: 250, price: 20, currency: 'USD' },
-  { id: 'premium', name: 'Premium Pack', credits: 700, price: 50, currency: 'USD' }
+  { id: 'basic', name: 'Basic Pack', credits: 100, price: 10, currency: 'EUR' },
+  { id: 'popular', name: 'Popular Pack', credits: 250, price: 20, currency: 'EUR' },
+  { id: 'premium', name: 'Premium Pack', credits: 700, price: 50, currency: 'EUR' }
 ];
 
 const Credits: React.FC = () => {

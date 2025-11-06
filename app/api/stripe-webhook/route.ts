@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
             user_id: withdrawal.user_id,
             type: 'withdrawal_paid',
             title: 'Withdrawal Completed',
-            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'USD'} has been successfully processed and sent to your account.`,
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'EUR'} has been successfully processed and sent to your account.`,
             created_at: new Date().toISOString()
           });
 
@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
             user_id: withdrawal.user_id,
             type: 'withdrawal_failed',
             title: 'Withdrawal Failed',
-            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'USD'} could not be processed. Reason: ${obj.failure_message || 'Unknown error'}. Please contact support.`,
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency || 'EUR'} could not be processed. Reason: ${obj.failure_message || 'Unknown error'}. Please contact support.`,
             created_at: new Date().toISOString()
           });
 

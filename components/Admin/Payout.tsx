@@ -158,7 +158,7 @@ const Payout = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-EU', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(amount);
 
   const pendingAmount = withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + w.amount, 0);
   const approvedAmount = withdrawals.filter(w => w.status === 'approved' || w.status === 'Paid' || w.status === 'paid').reduce((s, w) => s + w.amount, 0);

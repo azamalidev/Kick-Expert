@@ -79,11 +79,11 @@ export async function POST(req: Request) {
         const amountCents = Math.round(Number(w.amount) * 100);
 
         // Create a Payment to connected account (using destination charges or transfers) — simplified example:
-        const transfer = await stripe.transfers.create({ amount: amountCents, currency: w.currency || 'usd', destination: w.provider_account });
+        const transfer = await stripe.transfers.create({ amount: amountCents, currency: w.currency || 'eur', destination: w.provider_account });
 
         // Optionally create a payout on connected account (requires platform to have balance)
         // Note: many Connect setups auto-handle payouts; adjust to your account type.
-        const payout = await stripe.payouts.create({ amount: amountCents, currency: w.currency || 'usd' }, { stripeAccount: w.provider_account });
+        const payout = await stripe.payouts.create({ amount: amountCents, currency: w.currency || 'eur' }, { stripeAccount: w.provider_account });
 
         // ===== WEBHOOK-BASED STATUS =====
         // Mark as 'approved' with payout_id, let webhook update to 'paid' or 'payout_failed'
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
         // Persist a provider_payouts row with failed status and specific code for later inspection/retry
         try {
           const errPayload = stripeErr && typeof stripeErr === 'object' ? stripeErr : { message: String(stripeErr) };
-          await supabaseAdmin.from('provider_payouts').insert([{ withdrawal_id: withdrawalId, provider: 'stripe', provider_payout_id: null, amount: Number(w.amount || 0), currency: w.currency || 'USD', status: code === 'balance_insufficient' ? 'failed_insufficient_funds' : 'failed', response: errPayload }]);
+          await supabaseAdmin.from('provider_payouts').insert([{ withdrawal_id: withdrawalId, provider: 'stripe', provider_payout_id: null, amount: Number(w.amount || 0), currency: w.currency || 'EUR', status: code === 'balance_insufficient' ? 'failed_insufficient_funds' : 'failed', response: errPayload }]);
         } catch (ppErr) {
           console.warn('Failed to insert provider_payouts row for stripe error', ppErr);
         }
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
               recipient_type: 'EMAIL',
               amount: {
                 value: w.amount.toString(),
-                currency: w.currency || 'USD'
+                currency: w.currency || 'EUR'
               },
               receiver: w.provider_account,
               note: 'Withdrawal payout',
@@ -220,7 +220,7 @@ export async function POST(req: Request) {
         // Persist a provider_payouts row with failed status for later inspection/retry
         try {
           const errPayload = paypalErr && typeof paypalErr === 'object' ? paypalErr : { message: String(paypalErr) };
-          await supabaseAdmin.from('provider_payouts').insert([{ withdrawal_id: withdrawalId, provider: 'paypal', provider_payout_id: null, amount: Number(w.amount || 0), currency: w.currency || 'USD', status: 'failed', response: errPayload }]);
+          await supabaseAdmin.from('provider_payouts').insert([{ withdrawal_id: withdrawalId, provider: 'paypal', provider_payout_id: null, amount: Number(w.amount || 0), currency: w.currency || 'EUR', status: 'failed', response: errPayload }]);
         } catch (ppErr) {
           console.warn('Failed to insert provider_payouts row for paypal error', ppErr);
         }

@@ -189,7 +189,7 @@ export default function Competitions() {
                   value={newCompetition.entry_fee}
                   onChange={(e) => setNewCompetition({...newCompetition, entry_fee: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lime-500"
-                  placeholder="e.g. $10"
+                  placeholder="e.g. €10"
                 />
               </div>
             </div>
