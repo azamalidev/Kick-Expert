@@ -312,65 +312,70 @@ export default function CompleteProfile() {
 
         if (upsertError) throw upsertError;
 
-        toast.success('Profile saved!', { id: toastId });
+        toast.success('Profile completed successfully! Welcome to KickExpert!', { id: toastId });
 
-        // Redirect to dashboard after successful save
-        router.replace('/');
+        // Redirect to home page after successful save - user is already logged in
+        setTimeout(() => {
+          router.replace('/');
+        }, 1000);
       } else {
-        // No session case: post form (including avatar file) to server endpoint
-        const form = new FormData();
-        form.append('email', user.email || '');
-        form.append('username', userName.trim() || '');
-        form.append('nationality', nationality || '');
-        if (avatarFile) form.append('avatar', avatarFile);
+        // No session case: auto-login the user first, then complete profile
+        const storedEmail = sessionStorage.getItem('signup_email');
+        const storedPassword = sessionStorage.getItem('signup_password');
 
-        const r = await fetch('/api/profile/complete', { method: 'POST', body: form });
-        if (!r.ok) throw new Error('Server profile completion failed');
-
-        // After successful profile completion, auto-login the user
-        try {
-          const storedEmail = sessionStorage.getItem('signup_email');
-          const storedPassword = sessionStorage.getItem('signup_password');
-
-          if (storedEmail && storedPassword) {
-            console.log('Attempting auto-login after profile completion...');
-
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-              email: storedEmail,
-              password: storedPassword
-            });
-
-            if (authError) {
-              console.error('Auto-login failed:', authError);
-              toast.error('Profile completed but login failed. Please sign in manually.', { id: toastId });
-              router.replace(`/login?email=${encodeURIComponent(storedEmail)}`);
-              return;
-            }
-
-            if (authData?.session) {
-              // Successfully logged in - clear stored credentials
-              sessionStorage.removeItem('signup_email');
-              sessionStorage.removeItem('signup_password');
-
-              toast.success('Profile completed and logged in successfully! Welcome to KickExpert!', { id: toastId });
-
-              // Redirect to dashboard with full page reload to ensure session is picked up
-              setTimeout(() => {
-                window.location.href = '/';
-              }, 1500);
-              return;
-            }
-          }
-
-          // If no stored credentials or login failed, redirect to login
-          toast.success('Profile completed! Please sign in to continue.', { id: toastId });
+        if (!storedEmail || !storedPassword) {
+          toast.error('Session expired. Please log in to complete your profile.', { id: toastId });
           router.replace('/login');
-
-        } catch (autoLoginError) {
-          console.error('Auto-login error:', autoLoginError);
-          toast.error('Profile completed but automatic login failed. Please sign in manually.', { id: toastId });
-          router.replace('/login');
+          return;
         }
+
+        // Step 1: Auto-login the user
+        console.log('Attempting auto-login before profile completion...');
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: storedEmail,
+          password: storedPassword
+        });
+
+        if (authError || !authData?.session) {
+          console.error('Auto-login failed:', authError);
+          toast.error('Unable to authenticate. Please log in manually.', { id: toastId });
+          sessionStorage.removeItem('signup_email');
+          sessionStorage.removeItem('signup_password');
+          router.replace(`/login?email=${encodeURIComponent(storedEmail)}`);
+          return;
+        }
+
+        // Step 2: Now complete the profile with the logged-in session
+        const loggedInUserId = authData.session.user.id;
+        const avatarUrl = await uploadImage(loggedInUserId);
+
+        const profilePayload = {
+          user_id: loggedInUserId,
+          username: userName.trim() || null,
+          avatar_url: avatarUrl || null,
+          nationality: nationality || null,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert([profilePayload], { onConflict: 'user_id' })
+          .select()
+          .single();
+
+        if (upsertError) throw upsertError;
+
+        // Successfully completed - clear stored credentials
+        sessionStorage.removeItem('signup_email');
+        sessionStorage.removeItem('signup_password');
+
+        toast.success('Profile completed successfully! Welcome to KickExpert!', { id: toastId });
+
+        // Redirect to home page - user is now logged in with complete profile
+        setTimeout(() => {
+          router.replace('/');
+        }, 1000);
       }
     } catch (error: any) {
       console.error('Profile setup error:', error);
