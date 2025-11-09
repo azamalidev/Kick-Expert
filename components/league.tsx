@@ -276,15 +276,23 @@ export default function LeaguePage() {
         const routeJson = await routeRes.json();
         const questionsData = routeJson?.questions ?? [];
 
+        console.log('🌐 Received from API:', questionsData.length, 'questions');
+        console.log('📊 Difficulty breakdown:', 
+          questionsData.reduce((acc: any, q: any) => {
+            const d = q.difficulty || 'unknown';
+            acc[d] = (acc[d] || 0) + 1;
+            return acc;
+          }, {})
+        );
+
         if (!questionsData || questionsData.length === 0) {
           setError('No questions are configured for this competition.');
           setLoading(false);
           return;
         }
 
-        // Normalize returned rows to client's Question shape. Keep competition_question_id
-        // and question_id where present.
-        const normalizedAll: Question[] = questionsData.map((q: any) => ({
+        // Normalize returned rows to client's Question shape
+        const normalizedQuestions: Question[] = questionsData.map((q: any) => ({
           id: q.competition_question_id ?? null,
           sourceQuestionId: q.source_question_id ?? q.question_id ?? null,
           // @ts-ignore preserve for later inserts
@@ -297,12 +305,6 @@ export default function LeaguePage() {
           explanation: q.explanation,
         }));
 
-        // Enforce 20 questions per session with a 40/40/20 difficulty split
-        const targetTotal = 20;
-        const targetEasy = Math.round(targetTotal * 0.4); // 8
-        const targetMedium = Math.round(targetTotal * 0.4); // 8
-        const targetHard = targetTotal - targetEasy - targetMedium; // 4
-
         const shuffle = <T,>(arr: T[]): T[] => {
           const a = [...arr];
           for (let i = a.length - 1; i > 0; i--) {
@@ -312,30 +314,16 @@ export default function LeaguePage() {
           return a;
         };
 
-        const easyQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('easy'));
-        const mediumQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('medium'));
-        const hardQs = normalizedAll.filter(q => (q.difficulty || '').toString().toLowerCase().includes('hard'));
+        // Shuffle choices for each question to randomize answer positions
+        const questionsWithShuffledChoices = normalizedQuestions.map(question => ({
+          ...question,
+          choices: shuffle(question.choices)
+        }));
 
-        let selected: Question[] = [];
-        selected = [
-          ...shuffle(easyQs).slice(0, targetEasy),
-          ...shuffle(mediumQs).slice(0, targetMedium),
-          ...shuffle(hardQs).slice(0, targetHard),
-        ];
+        console.log('✅ Final questions ready:', questionsWithShuffledChoices.length);
+        console.log('🎲 Questions order:', questionsWithShuffledChoices.map((q, i) => `${i+1}. ${q.difficulty}`));
 
-        // If any bucket lacked enough questions, backfill from remaining pool to reach 20
-        if (selected.length < targetTotal) {
-          const selectedIds = new Set(selected.map(q => q.id as any));
-          const remaining = shuffle(normalizedAll.filter(q => !selectedIds.has(q.id as any)));
-          selected = [...selected, ...remaining.slice(0, targetTotal - selected.length)];
-        }
-
-        // Ensure we do not exceed total
-        if (selected.length > targetTotal) {
-          selected = shuffle(selected).slice(0, targetTotal);
-        }
-
-        setQuestions(selected);
+        setQuestions(questionsWithShuffledChoices);
 
 
 
@@ -390,7 +378,7 @@ export default function LeaguePage() {
             // compute difficulty breakdown from the questions
             difficulty_breakdown: ((): any => {
               const acc: any = { easy: 0, medium: 0, hard: 0 };
-              (selected || []).forEach((q: any) => {
+              (normalizedQuestions || []).forEach((q: any) => {
                 const d = (q.difficulty || '').toString().toLowerCase();
                 if (d.includes('easy')) acc.easy += 1;
                 else if (d.includes('medium')) acc.medium += 1;
@@ -459,6 +447,12 @@ export default function LeaguePage() {
 
       if (remaining <= 0) {
         clearInterval(timerInterval);
+
+        // Prevent calling handleNextQuestion if already processing (nextCalled flag)
+        if (nextCalled.current) {
+          console.log('Timer: nextCalled is true, skipping handleNextQuestion');
+          return;
+        }
 
         // Case 1: user did NOT select an answer → skip to next
         if (!selectedChoice) {
@@ -599,8 +593,9 @@ export default function LeaguePage() {
   }, [selectedChoice]);
 
   const handleNextQuestion = async () => {
-    // Prevent multiple calls
+    // Prevent multiple calls - use a more robust check
     if (nextCalled.current) {
+      console.log('handleNextQuestion already called, skipping...');
       return;
     }
     nextCalled.current = true;
@@ -609,10 +604,12 @@ export default function LeaguePage() {
     if (hasCompetitionEnded()) {
       console.log('Competition ended - moving to results');
       setPhase('results');
+      nextCalled.current = false; // Reset for future use
       return;
     }
 
     if (questions.length === 0) {
+      nextCalled.current = false; // Reset for future use
       return;
     }
 
@@ -641,9 +638,12 @@ export default function LeaguePage() {
     const isCorrect = selectedChoiceRef.current === currentQuestion?.correct_answer;
 
 
-    // Update score
+    // Update score ONLY if correct and not already counted
     if (isCorrect) {
-      setScore((prev) => prev + 1);
+      setScore((prev) => {
+        console.log(`Score update: ${prev} -> ${prev + 1}`);
+        return prev + 1;
+      });
     }
 
 
@@ -663,13 +663,23 @@ export default function LeaguePage() {
       const userId = authData.data.user?.id;
 
       // Determine FK fields
+      // For competition questions, id is a UUID (competition_question_id)
+      // For regular questions, it would be an integer (question_id)
       let fkQuestionId: number | null = null;
-      if (typeof currentQuestion.id === 'number' && Number.isInteger(currentQuestion.id)) {
+      let competitionQuestionId: string | null = null;
+
+      if (typeof currentQuestion.id === 'string') {
+        // It's a UUID from competition_questions table
+        competitionQuestionId = currentQuestion.id;
+      } else if (typeof currentQuestion.id === 'number' && Number.isInteger(currentQuestion.id)) {
+        // It's an integer from questions table
         fkQuestionId = currentQuestion.id;
       }
 
-      // competition_question_id comes from the merged object if available
-      const competitionQuestionId = (currentQuestion as any).competition_question_id ?? null;
+      // Also check the competition_question_id property if it exists
+      if ((currentQuestion as any).competition_question_id) {
+        competitionQuestionId = (currentQuestion as any).competition_question_id;
+      }
 
       // registration id saved earlier when session was created (fall back to reading global)
       const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
@@ -686,6 +696,12 @@ export default function LeaguePage() {
         is_correct: isCorrect,
         submitted_at: new Date().toISOString(),
       };
+
+      console.log('💾 Saving answer:', { 
+        question_id: fkQuestionId, 
+        competition_question_id: competitionQuestionId,
+        is_correct: isCorrect 
+      });
 
       await supabase.from('competition_answers').insert(payload);
 
@@ -734,19 +750,20 @@ export default function LeaguePage() {
       setShowResult(false);
       setTimer(30);
       setTimerKey((prev) => prev + 1);
+      // Reset the flag after state updates to allow next question
+      setTimeout(() => {
+        nextCalled.current = false;
+      }, 500);
     } else {
+      // Last question - complete the quiz
       setTimeout(async () => {
         await completeQuiz();
         setQuizCompleted(true);
         setShowResult(false);
         setPhase('results');
+        nextCalled.current = false; // Reset after completion
       }, 100);
     }
-
-
-    setTimeout(() => {
-      nextCalled.current = false;
-    }, 300);
   };
 
   // Analyze response patterns for cheating detection
@@ -901,87 +918,12 @@ export default function LeaguePage() {
           }
         }
 
-        // Add winning credits to user's account if they won a prize
-        if (userRank <= prizeConfig.winnerCount && prizeAmount > 0) {
-          try {
-            // Check if user_credits record exists
-            const { data: existingCredits, error: fetchError } = await supabase
-              .from('user_credits')
-              .select('*')
-              .eq('user_id', userId)
-              .maybeSingle();
+        // ⚠️ DO NOT ADD CREDITS HERE - Credits should only be distributed AFTER competition ends
+        // Credits will be added by a backend process when the competition end_time is reached
+        // This ensures fair distribution and prevents early finishers from getting credits before final rankings
 
-            if (fetchError && fetchError.code !== 'PGRST116') {
-              console.error('Error fetching user credits:', fetchError);
-            }
-
-            if (existingCredits) {
-              // Update existing record - add to winnings_credits
-              const { error: updateError } = await supabase
-                .from('user_credits')
-                .update({
-                  winnings_credits: (existingCredits.winnings_credits || 0) + prizeAmount,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('user_id', userId);
-
-              if (updateError) {
-                console.error('Error updating user credits:', updateError);
-              } else {
-                console.log(`Added ${prizeAmount} credits to user's winnings`);
-              }
-            } else {
-              // Create new record with winnings_credits
-              const { error: insertError } = await supabase
-                .from('user_credits')
-                .insert({
-                  user_id: userId,
-                  purchased_credits: 0,
-                  winnings_credits: prizeAmount,
-                  referral_credits: 0,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-
-              if (insertError) {
-                console.error('Error creating user credits record:', insertError);
-              } else {
-                console.log(`Created user credits record with ${prizeAmount} winnings`);
-              }
-            }
-
-            // Insert transaction record for the reward
-            const rankSuffix = userRank === 1 ? 'st' : userRank === 2 ? 'nd' : 'rd';
-            const { error: transactionError } = await supabase
-              .from('transactions')
-              .insert({
-                user_id: userId,
-                type: 'reward',
-                amount: prizeAmount,
-                status: 'completed',
-                description: `Competition Reward (${competitionDetails?.name}) - Rank: ${userRank}${rankSuffix} - Score: ${correctAnswers}/${questions.length}`,
-                session_id: sessionId,
-                source: 'league_competition',
-                created_at: new Date().toISOString(),
-                metadata: {
-                  competition_id: competitionId,
-                  competition_name: competitionDetails?.name,
-                  rank: userRank,
-                  score: correctAnswers,
-                  total_questions: questions.length,
-                  prize_amount: prizeAmount
-                }
-              });
-
-            if (transactionError) {
-              console.error('Error creating transaction record:', transactionError);
-            } else {
-              console.log(`Transaction record created for ${prizeAmount} credits reward`);
-            }
-          } catch (creditsErr) {
-            console.error('Unexpected error updating user credits:', creditsErr);
-          }
-        }
+        // Store the prize info in competition_results for later credit distribution
+        // The backend job will read from competition_results and distribute credits after competition ends
 
         // Update user profile - increment games, wins (if winner), and XP
         try {
@@ -1351,8 +1293,8 @@ export default function LeaguePage() {
   }
 
   return (
-    <div className="min-h-screen mt-14 bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 p-4 sm:p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl sm:rounded-2xl border border-gray-200 shadow-lg sm:shadow-xl overflow-hidden">
+    <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-6">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
         {initializing && (
           <div className="p-6 sm:p-8 text-center min-h-[400px] flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -1523,21 +1465,20 @@ export default function LeaguePage() {
         )}
 
         {phase === 'quiz' && !quizCompleted && (
-          <div className="p-4 sm:p-6">
-            {/* Header with Progress */}
-            <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-4 sm:p-6 rounded-lg mb-4">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
+          <>
+            <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <h1 className="text-xl sm:text-2xl font-bold text-white text-center sm:text-left">
                   {competitionDetails?.name || 'League Competition'}
                 </h1>
                 <div className="flex items-center justify-center sm:justify-end space-x-3 sm:space-x-4">
-                  <div className="bg-white  bg-opacity-20 px-3 py-1 rounded-full flex items-center">
-                    <span className="font-bold text-lime-500">{score}</span>
-                    <span className="text-lime-500 opacity-90">/{questions.length}</span>
+                  <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full flex items-center">
+                    <span className="font-bold text-black">{score}</span>
+                    <span className="text-black opacity-80">/{questions.length}</span>
                   </div>
                   <div className="w-24 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 transition-all duration-500"
+                      className="h-full bg-lime-700 transition-all duration-500"
                       style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
                     />
                   </div>
@@ -1569,95 +1510,97 @@ export default function LeaguePage() {
               </div>
             </div>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentQuestionIndex}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="p-4 sm:p-6"
-              >
-                {/* Question Metadata */}
-                <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                  <div className="flex items-center space-x-3">
-                    <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
-                      {questions[currentQuestionIndex]?.category}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
-                        questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                      }`}>
-                      {questions[currentQuestionIndex]?.difficulty}
+            <div className="p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentQuestionIndex}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Question Metadata */}
+                  <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <div className="flex items-center space-x-3">
+                      <span className="bg-gray-100 px-3 py-1 rounded-full text-sm text-gray-600">
+                        {questions[currentQuestionIndex]?.category}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${questions[currentQuestionIndex]?.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                          questions[currentQuestionIndex]?.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }`}>
+                        {questions[currentQuestionIndex]?.difficulty}
+                      </span>
+                    </div>
+                    <span className="text-gray-500">
+                      Question {currentQuestionIndex + 1} of {questions.length}
                     </span>
                   </div>
-                </div>
 
-                {/* Question Text */}
-                <h2 className="text-xl font-semibold mb-6 text-gray-800">
-                  {questions[currentQuestionIndex]?.question_text}
-                </h2>
+                  {/* Question Text */}
+                  <h2 className="text-xl font-semibold mb-6 text-gray-800">
+                    {questions[currentQuestionIndex]?.question_text}
+                  </h2>
 
-                {/* Answer Choices */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {questions[currentQuestionIndex]?.choices.map((choice, index) => (
-                    <motion.button
-                      key={index}
-                      whileHover={!showResult ? { scale: 1.02 } : {}}
-                      whileTap={!showResult ? { scale: 0.98 } : {}}
-                      onClick={() => handleChoiceSelect(choice)}
-                      className={`p-4 rounded-xl border-2 text-left transition-all ${showResult && choice === questions[currentQuestionIndex]?.correct_answer
-                          ? 'border-green-500 bg-green-50'
-                          : showResult && selectedChoice === choice
-                            ? 'border-red-500 bg-red-50'
-                            : selectedChoice === choice
-                              ? 'border-lime-400 bg-lime-50'
-                              : 'border-gray-200 hover:border-lime-300 bg-white'
-                        }`}
-                      disabled={showResult || quizCompleted}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm sm:text-base">{choice}</span>
-                        {showResult && choice === questions[currentQuestionIndex]?.correct_answer && (
-                          <span className="ml-2 text-green-500 text-xl">✓</span>
-                        )}
-                        {showResult && selectedChoice === choice && selectedChoice !== questions[currentQuestionIndex]?.correct_answer && (
-                          <span className="ml-2 text-red-500 text-xl">✗</span>
-                        )}
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
+                  {/* Answer Choices */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {questions[currentQuestionIndex]?.choices.map((choice, index) => (
+                      <motion.button
+                        key={index}
+                        whileHover={!showResult ? { scale: 1.02 } : {}}
+                        whileTap={!showResult ? { scale: 0.98 } : {}}
+                        onClick={() => handleChoiceSelect(choice)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${showResult && choice === questions[currentQuestionIndex]?.correct_answer
+                            ? 'border-green-500 bg-green-50'
+                            : showResult && selectedChoice === choice
+                              ? 'border-red-500 bg-red-50'
+                              : selectedChoice === choice
+                                ? 'border-lime-400 bg-lime-50'
+                                : 'border-gray-200 hover:border-lime-300 bg-white'
+                          }`}
+                        disabled={showResult || quizCompleted}
+                      >
+                        <div className="flex items-center">
+                          <span className="font-medium">{choice}</span>
+                          {showResult && choice === questions[currentQuestionIndex]?.correct_answer && (
+                            <span className="ml-2 text-green-500">✓</span>
+                          )}
+                          {showResult && selectedChoice === choice && selectedChoice !== questions[currentQuestionIndex]?.correct_answer && (
+                            <span className="ml-2 text-red-500">✗</span>
+                          )}
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
 
-                {/* Action Buttons */}
-                <div className="flex flex-col space-y-4">
-                  {selectedChoice && !showResult && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowResult(true)}
-                      className="w-full py-3 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md transition-all"
-                    >
-                      Submit Answer
-                    </motion.button>
-                  )}
+                  {/* Action Buttons */}
+                  <div className="flex flex-col space-y-4">
+                    {selectedChoice && !showResult && (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowResult(true)}
+                        className="w-full py-3 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md transition-all"
+                      >
+                        Submit Answer
+                      </motion.button>
+                    )}
 
-                  {showResult && (
-                    <>
+                    {showResult && (
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleNextQuestion}
                         className="w-full py-3 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md transition-all"
                       >
-                        {currentQuestionIndex < questions.length - 1 ? 'Next Question →' : 'View Results 🎯'}
+                        {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'View Results'}
                       </motion.button>
-                    </>
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+                    )}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </>
         )}
 
         {phase === 'results' && (

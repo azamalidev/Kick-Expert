@@ -72,7 +72,13 @@ export default function QuizDashboard() {
         ...selectedHard
       ]);
 
-      setQuestions(allQuestions);
+      // Shuffle choices for each question to randomize answer positions
+      const questionsWithShuffledChoices = allQuestions.map(question => ({
+        ...question,
+        choices: shuffleArray(question.choices)
+      }));
+
+      setQuestions(questionsWithShuffledChoices);
 
       // DON'T mark questions as used here - they'll be marked when actually served to user
       // Removing the premature mark_question_as_used calls
