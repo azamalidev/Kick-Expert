@@ -1190,4 +1190,310 @@ export const transactionalTemplates = {
       </html>
     `,
   }),
+
+  competitionReminder: (data: {
+    name?: string;
+    competitionName: string;
+    competitionDate: string;
+    competitionTime: string;
+    entryFee: string;
+    prizePool: string;
+    competitionId: string;
+    minutesUntilStart: number;
+  }) => ({
+    subject: `⏰ ${data.competitionName} Starts in ${data.minutesUntilStart} Minutes!`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Competition Reminder</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', system-ui, Arial, sans-serif; background-color: #f8fafc;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header with Logo -->
+          <div style="background: #ffffff; padding: 32px 24px; text-align: center;">
+            <img src="https://www.kickexpert.com/logo.png" alt="KickExpert Logo" style="width: 60px; height: 60px; margin-bottom: 8px; border-radius: 8px;">
+            <h1 style="font-size: 28px; font-weight: 700; margin: 0;">
+              <span style="color: #84cc16;">Kick</span><span style="color: #000000;">Expert</span>
+            </h1>
+          </div>
+
+          <!-- Main Content -->
+          <div style="padding: 40px 32px;">
+
+
+            <div style="text-align: center;">
+              <h2 style="color: #1e293b; font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">
+                Competition Starting Soon!
+              </h2>
+              <p style="color: #64748b; font-size: 16px; line-height: 1.6; margin: 0;">
+                ${data.name ? `Hi ${data.name},` : 'Hello,'} Your competition starts in ${data.minutesUntilStart} minutes. Get ready!
+              </p>
+            </div>
+
+            <!-- Countdown Card -->
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 24px; margin: 24px 0; color: #ffffff; text-align: center;">
+              <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #ffffff;">⏰ Time Remaining</h3>
+              <div style="font-size: 48px; font-weight: 800; margin: 8px 0; color: #ffffff;">
+                ${data.minutesUntilStart} Minutes
+              </div>
+              <p style="margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.9);">
+                Make sure you're ready to compete!
+              </p>
+            </div>
+
+            <!-- Competition Details Box -->
+            <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+              <h3 style="color: #1e293b; font-size: 18px; font-weight: 600; margin: 0 0 16px 0; text-align: center;">📋 Competition Details</h3>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e2e8f0;">Competition:</td>
+                  <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #1e293b; border-bottom: 1px solid #e2e8f0;">${data.competitionName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e2e8f0;">Start Time:</td>
+                  <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #1e293b; border-bottom: 1px solid #e2e8f0;">${data.competitionTime}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e2e8f0;">Date:</td>
+                  <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #1e293b; border-bottom: 1px solid #e2e8f0;">${data.competitionDate}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; color: #64748b; font-size: 14px; border-bottom: 1px solid #e2e8f0;">Entry Fee:</td>
+                  <td style="padding: 12px 0; text-align: right; font-weight: 600; color: #1e293b; border-bottom: 1px solid #e2e8f0;">${data.entryFee} Credits</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; color: #64748b; font-size: 14px;">Prize Pool:</td>
+                  <td style="padding: 12px 0; text-align: right; font-weight: 700; color: #84cc16;">${data.prizePool} Credits</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Quick Tips -->
+            <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+              <h3 style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">⚡ Quick Tips for Success:</h3>
+              <ul style="color: #1e3a8a; font-size: 14px; margin: 0; padding-left: 20px; text-align: left; line-height: 1.6;">
+                <li>Ensure you have a stable internet connection</li>
+                <li>Join the competition 2-3 minutes early if possible</li>
+                <li>Read each question carefully before answering</li>
+                <li>You have 30 seconds per question - use your time wisely!</li>
+                <li>Stay focused and give it your best shot!</li>
+              </ul>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="https://www.kickexpert.com/livecompetition" style="display: inline-block; background: #84cc16; color: #ffffff; font-size: 18px; font-weight: 600; text-decoration: none; padding: 16px 32px; border-radius: 8px; box-shadow: 0 4px 12px rgba(132, 204, 22, 0.3); transition: all 0.3s ease;">
+                Join Competition Now
+              </a>
+            </div>
+
+            <!-- Reminder Note -->
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 16px; margin: 24px 0; text-align: center;">
+              <p style="color: #92400e; font-size: 14px; margin: 0; line-height: 1.6;">
+                <strong>⏰ Reminder:</strong> Competition registration closes 5 minutes before start time. Don't miss out!
+              </p>
+            </div>
+
+            <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 24px 0 0 0;">
+              Good luck! <a href="https://www.kickexpert.com/contact" style="color: #84cc16; text-decoration: none;">Need help?</a>
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #1e293b; color: #ffffff; padding: 32px 24px;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="color: #ffffff;">
+              <tr>
+                <td align="center" style="padding-bottom: 16px;">
+                  <img src="https://www.kickexpert.com/logo.png" alt="KickExpert Logo" style="width: 40px; height: 40px; border-radius: 6px;" />
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-bottom: 8px;">
+                  <span style="font-size: 16px; font-weight: 600;">
+                    <span style="color: #84cc16;">Kick</span><span style="color: #ffffff;">Expert</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-bottom: 16px;">
+                  <span style="color: #cbd5e1; font-size: 14px;">The ultimate destination for football enthusiasts</span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="border-top: 1px solid #334155; padding-top: 16px;">
+                  <div style="color: #94a3b8; font-size: 12px; line-height: 1.4;">
+                    © 2025 KickExpert. All rights reserved.<br />
+                    <a href="https://www.kickexpert.com/policy" style="color: #94a3b8; text-decoration: none;">Privacy Policy</a> |
+                    <a href="https://www.kickexpert.com/termsofservice" style="color: #94a3b8; text-decoration: none;">Terms of Service</a>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  }),
+
+  weeklySchedule: (data: {
+    name?: string;
+    weekDate: string;
+    competitions: Array<{
+      name: string;
+      startTime: string;
+      entryFee: string | number;
+      prizePool: string | number;
+      competitionId?: string;
+    }>;
+  }) => ({
+    subject: `Football Competitions This Week - ${data.weekDate}`,
+    html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Weekly Competition Schedule</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', system-ui, Arial, sans-serif; background-color: #f8fafc;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header with Logo -->
+          <div style="background: #ffffff; padding: 32px 24px; text-align: center;">
+            <img src="https://www.kickexpert.com/logo.png" alt="KickExpert Logo" style="width: 60px; height: 60px; margin-bottom: 8px; border-radius: 8px;">
+            <h1 style="font-size: 28px; font-weight: 700; margin: 0;">
+              <span style="color: #84cc16;">Kick</span><span style="color: #000000;">Expert</span>
+            </h1>
+          </div>
+
+          <!-- Main Content -->
+          <div style="padding: 40px 32px;">
+            <div style="text-align: center;">
+              <h2 style="color: #1e293b; font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">
+                This Week's Competitions
+              </h2>
+              <p style="color: #64748b; font-size: 16px; line-height: 1.6; margin: 0;">
+                ${data.name ? `Hi ${data.name},` : 'Hello,'} All competitions for ${data.weekDate} have been scheduled!
+              </p>
+            </div>
+
+            <!-- Schedule Overview -->
+            <div style="background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%); border-radius: 12px; padding: 24px; margin: 24px 0; color: #ffffff; text-align: center;">
+              <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #ffffff;">Complete Competition Schedule</h3>
+              <p style="margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.9);">
+                ${data.competitions.length} competitions ready for this Saturday
+              </p>
+            </div>
+
+            <!-- Competitions List -->
+            <div style="background-color: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0;">
+              <h3 style="color: #1e293b; font-size: 18px; font-weight: 600; margin: 0 0 16px 0; text-align: center;">Competition Details</h3>
+
+              ${data.competitions.map((comp, index) => `
+                <div style="background: #ffffff; border-radius: 8px; padding: 16px; margin: 12px 0; border-left: 4px solid ${index === 0 ? '#84cc16' : index === 1 ? '#3b82f6' : '#8b5cf6'};">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">${comp.name}</h4>
+                    <span style="background: ${index === 0 ? '#dcfce7' : index === 1 ? '#dbeafe' : '#f3e8ff'}; color: ${index === 0 ? '#166534' : index === 1 ? '#1e40af' : '#6b21a8'}; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                      ${comp.startTime}
+                    </span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 14px;">
+                    <span style="color: #64748b;">Entry Fee: <strong style="color: #1e293b;">${comp.entryFee} Credits</strong></span>
+                    <span style="color: #64748b;">Prize Pool: <strong style="color: #84cc16;">${comp.prizePool} Credits</strong></span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- Competition Types Info -->
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+              <h3 style="color: #92400e; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Competition Levels</h3>
+              <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; margin-bottom: 4px;">🌱</div>
+                  <div style="font-size: 12px; color: #78350f; font-weight: 600;">Starter League</div>
+                  <div style="font-size: 11px; color: #92400e;">Perfect for beginners</div>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; margin-bottom: 4px;">⚡</div>
+                  <div style="font-size: 12px; color: #78350f; font-weight: 600;">Pro League</div>
+                  <div style="font-size: 11px; color: #92400e;">Challenge yourself</div>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-size: 18px; margin-bottom: 4px;">👑</div>
+                  <div style="font-size: 12px; color: #78350f; font-weight: 600;">Elite League</div>
+                  <div style="font-size: 11px; color: #92400e;">For champions only</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Tips -->
+            <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+              <h3 style="color: #1e40af; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Weekly Tips:</h3>
+              <ul style="color: #1e3a8a; font-size: 14px; margin: 0; padding-left: 20px; text-align: left; line-height: 1.6;">
+                <li>Register early to secure your spot in all competitions</li>
+                <li>Each competition runs for about 30-45 minutes</li>
+                <li>You can participate in multiple competitions on the same day</li>
+                <li>Check your email for competition reminders 10 minutes before start</li>
+                <li>Top performers in each league may qualify for higher tiers</li>
+              </ul>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="https://www.kickexpert.com/livecompetition" style="display: inline-block; background: #84cc16; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(132, 204, 22, 0.3); margin: 0 8px 8px 0;">
+                View All Competitions
+              </a>
+              <a href="https://www.kickexpert.com/leaderboard" style="display: inline-block; background: #3b82f6; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); margin: 0 8px 8px 0;">
+                Check Leaderboards
+              </a>
+            </div>
+
+            <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 24px 0 0 0;">
+              Excited for this week's competitions? <a href="https://www.kickexpert.com/contact" style="color: #84cc16; text-decoration: none;">Share your thoughts!</a>
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #1e293b; color: #ffffff; padding: 32px 24px;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="color: #ffffff;">
+              <tr>
+                <td align="center" style="padding-bottom: 16px;">
+                  <img src="https://www.kickexpert.com/logo.png" alt="KickExpert Logo" style="width: 40px; height: 40px; border-radius: 6px;" />
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-bottom: 8px;">
+                  <span style="font-size: 16px; font-weight: 600;">
+                    <span style="color: #84cc16;">Kick</span><span style="color: #ffffff;">Expert</span>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-bottom: 16px;">
+                  <span style="color: #cbd5e1; font-size: 14px;">The ultimate destination for football enthusiasts</span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="border-top: 1px solid #334155; padding-top: 16px;">
+                  <div style="color: #94a3b8; font-size: 12px; line-height: 1.4;">
+                    © 2025 KickExpert. All rights reserved.<br />
+                    <a href="https://www.kickexpert.com/policy" style="color: #94a3b8; text-decoration: none;">Privacy Policy</a> |
+                    <a href="https://www.kickexpert.com/termsofservice" style="color: #94a3b8; text-decoration: none;">Terms of Service</a>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  }),
+
 };
