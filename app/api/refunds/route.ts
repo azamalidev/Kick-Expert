@@ -188,6 +188,38 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString()
       });
 
+    // Send refund request confirmation email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/refund-processed`;
+      console.log('Sending refund request confirmation email to user:', userId);
+      
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refundId: refund.id,
+          userId: userId,
+          amount: amount,
+          status: 'pending',
+          refundMethod: purchase.payment_provider || 'stripe',
+          requestDate: refund.created_at,
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error('Failed to send refund request email:', emailError);
+      } else {
+        console.log('Refund request confirmation email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending refund request email:', emailError);
+      // Don't fail the refund request if email fails
+    }
+
     return NextResponse.json(refund, { status: 201 });
   } catch (error) {
     console.error('Refund API error:', error);

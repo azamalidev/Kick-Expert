@@ -71,6 +71,40 @@ export async function POST(req: Request) {
     // insert audit log
     await supabaseAdmin.from('withdrawal_audit_logs').insert([{ withdrawal_id: withdrawalId, admin_id: user.id, action: 'approved', note: null }]);
 
+    // Send withdrawal approved email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/withdrawal-requested`;
+      console.log('Sending withdrawal approved email to user:', w.user_id);
+
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          withdrawalId: withdrawalId,
+          userId: w.user_id,
+          amount: Number(w.amount),
+          status: 'approved',
+          withdrawalMethod: w.provider || 'stripe',
+          paypalEmail: w.provider === 'paypal' ? w.provider_account : undefined,
+          requestDate: w.requested_at,
+          processedDate: new Date().toISOString(),
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error('Failed to send withdrawal approved email:', emailError);
+      } else {
+        console.log('Withdrawal approved email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending withdrawal approved email:', emailError);
+      // Don't fail the approval if email fails
+    }
+
     // attempt Stripe payout if configured and provider account exists
     if (stripe && w.provider === 'stripe' && w.provider_account) {
       try {

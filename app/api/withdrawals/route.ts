@@ -133,6 +133,40 @@ export async function POST(req: NextRequest) {
 			if (rpcErr) throw rpcErr;
 
 			const rpcAny = rpcData as any;
+
+			// Send withdrawal pending email for RPC path
+			try {
+				const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+				const emailUrl = `${appUrl}/api/email/withdrawal-requested`;
+				console.log('Sending withdrawal pending email to user (RPC):', user.id);
+
+				const emailResponse = await fetch(emailUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						withdrawalId: rpcAny?.withdrawal_id || 'unknown',
+						userId: user.id,
+						amount: amount,
+						status: 'pending',
+						withdrawalMethod: method,
+						paypalEmail: method === 'paypal' ? providerAccount : undefined,
+						requestDate: new Date().toISOString(),
+					})
+				});
+
+				if (!emailResponse.ok) {
+					const emailError = await emailResponse.json();
+					console.error('Failed to send withdrawal pending email (RPC):', emailError);
+				} else {
+					console.log('Withdrawal pending email sent successfully (RPC)');
+				}
+			} catch (emailError) {
+				console.error('Error sending withdrawal pending email (RPC):', emailError);
+				// Don't fail the withdrawal creation if email fails
+			}
+
 			return NextResponse.json({ ok: true, withdrawal_id: rpcAny?.withdrawal_id ?? null });
 		} catch (rpcErr) {
 			// Fallback: perform conditional update then insert using the JS client.
@@ -190,6 +224,39 @@ export async function POST(req: NextRequest) {
 				if (insErr || !insData) {
 					console.error('Failed inserting withdrawal', insErr);
 					return NextResponse.json({ error: 'Failed to create withdrawal' }, { status: 500 });
+				}
+
+				// Send withdrawal pending email
+				try {
+					const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+					const emailUrl = `${appUrl}/api/email/withdrawal-requested`;
+					console.log('Sending withdrawal pending email to user:', user.id);
+
+					const emailResponse = await fetch(emailUrl, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							withdrawalId: insData.id,
+							userId: user.id,
+							amount: amount,
+							status: 'pending',
+							withdrawalMethod: method,
+							paypalEmail: method === 'paypal' ? providerAccount : undefined,
+							requestDate: new Date().toISOString(),
+						})
+					});
+
+					if (!emailResponse.ok) {
+						const emailError = await emailResponse.json();
+						console.error('Failed to send withdrawal pending email:', emailError);
+					} else {
+						console.log('Withdrawal pending email sent successfully');
+					}
+				} catch (emailError) {
+					console.error('Error sending withdrawal pending email:', emailError);
+					// Don't fail the withdrawal creation if email fails
 				}
 
 				return NextResponse.json({ ok: true, withdrawal_id: insData.id });

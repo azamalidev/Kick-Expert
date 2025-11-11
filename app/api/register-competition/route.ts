@@ -6,6 +6,128 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Helper function to send competition email
+async function sendCompetitionEmail(
+  userId: string,
+  competitionId: string,
+  competitionName: string,
+  startTime: string,
+  entryFee: number,
+  prizePool: string | undefined
+) {
+  try {
+    console.log('📧 Attempting to send competition email to userId:', userId);
+    
+    const startTimeDate = new Date(startTime);
+    const emailPayload = {
+      userId,
+      competitionId,
+      competitionName: competitionName || 'Competition',
+      competitionDate: startTimeDate.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      competitionTime: startTimeDate.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }),
+      entryFee: entryFee.toString(),
+      prizePool: prizePool || 'TBD',
+    };
+
+    console.log('📦 Email payload:', emailPayload);
+
+    // Use absolute URL for the API call
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const emailApiUrl = `${baseUrl}/api/email/competition`;
+    
+    console.log('🔗 Calling email API at:', emailApiUrl);
+
+    const response = await fetch(emailApiUrl, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('❌ Email API returned error:', result);
+      throw new Error(`Email API failed: ${result.error || 'Unknown error'}`);
+    }
+    
+    console.log('✅ Email sent successfully:', result);
+  } catch (emailError) {
+    console.error('❌ Failed to send competition email:', emailError);
+    // Don't throw - we don't want to fail the registration if email fails
+  }
+}
+
+// Helper function to send referral confirmation email
+async function sendReferralConfirmationEmail(referrerId: string, referredUserId: string) {
+  try {
+    console.log('📧 Attempting to send referral confirmation email to referrer:', referrerId, 'for referred user:', referredUserId);
+
+    // Get referrer's current referral count for email content
+    const { data: referrals, error: referralsError } = await supabase
+      .from('referrals')
+      .select('*')
+      .eq('referrer_id', referrerId);
+
+    if (referralsError) {
+      console.error('❌ Error fetching referrals for email:', referralsError);
+      return;
+    }
+
+    const effectiveCount = referrals.filter(r => r.email_confirmed && r.competition_joined).length;
+    const milestones = [3, 5, 10];
+    const nextMilestone = milestones.find(m => effectiveCount < m) || 10;
+
+    const emailPayload = {
+      referrerId,
+      referredUserId,
+      xpAwarded: 50,
+      totalReferrals: effectiveCount,
+      nextMilestone
+    };
+
+    console.log('📦 Referral confirmation email payload:', emailPayload);
+
+    // Use absolute URL for the API call
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const emailApiUrl = `${baseUrl}/api/email/referral-confirmed`;
+    
+    console.log('🔗 Calling referral confirmation email API at:', emailApiUrl);
+
+    const response = await fetch(emailApiUrl, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('❌ Referral confirmation email API returned error:', result);
+      throw new Error(`Referral confirmation email API failed: ${result.error || 'Unknown error'}`);
+    }
+    
+    console.log('✅ Referral confirmation email sent successfully:', result);
+  } catch (emailError) {
+    console.error('❌ Failed to send referral confirmation email:', emailError);
+    // Don't throw - we don't want to fail the registration if email fails
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { userId, competitionId, status, paid_amount, payment_method = 'none', payment_type = 'credits' } = await req.json();
@@ -76,7 +198,7 @@ export async function POST(req: Request) {
     // Fetch competition name
     const { data: compNameRow } = await supabase
       .from('competitions')
-      .select('name')
+      .select('name, prize_pool')
       .eq('id', competitionId)
       .maybeSingle();
 
@@ -168,6 +290,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: updRegErr.message }, { status: 500 });
       }
 
+      // Send email for updated registration
+      sendCompetitionEmail(userId, competitionId, compName, competition.start_time, authoritativePaidAmount, compNameRow?.prize_pool);
+
       return NextResponse.json({ success: true, data: updatedReg, deductedFrom: deducted });
     }
 
@@ -187,6 +312,95 @@ export async function POST(req: Request) {
       }).eq('user_id', userId);
 
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // Send competition confirmation email
+    await sendCompetitionEmail(
+      userId, 
+      competitionId, 
+      compName, 
+      competition.start_time, 
+      authoritativePaidAmount, 
+      compNameRow?.prize_pool
+    );
+
+    // Check for referral confirmation
+    try {
+      // Get user data to check for referrer
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('parent_id, email_confirmed')
+        .eq('id', userId)
+        .single();
+
+      console.log('🔍 Checking referral confirmation for user:', userId, 'userData:', userData, 'userError:', userError);
+
+      if (!userError && userData?.parent_id && userData?.email_confirmed) {
+        console.log('✅ User has referrer and email confirmed, checking referral record...');
+        
+        // User has a referrer and email is confirmed
+        // Check if referral record exists and needs updating
+        const { data: existingReferral, error: referralError } = await supabase
+          .from('referrals')
+          .select('*')
+          .eq('referrer_id', userData.parent_id)
+          .eq('referred_id', userId)
+          .maybeSingle();
+
+        console.log('📋 Existing referral record:', existingReferral, 'referralError:', referralError);
+
+        if (!referralError) {
+          if (!existingReferral) {
+            console.log('🆕 Creating new referral record...');
+            // Create new referral record
+            const { error: insertError } = await supabase
+              .from('referrals')
+              .insert({
+                id: crypto.randomUUID(),
+                referrer_id: userData.parent_id,
+                referred_id: userId,
+                email_confirmed: true,
+                competition_joined: true,
+                created_at: new Date().toISOString(),
+              });
+
+            if (!insertError) {
+              console.log('✅ New referral record created, sending confirmation email...');
+              // Send referral confirmation email
+              await sendReferralConfirmationEmail(userData.parent_id, userId);
+            } else {
+              console.error('❌ Failed to create referral record:', insertError);
+            }
+          } else if (!existingReferral.competition_joined) {
+            console.log('🔄 Updating existing referral record to mark competition joined...');
+            // Update existing referral to mark competition joined
+            const { error: updateError } = await supabase
+              .from('referrals')
+              .update({ 
+                competition_joined: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingReferral.id);
+
+            if (!updateError && existingReferral.email_confirmed) {
+              console.log('✅ Referral record updated and fully confirmed, sending confirmation email...');
+              // Referral is now fully confirmed, send email
+              await sendReferralConfirmationEmail(userData.parent_id, userId);
+            } else {
+              console.log('⚠️ Referral record updated but not sending email - email_confirmed:', existingReferral.email_confirmed, 'updateError:', updateError);
+            }
+          } else {
+            console.log('ℹ️ Referral already fully confirmed, no email sent');
+          }
+        } else {
+          console.error('❌ Error checking referral record:', referralError);
+        }
+      } else {
+        console.log('ℹ️ User has no referrer or email not confirmed - no referral processing needed');
+      }
+    } catch (referralCheckError) {
+      console.error('❌ Error checking referral confirmation:', referralCheckError);
+      // Don't fail the registration if referral check fails
     }
 
     return NextResponse.json({ success: true, data, deductedFrom: deducted });

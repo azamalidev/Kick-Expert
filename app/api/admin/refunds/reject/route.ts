@@ -107,6 +107,40 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString()
       });
 
+    // Send refund rejected email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/refund-processed`;
+      console.log('Sending refund rejected email to user:', refund.user_id);
+      
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refundId: refund_id,
+          userId: refund.user_id,
+          amount: refund.amount,
+          status: 'rejected',
+          reason: reason,
+          refundMethod: refund.provider || 'stripe',
+          requestDate: refund.created_at,
+          processedDate: new Date().toISOString(),
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error('Failed to send refund rejected email:', emailError);
+      } else {
+        console.log('Refund rejected email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending refund rejected email:', emailError);
+      // Don't fail the rejection if email fails
+    }
+
     return NextResponse.json({ success: true, refund });
   } catch (error) {
     console.error('Refund rejection API error:', error);

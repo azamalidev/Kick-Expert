@@ -118,6 +118,39 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString()
       });
 
+    // Send refund approved email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/refund-processed`;
+      console.log('Sending refund approved email to user:', refund.user_id);
+      
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refundId: refund_id,
+          userId: refund.user_id,
+          amount: refund.amount,
+          status: 'approved',
+          refundMethod: refund.provider || 'stripe',
+          requestDate: refund.created_at,
+          processedDate: new Date().toISOString(),
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error('Failed to send refund approved email:', emailError);
+      } else {
+        console.log('Refund approved email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending refund approved email:', emailError);
+      // Don't fail the approval if email fails
+    }
+
     // ===== NEW: TRIGGER REFUND PROCESSING =====
     // Call the refund processing endpoint to actually send money back
     console.log('Triggering refund processing for refund_id:', refund_id);

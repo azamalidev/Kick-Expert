@@ -482,6 +482,29 @@ export default function Profile() {
         }
       }
       if (rewardsClaimed) {
+        // Send milestone achievement emails for each new milestone reached
+        try {
+          for (const milestone of milestones) {
+            if (effectiveCount >= milestone.count && !existingMilestones.includes(milestone.count)) {
+              await fetch('/api/email/milestone-achieved', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  referrerId: userId,
+                  milestone: milestone.count,
+                  rewardType: milestone.reward_type,
+                  credits: milestone.credits,
+                  totalReferrals: effectiveCount,
+                  nextMilestone: milestones.find(m => effectiveCount < m.count)?.count || null
+                }),
+              });
+            }
+          }
+        } catch (emailError) {
+          console.error('Failed to send milestone achievement email:', emailError);
+          // Don't show error to user as this is not critical
+        }
+        
         toast.success("New rewards added successfully!", { style: { background: '#363636', color: '#fff' } });
       } else {
         toast("No new rewards available to add", { icon: 'ℹ️', style: { background: '#363636', color: '#fff' } });

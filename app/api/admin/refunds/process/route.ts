@@ -314,6 +314,41 @@ export async function POST(request: NextRequest) {
     }
     console.log('Refund status updated successfully');
 
+    // Send refund status email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/refund-processed`;
+      console.log(`Sending refund ${refundStatus} email to user:`, refund.user_id);
+      
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refundId: refund_id,
+          userId: refund.user_id,
+          amount: refund.amount,
+          status: refundStatus,
+          refundMethod: refundProvider,
+          requestDate: refund.created_at,
+          processedDate: new Date().toISOString(),
+          processingFee: refundResult?.processing_fee,
+          netAmount: refundResult?.net_amount,
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error(`Failed to send refund ${refundStatus} email:`, emailError);
+      } else {
+        console.log(`Refund ${refundStatus} email sent successfully`);
+      }
+    } catch (emailError) {
+      console.error(`Error sending refund ${refundStatus} email:`, emailError);
+      // Don't fail the processing if email fails
+    }
+
     // ===== CREATE REFUND TRANSACTION RECORD =====
     // Insert refund transaction record. Some deployments may not have a
     // `completed_at` column in the `credit_transactions` table, so avoid

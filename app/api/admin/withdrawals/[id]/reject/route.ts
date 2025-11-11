@@ -55,6 +55,41 @@ export async function POST(req: Request) {
     // audit log
     await supabaseAdmin.from('withdrawal_audit_logs').insert([{ withdrawal_id: withdrawalId, admin_id: user.id, action: 'rejected', note }]);
 
+    // Send withdrawal rejected email
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const emailUrl = `${appUrl}/api/email/withdrawal-requested`;
+      console.log('Sending withdrawal rejected email to user:', w.user_id);
+
+      const emailResponse = await fetch(emailUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          withdrawalId: withdrawalId,
+          userId: w.user_id,
+          amount: Number(w.amount),
+          status: 'rejected',
+          reason: note || 'Your withdrawal request has been declined.',
+          withdrawalMethod: w.provider || 'stripe',
+          paypalEmail: w.provider === 'paypal' ? w.provider_account : undefined,
+          requestDate: w.requested_at,
+          processedDate: new Date().toISOString(),
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const emailError = await emailResponse.json();
+        console.error('Failed to send withdrawal rejected email:', emailError);
+      } else {
+        console.log('Withdrawal rejected email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending withdrawal rejected email:', emailError);
+      // Don't fail the rejection if email fails
+    }
+
     return NextResponse.json({ ok: true, refunded: true });
   } catch (err) {
     console.error('Error rejecting withdrawal', err);
