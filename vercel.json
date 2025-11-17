@@ -10,15 +10,15 @@
     },
     {
       "path": "/api/cron/finalize-competitions",
-      "schedule": "0,5,10,15,20,25 15 * * 6"
+      "schedule": "25 15 * * 6"
     },
     {
       "path": "/api/cron/finalize-competitions",
-      "schedule": "0,5,10,15,20,25,30,35 16 * * 6"
+      "schedule": "35 16 * * 6"
     },
     {
       "path": "/api/cron/finalize-competitions",
-      "schedule": "0,5,10,15,20,25,30,35,40 17 * * 6"
+      "schedule": "40 17 * * 6"
     }
   ]
 }
