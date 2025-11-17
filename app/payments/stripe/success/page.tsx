@@ -117,10 +117,10 @@ export default function StripeOnboardSuccessPage() {
   return (
     <div className="max-w-xl mx-auto py-16 px-6 text-center">
       {status === 'pending' && <div><h2 className="text-2xl font-semibold">Finishing setup...</h2><p className="mt-2 text-sm text-gray-600">We're finalizing your payout setup. Please wait.</p></div>}
-      {status === 'ok' && <div><h2 className="text-2xl font-semibold">All set!</h2><p className="mt-2 text-sm text-gray-600">Your payout setup was completed. You can now request withdrawals.</p><div className="mt-6"><a href="/profile" className="px-4 py-2 bg-blue-600 text-white rounded">Go to Profile</a></div></div>}
+      {status === 'ok' && <div><h2 className="text-2xl font-semibold">All set!</h2><p className="mt-2 text-sm text-gray-600">Your payout setup was completed. You can now request withdrawals.</p><div className="mt-6"><a href="/credits/manage" className="px-4 py-2 bg-blue-600 text-white rounded">Go to Credits</a></div></div>}
       {status === 'error' && <div><h2 className="text-2xl font-semibold">Couldn't verify</h2><p className="mt-2 text-sm text-gray-600">There was a problem verifying your payout setup. Please return to the onboarding link or contact support.</p>
         {errorMsg && <pre className="mt-3 p-3 bg-gray-50 rounded text-xs text-red-700">{errorMsg}</pre>}
-        <div className="mt-6"><a href="/profile" className="px-4 py-2 bg-gray-200 text-gray-800 rounded">Back to profile</a></div></div>}
+        <div className="mt-6"><a href="/credits/manage" className="px-4 py-2 bg-gray-200 text-gray-800 rounded">Back to Credits</a></div></div>}
     </div>
   );
 }

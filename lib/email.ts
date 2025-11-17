@@ -1,10 +1,3 @@
-import SibApiV3Sdk from 'sib-api-v3-sdk';
-
-const defaultClient = SibApiV3Sdk.ApiClient.instance;
-
-const transactionalEmailsApi = new SibApiV3Sdk.TransactionalEmailsApi();
-const contactsApi = new SibApiV3Sdk.ContactsApi();
-
 interface SendEmailProps {
   to: string;
   subject: string;
@@ -17,15 +10,12 @@ function resolveApiKey(): string | undefined {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailProps) {
-  // Set API key at call time so missing env var is easier to detect and doesn't throw during module import
-  const apiKey = defaultClient.authentications['api-key'];
   const key = resolveApiKey();
   if (!key) {
     const msg = 'Missing BREVO_API_KEY (or SENDINBLUE_API_KEY / BRAWO_API_KEY) environment variable';
     console.error(msg);
     throw new Error(msg);
   }
-  apiKey.apiKey = key as string;
 
   // Accept either EMAIL_SENDER_* or SENDER_* env var names (the repo currently has SENDER_NAME/SENDER_EMAIL)
   const senderName = process.env.EMAIL_SENDER_NAME || process.env.SENDER_NAME;
@@ -36,25 +26,37 @@ export async function sendEmail({ to, subject, html }: SendEmailProps) {
     throw new Error(msg);
   }
 
-  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-
-  sendSmtpEmail.subject = subject;
-  sendSmtpEmail.htmlContent = html;
-  sendSmtpEmail.sender = {
-    name: senderName as string,
-    email: senderEmail as string,
+  const emailData = {
+    sender: {
+      name: senderName,
+      email: senderEmail,
+    },
+    to: [{ email: to }],
+    subject: subject,
+    htmlContent: html,
   };
-  sendSmtpEmail.to = [{ email: to }];
 
   try {
-    const response = await transactionalEmailsApi.sendTransacEmail(sendSmtpEmail);
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': key,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(emailData),
+    });
 
+    if (!response.ok) {
+      throw new Error(`Brevo API error: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
     console.log('Email sent to', to, 'subject:', subject);
-    console.log(response, 'Brevo response');
-    return response;
+    console.log(result, 'Brevo response');
+    return result;
   } catch (error: any) {
-    // Axios-style errors from the SDK include response etc. Log the most useful parts.
-    console.error('Brevo Email Send Error:', error?.response || error?.message || error);
+    console.error('Brevo Email Send Error:', error?.message || error);
     throw error;
   }
 }
@@ -64,33 +66,47 @@ export async function addContactToList(email: string, name?: string, listId?: st
   const key = resolveApiKey();
   if (!key) throw new Error('Missing BREVO_API_KEY');
 
-  const apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = key;
-
-    const listIds = listId ? [parseInt(listId)] : (process.env.BREVO_LIST_ID_NEWSLETTER ? [parseInt(process.env.BREVO_LIST_ID_NEWSLETTER)] : []);
+  const listIds = listId ? [parseInt(listId)] : (process.env.BREVO_LIST_ID_NEWSLETTER ? [parseInt(process.env.BREVO_LIST_ID_NEWSLETTER)] : []);
 
   if (listIds.length === 0) {
     console.warn('No list ID provided for Brevo contact add');
     return;
   }
 
-  const createContact = new SibApiV3Sdk.CreateContact();
-  createContact.email = email;
-  createContact.listIds = listIds;
+  const contactData: any = {
+    email: email,
+    listIds: listIds,
+  };
 
   if (name) {
     const parts = name.trim().split(' ');
-    createContact.attributes = {
+    contactData.attributes = {
       FIRSTNAME: parts[0],
       LASTNAME: parts.length > 1 ? parts.slice(1).join(' ') : '',
     };
   }
 
   try {
-    await contactsApi.createContact(createContact);
+    const response = await fetch('https://api.brevo.com/v3/contacts', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': key,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(contactData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Brevo API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
     console.log('Brevo contact added:', email);
+    return result;
   } catch (err: any) {
-    console.error('Brevo add contact error:', err?.response?.text || err.message || err);
+    console.error('Brevo add contact error:', err?.message || err);
     // Don't throw, as newsletter should still work
   }
 }
@@ -98,9 +114,6 @@ export async function addContactToList(email: string, name?: string, listId?: st
 export async function removeContactFromList(email: string, listId?: string) {
   const key = resolveApiKey();
   if (!key) throw new Error('Missing BREVO_API_KEY');
-
-  const apiKey = defaultClient.authentications['api-key'];
-  apiKey.apiKey = key;
 
   // Brevo doesn't have direct remove from list, but can update contact to remove listIds
   // For simplicity, mark as unsubscribed or log

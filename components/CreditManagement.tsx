@@ -180,7 +180,7 @@ const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClo
   const [paypalEmail, setPaypalEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const MIN_WITHDRAW = 50;
-  const MAX_WITHDRAW = 100;
+  const MAX_WITHDRAW = 500;
 
   useEffect(() => {
     if (!isOpen) {
@@ -235,7 +235,7 @@ const PayPalWithdrawModal: React.FC<PayPalWithdrawModalProps> = ({ isOpen, onClo
             </div>
 
             <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">Enter your PayPal email and the amount of winnings credits to withdraw. Minimum 20 — max 50 per request.</p>
+              <p className="text-sm text-gray-600 mb-4">Enter your PayPal email and the amount of winnings credits to withdraw. Minimum 50 — max 500 per request.</p>
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">PayPal Email</label>
@@ -643,7 +643,7 @@ const RefundRequestModal: React.FC<{
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-5 text-white relative">
-            <h2 className="text-lg font-bold text-center">Refund Transaction</h2>
+            <h2 className="text-lg font-bold text-center">Request Refund</h2>
             <button onClick={onClose} className="absolute top-4 right-4 text-white hover:text-lime-200">
               <X size={18} />
             </button>
@@ -665,14 +665,14 @@ const RefundRequestModal: React.FC<{
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-gray-900">${purchase.amount}</span>
+                  <span className="font-medium text-gray-900">€{purchase.amount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Already Refunded:</span>
                   <span className="font-medium text-orange-600">{purchase.refunded_credits} credits</span>
                 </div>
                 <div className="flex justify-between border-t border-gray-300 pt-2 mt-2">
-                  <span className="text-gray-700 font-semibold">Refundable:</span>
+                  <span className="text-gray-700 font-semibold">Refundable Remaining:</span>
                   <span className="font-bold text-lime-600">{purchase.refundable_credits} credits</span>
                 </div>
               </div>
@@ -725,7 +725,7 @@ const RefundRequestModal: React.FC<{
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                 <p className="text-blue-800 text-xs flex items-start gap-2">
                   <Lightbulb size={16} className="flex-shrink-0 mt-0.5" />
-                  <span>Your refund will be processed to your original payment method. Admin approval is required. Refunds are only available within 7 days of purchase.</span>
+                  <span>Your refund will be processed to your original payment method. Admin approval is required. You can request multiple refunds for the same purchase, but each refund is processed individually. Refunds are only available within 7 days of purchase.</span>
                 </p>
               </div>
             </div>
@@ -751,7 +751,7 @@ const RefundRequestModal: React.FC<{
                   Submitting...
                 </>
               ) : (
-                'Request Refund'
+                'Submit Refund Request'
               )}
             </button>
           </div>
@@ -767,7 +767,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
     const [amount, setAmount] = useState<number | ''>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
-    const MAX_WITHDRAW_PER_REQUEST = 100;
+    const MAX_WITHDRAW_PER_REQUEST = 500;
     const [paypalEmail, setPaypalEmail] = useState<string>('');
 
     useEffect(() => {
@@ -847,7 +847,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
               </div>
 
               <div className="p-6">
-                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>50 credits</strong>. Maximum per request: <strong>100 credits</strong>. <strong>Withdrawals are available only from Winnings Credits.</strong></p>
+                <p className="text-sm text-gray-600 mb-4">Withdraw funds from your winnings credits to your connected bank account. Minimum withdrawal: <strong>50 credits</strong>. Maximum per request: <strong>500 credits</strong>. <strong>Withdrawals are available only from Winnings Credits.</strong></p>
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Amount (Credits)</label>
@@ -918,7 +918,7 @@ const CreditManagement: React.FC = () => {
   const [isBuyModalOpen, setBuyModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [withdrawMin] = useState(20);
+  const [withdrawMin] = useState(50);
   const [activeTab, setActiveTab] = useState('overview');
 
   const tabs = [
@@ -1554,7 +1554,7 @@ const CreditManagement: React.FC = () => {
                     <RefreshCw className="h-6 w-6 text-orange-600" />
                   </div>
                   <h4 className="font-semibold text-gray-900 mb-2">Maximum Per Request</h4>
-                  <p className="text-2xl font-bold text-orange-600">100</p>
+                  <p className="text-2xl font-bold text-orange-600">500</p>
                   <p className="text-sm text-gray-600">Credits</p>
                 </div>
               </div>
@@ -1577,7 +1577,7 @@ const CreditManagement: React.FC = () => {
                     </div>
                     <div className="flex items-start">
                       <span className="text-amber-600 mr-2">•</span>
-                      <span className="text-sm text-amber-700">Maximum per request: 100 credits</span>
+                      <span className="text-sm text-amber-700">Maximum per request: 500 credits</span>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -1597,21 +1597,21 @@ const CreditManagement: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Ready to Withdraw?</h4>
                 <p className="text-gray-600 mb-6">
-                  {(balance?.winnings_credits || 0) >= 20
+                  {(balance?.winnings_credits || 0) >= 50
                     ? "You have sufficient winnings credits to request a withdrawal."
-                    : "You need at least 20 winnings credits to withdraw."
+                    : "You need at least 50 winnings credits to withdraw."
                   }
                 </p>
                 <button
                   onClick={() => {
                     const available = balance?.winnings_credits || 0;
-                    if (available < withdrawMin) {
-                      toast.error(`Minimum withdrawal is ${withdrawMin} credits`);
+                    if (available < 50) {
+                      toast.error(`Minimum withdrawal is 50 credits`);
                       return;
                     }
                     setIsWithdrawMethodOpen(true);
                   }}
-                  disabled={(balance?.winnings_credits || 0) < 20}
+                  disabled={(balance?.winnings_credits || 0) < 50}
                   className="px-8 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   Request Withdrawal
@@ -1776,7 +1776,7 @@ const CreditManagement: React.FC = () => {
                           <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b border-gray-200">
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Amount Paid</p>
-                              <p className="text-sm font-semibold text-gray-900">${purchase.amount}</p>
+                              <p className="text-sm font-semibold text-gray-900">€{purchase.amount}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 mb-1">Refunded</p>
@@ -1789,15 +1789,36 @@ const CreditManagement: React.FC = () => {
                           </div>
 
                           {purchase.has_pending_refund ? (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-                              <div className="flex items-center">
-                                <Clock size={16} className="text-yellow-600 mr-2" />
-                                <span className="text-sm font-medium text-yellow-800">
-                                  {purchase.pending_refund_status === 'processing' ? 'Refund processing' :
-                                   purchase.pending_refund_status === 'approved' ? 'Refund approved (processing)' :
-                                   'Refund pending approval'}
-                                </span>
+                            <div className="space-y-3">
+                              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                                <div className="flex items-center">
+                                  <Clock size={16} className="text-yellow-600 mr-2" />
+                                  <span className="text-sm font-medium text-yellow-800">
+                                    {purchase.pending_refund_status === 'processing' ? 'Refund processing' :
+                                     purchase.pending_refund_status === 'approved' ? 'Refund approved (processing)' :
+                                     'Refund pending approval'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-yellow-700 mt-1">
+                                  You can request additional refunds for remaining credits while this refund is being processed.
+                                </p>
                               </div>
+                              {purchase.refundable_credits > 0 ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedPurchase(purchase);
+                                    setIsRefundModalOpen(true);
+                                  }}
+                                  className="w-full bg-lime-600 hover:bg-lime-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center"
+                                >
+                                  <RefreshCw size={16} className="mr-2" />
+                                  Request Additional Refund ({purchase.refundable_credits} credits available)
+                                </button>
+                              ) : (
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                                  <span className="text-sm text-gray-600">No additional refundable credits remaining</span>
+                                </div>
+                              )}
                             </div>
                           ) : purchase.refundable_credits === 0 ? (
                             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
@@ -1985,7 +2006,7 @@ const CreditManagement: React.FC = () => {
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-green-100">
                       <h5 className="font-medium text-green-900 mb-2">Winnings Credits</h5>
-                      <p className="text-green-800 text-sm">Earned by winning competitions, can be withdrawn (min 20 credits). Subject to admin approval.</p>
+                      <p className="text-green-800 text-sm">Earned by winning competitions, can be withdrawn (min 50 credits). Subject to admin approval.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-green-100">
                       <h5 className="font-medium text-green-900 mb-2">Referral Credits</h5>
@@ -2029,7 +2050,7 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border border-orange-100">
                       <h5 className="font-medium text-orange-900 mb-2">Withdrawal Requirements</h5>
-                      <p className="text-orange-800 text-sm">Only Winnings Credits can be withdrawn. Minimum withdrawal is 50 credits, maximum 100 credits per request. All withdrawals require admin approval.</p>
+                      <p className="text-orange-800 text-sm">Only Winnings Credits can be withdrawn. Minimum withdrawal is 50 credits, maximum 500 credits per request. All withdrawals require admin approval.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-orange-100">
                       <h5 className="font-medium text-orange-900 mb-2">Payment Methods</h5>
@@ -2047,7 +2068,11 @@ const CreditManagement: React.FC = () => {
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border border-purple-100">
                       <h5 className="font-medium text-purple-900 mb-2">Refund Policy</h5>
-                      <p className="text-purple-800 text-sm">Purchased credits are refundable to the original payment method. Refunds cannot be redirected to another card/account for AML compliance.</p>
+                      <p className="text-purple-800 text-sm">Purchased credits are refundable to the original payment method. You can request multiple refunds for the same purchase as long as credits remain. Each refund is processed individually and requires admin approval.</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-purple-100">
+                      <h5 className="font-medium text-purple-900 mb-2">Partial Refunds</h5>
+                      <p className="text-purple-800 text-sm">You can request refunds for any amount up to the remaining refundable credits. For example, if you purchased 100 credits and request a refund for 50 credits, you can later request another refund for the remaining 50 credits.</p>
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-purple-100">
                       <h5 className="font-medium text-purple-900 mb-2">Competition Cancellations</h5>

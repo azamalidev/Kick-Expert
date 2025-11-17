@@ -33,14 +33,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let avatar_url = null;
     if (files && files.avatar) {
-      const file = files.avatar as any;
-      const buffer = fs.readFileSync(file.filepath || file.path);
-      const ext = (file.originalFilename || file.name || 'png').split('.').pop();
-      const filePath = `${userId}.${ext}`;
-      const { error: upErr } = await supabaseAdmin.storage.from('profileimages').upload(filePath, buffer, { upsert: true });
-      if (upErr) console.error('storage upload error', upErr);
-      const { data: urlData } = supabaseAdmin.storage.from('profileimages').getPublicUrl(filePath);
-      avatar_url = (urlData as any).publicUrl;
+      // Handle formidable v3 file structure
+      const file = Array.isArray(files.avatar) ? files.avatar[0] : files.avatar;
+      if (file && file.filepath) {
+        const buffer = fs.readFileSync(file.filepath);
+        const ext = (file.originalFilename || file.newFilename || 'png').split('.').pop();
+        const filePath = `${userId}.${ext}`;
+        const { error: upErr } = await supabaseAdmin.storage.from('profileimages').upload(filePath, buffer, { upsert: true });
+        if (upErr) console.error('storage upload error', upErr);
+        const { data: urlData } = supabaseAdmin.storage.from('profileimages').getPublicUrl(filePath);
+        avatar_url = (urlData as any).publicUrl;
+      }
     }
 
     const profilePayload: any = {

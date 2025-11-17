@@ -166,6 +166,7 @@ export async function GET(req: NextRequest) {
       // the checkout session id as a fallback.
       const updatePayload: any = {
         status: 'completed',
+        credits: creditsToAdd, // Update to actual credits received after fees
         payment_data: session,
         updated_at: new Date().toISOString()
       };
@@ -201,6 +202,7 @@ export async function GET(req: NextRequest) {
         .from('credit_purchases')
         .update({
           status: 'completed',
+          credits: creditsToAdd, // Update to actual credits received after fees
           payment_data: session,
           updated_at: new Date().toISOString()
         })

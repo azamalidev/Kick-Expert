@@ -181,9 +181,9 @@ export default function Signup() {
               email: email,
               consent_source: 'signup',
               consent_date: currentDate,
-              unsubscribe_date: null,
-              status: 'active',
-              ip_address: userIP
+              consent_ip: userIP,
+              ip_address: userIP,
+              status: 'active'
             }
           ])
 
@@ -191,9 +191,35 @@ export default function Signup() {
           console.error('Email consent insert failed:', emailConsentError);
           toast.error(`Email consent failed: ${emailConsentError.message || 'Unknown error'}`); // User-visible error
           throw emailConsentError;  
-        } 
+        }
+
+        // Sync with Brevo marketing list
+        console.log(`🔄 Starting Brevo sync for user: ${name} (${email})`);
+        try {
+          const brevoResponse = await fetch('/api/brevo/add-contact', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              name,
+            }),
+          });
+
+          if (brevoResponse.ok) {
+            const brevoData = await brevoResponse.json();
+            console.log(`✅ User "${name}" (${email}) successfully added to Brevo marketing list during signup`, brevoData);
+          } else {
+            const errorData = await brevoResponse.json().catch(() => ({ error: 'Unknown error' }));
+            console.error(`❌ Failed to add user "${name}" (${email}) to Brevo marketing list:`, errorData);
+          }
+        } catch (brevoError) {
+          console.error(`❌ Failed to add user "${name}" (${email}) to Brevo marketing list:`, brevoError);
+          // Don't throw error here as signup should still succeed even if Brevo fails
+        }
       } else {
-        console.log('Email opt-in not checked, skipping email_consents insert');
+        console.log('Email opt-in not checked, skipping email_consents insert and Brevo sync');
       }
 
       console.log('User consents recorded successfully');

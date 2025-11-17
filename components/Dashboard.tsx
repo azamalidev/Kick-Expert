@@ -14,11 +14,11 @@ import Link from "next/link";
 
 // Rank definitions
 const ranks = [
-  { label: 'Beginner', minXP: 0, maxXP: 499, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
-  { label: 'Novice', minXP: 500, maxXP: 999, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
-  { label: 'Competent', minXP: 1000, maxXP: 1999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
-  { label: 'Proficient', minXP: 2000, maxXP: 4999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
-  { label: 'Expert', minXP: 5000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
+  { label: 'Rookie', minXP: 0, maxXP: 199, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
+  { label: 'Starter', minXP: 200, maxXP: 499, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
+  { label: 'Pro', minXP: 500, maxXP: 999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
+  { label: 'Expert', minXP: 1000, maxXP: 1999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
+  { label: 'Champion', minXP: 2000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
 ];
 
 // Initialize Supabase client
@@ -96,7 +96,7 @@ export default function Dashboard() {
   // Fallback states for when data is loading
   const [username, setUsername] = useState<string>("Loading...");
   const [userEmail, setUserEmail] = useState<string>("Loading...");
-  const [rankLabel, setRankLabel] = useState<string>("Beginner");
+  const [rankLabel, setRankLabel] = useState<string>("Rookie");
   const [entryCredits, setEntryCredits] = useState<number>(2);
   const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(0);
   const [winPercentage, setWinPercentage] = useState<number>(0);
@@ -111,6 +111,13 @@ export default function Dashboard() {
   // Pagination for history
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 5; // items per page (show 5 results per page)
+
+  // Response modal states
+  const [showResponseModal, setShowResponseModal] = useState<boolean>(false);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [ticketResponses, setTicketResponses] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState<string>("");
+  const [sendingMessage, setSendingMessage] = useState<boolean>(false);
 
   // Handle client-side mounting to prevent hydration errors
   useEffect(() => {
@@ -160,14 +167,14 @@ export default function Dashboard() {
           xp: profile.xp || 0,
           total_games: profile.total_games || 0,
           total_wins: profile.total_wins || 0,
-          rank_label: profile.rank_label || "Beginner",
+          rank_label: profile.rank_label || "Rookie",
           avatar_url: profile.avatar_url,
         });
 
         // Update state variables
         setUsername(profile.username || "User");
         setUserEmail(user.email || "");
-        setRankLabel(profile.rank_label || "Beginner");
+        setRankLabel(profile.rank_label || "Rookie");
         setCompetitionsPlayed(profile.total_games || 0);
 
         // Calculate win percentage
@@ -329,6 +336,28 @@ export default function Dashboard() {
     }
   };
 
+  const fetchTicketResponses = async (ticketId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("id, message, sender, created_at")
+        .eq("ticket_id", ticketId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching ticket responses:", error);
+        toast.error("Failed to load responses");
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching ticket responses:", error);
+      toast.error("Failed to load responses");
+      return [];
+    }
+  };
+
   // Withdraw functionality removed - credits management handled via user_credits
 
   const handleSupportSubmit = async (e: React.FormEvent) => {
@@ -376,6 +405,60 @@ export default function Dashboard() {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleViewResponse = async (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+    const responses = await fetchTicketResponses(ticket.id);
+    setTicketResponses(responses);
+    setShowResponseModal(true);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedTicket) {
+      toast.error("Please enter a message");
+      return;
+    }
+
+    setSendingMessage(true);
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user) {
+        toast.error("User not authenticated. Please log in.");
+        setSendingMessage(false);
+        return;
+      }
+
+      const { error } = await supabase.from("support_messages").insert({
+        ticket_id: selectedTicket.id,
+        sender: "user",
+        message: newMessage.trim(),
+      });
+
+      if (error) {
+        console.error("Error sending message:", error);
+        toast.error(`Failed to send message: ${error.message}`);
+        setSendingMessage(false);
+        return;
+      }
+
+
+      setNewMessage("");
+      
+      // Refresh the conversation
+      const responses = await fetchTicketResponses(selectedTicket.id);
+      setTicketResponses(responses);
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      toast.error(`Failed to send message: ${error.message || "Unexpected error"}`);
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -1543,12 +1626,20 @@ export default function Dashboard() {
                                     ).toLocaleDateString()}
                                   </p>
                                 </div>
-                                <span
-                                  className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}
-                                >
-                                  {ticket.status.charAt(0).toUpperCase() +
-                                    ticket.status.slice(1)}
-                                </span>
+                                <div className="flex flex-col items-end space-y-2">
+                                  <span
+                                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}
+                                  >
+                                    {ticket.status.charAt(0).toUpperCase() +
+                                      ticket.status.slice(1)}
+                                  </span>
+                                  <button
+                                    onClick={() => handleViewResponse(ticket)}
+                                    className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold rounded-full transition-colors"
+                                  >
+                                    View Response
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1565,6 +1656,100 @@ export default function Dashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Response Modal */}
+      {showResponseModal && selectedTicket && (
+        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-300 rounded-lg p-6 w-full max-w-2xl h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 flex-shrink-0">
+              <h3 className="text-xl font-bold text-gray-800">
+                Support Conversation - "{selectedTicket.topic}"
+              </h3>
+              <button
+                onClick={() => setShowResponseModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-2 flex-shrink-0">
+           
+              <p className="text-xs text-gray-400 ">
+                Submitted: {new Date(selectedTicket.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto mb-4">
+              {ticketResponses.length > 0 ? (
+                <div className="flex flex-col space-y-4">
+                  {ticketResponses.map((response) => (
+                    <div
+                      key={response.id}
+                      className={`p-3 rounded-lg max-w-[80%] ${
+                        response.sender === 'user'
+                          ? 'bg-gray-100 border border-gray-200 self-start'
+                          : 'bg-indigo-500 text-white self-end ml-auto'
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap break-words">{response.message}</p>
+                      <span className="block text-xs mt-1 opacity-70">
+                        {new Date(response.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">📝</div>
+                  <p className="text-gray-500">No messages yet.</p>
+                  <p className="text-sm text-gray-400 mt-1">Start the conversation by sending a message below.</p>
+                </div>
+              )}
+            </div>
+            {selectedTicket.status !== 'closed' && (
+              <div className="flex-shrink-0 border-t pt-4">
+                <form onSubmit={handleSendMessage} className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+                    disabled={sendingMessage}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingMessage || !newMessage.trim()}
+                    className="px-6 py-2 bg-lime-500 hover:bg-lime-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {sendingMessage ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      "Send"
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Ticket Closed Message */}
+            {selectedTicket.status === 'closed' && (
+              <div className="flex-shrink-0 border-t pt-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <svg className="text-green-600 mr-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-green-800 font-semibold">Ticket Closed</span>
+                  </div>
+                  <p className="text-sm text-green-700">This support ticket has been resolved. No further messages can be sent.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

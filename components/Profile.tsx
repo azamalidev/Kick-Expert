@@ -44,11 +44,11 @@ const countries = [
 ];
 
 const ranks = [
-  { label: 'Beginner', minXP: 0, maxXP: 499, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
-  { label: 'Novice', minXP: 500, maxXP: 999, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
-  { label: 'Competent', minXP: 1000, maxXP: 1999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
-  { label: 'Proficient', minXP: 2000, maxXP: 4999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
-  { label: 'Expert', minXP: 5000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
+  { label: 'Rookie', minXP: 0, maxXP: 199, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
+  { label: 'Starter', minXP: 200, maxXP: 499, color: 'text-green-600', bgColor: 'bg-green-100', icon: '📗' },
+  { label: 'Pro', minXP: 500, maxXP: 999, color: 'text-blue-600', bgColor: 'bg-blue-100', icon: '🛠️' },
+  { label: 'Expert', minXP: 1000, maxXP: 1999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
+  { label: 'Champion', minXP: 2000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
 ];
 
 export default function Profile() {
@@ -367,7 +367,7 @@ export default function Profile() {
           setTotalWins(profile.total_wins || 0);
           setTotalGames(profile.total_games || 0);
           setXp(profile.xp || 0);
-          setRankLabel(profile.rank_label || "Beginner");
+          setRankLabel(profile.rank_label || "Rookie");
           setCredits(profile.credits || 0);
           setPublicProfile(profile.public_profile ?? true);
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
