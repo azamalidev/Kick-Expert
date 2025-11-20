@@ -28,7 +28,17 @@ const BroadcastEditor: React.FC = () => {
         return;
       }
 
-  const payload = { type, priority, title: title.trim(), message: message.trim(), cta_url: cta.trim() || null, is_banner: isBanner, expiry_date: expiryDate || null };
+  const payload = { 
+    type, 
+    priority, 
+    title: title.trim(), 
+    message: message.trim(), 
+    cta_url: cta.trim() || null, 
+    is_banner: isBanner, 
+    expiry_date: expiryDate || null,
+    send_now: true,
+    deliveryMethods: ['In-App'], // Default to in-app only for settings page
+  };
 
       const res = await fetch('/api/admin/broadcasts', {
         method: 'POST',

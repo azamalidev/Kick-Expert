@@ -130,6 +130,8 @@ export async function POST(req: Request) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
     // Create PayPal order using SDK
+    // PayPal will add their fees on top of this amount
+    // User receives the full credit amount without any deductions
     const paypalRequest = new paypal.orders.OrdersCreateRequest();
     paypalRequest.prefer('return=representation');
     paypalRequest.requestBody({
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
       purchase_units: [
         {
           reference_id: purchaseData.id,
-          description: `${credits} Credits Purchase`,
+          description: `${credits} Credits Purchase - Payment processing fees will be added at checkout. You will receive exactly ${credits} credits`,
           amount: {
             currency_code: 'EUR',
             value: Number(amount).toFixed(2),

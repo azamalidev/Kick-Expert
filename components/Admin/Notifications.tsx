@@ -150,21 +150,34 @@ const Notifications: React.FC = () => {
         expiry_date: null,
         target: { audience: newNotification.recipient },
         send_now: true,
+        deliveryMethods: newNotification.deliveryMethod, // Pass delivery methods
       } as any;
 
       const res = await fetch('/api/admin/broadcasts', {
         method: 'POST',
-        // prefer the Supabase session token (keeps auth consistent across the app)
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
+      
       if (!res.ok) {
         const j = await res.json();
         throw new Error(j?.error || 'Failed');
       }
-      toast.success('Broadcast queued');
+      
+      const result = await res.json();
+      
+      // Show success message with details
+      const methods = newNotification.deliveryMethod.join(' + ');
+      toast.success(`Notification sent via ${methods}!`, { duration: 4000 });
+      
       setIsCreateModalOpen(false);
-      setNewNotification({ recipient: 'All Users', subject: '', message: '', type: 'Info', deliveryMethod: ['In-App'] });
+      setNewNotification({ 
+        recipient: 'All Users', 
+        subject: '', 
+        message: '', 
+        type: 'Info', 
+        deliveryMethod: ['In-App'] 
+      });
       loadBroadcasts();
     } catch (err: any) {
       console.error(err);
@@ -302,7 +315,7 @@ const Notifications: React.FC = () => {
                               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <p className="text-base text-gray-700 whitespace-pre-line">{notification.details}</p>
                                 {notification.amount && (
-                                  <div className="mt-3 flex items-center text-base text-gray-600"><FiDollarSign className="mr-2" /> <span>Amount: ${notification.amount.toFixed(2)}</span></div>
+                                  <div className="mt-3 flex items-center text-base text-gray-600"><FiDollarSign className="mr-2" /> <span>Amount: €{notification.amount.toFixed(2)}</span></div>
                                 )}
                                 {notification.userId && (
                                   <div className="mt-2 flex items-center text-base text-gray-600"><FiUser className="mr-2" /> <span>User ID: {notification.userId}</span></div>
@@ -356,15 +369,35 @@ const Notifications: React.FC = () => {
                   <div>
                     <label className="block text-base font-medium text-gray-700 mb-2">Delivery Method</label>
                     <div className="flex gap-4">
-                      {['In-App', 'Email', 'SMS'].map(m => (
-                        <label key={m} className="flex items-center space-x-2"><input type="checkbox" checked={newNotification.deliveryMethod.includes(m)} onChange={() => toggleDeliveryMethod(m)} /> <span>{m}</span></label>
+                      {['In-App', 'Email'].map(m => (
+                        <label key={m} className="flex items-center space-x-2">
+                          <input 
+                            type="checkbox" 
+                            checked={newNotification.deliveryMethod.includes(m)} 
+                            onChange={() => toggleDeliveryMethod(m)} 
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                          /> 
+                          <span className="text-sm font-medium text-gray-700">{m}</span>
+                        
+                          {/* {m === 'SMS' && <span className="text-xs text-gray-400">(Coming Soon)</span>} */}
+                        </label>
                       ))}
                     </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 Emails are sent via Brevo. Marketing emails only go to users who opted in.
+                    </p>
                   </div>
                 </div>
                 <div className="flex justify-end p-6 border-t border-gray-200">
-                  <button onClick={() => setIsCreateModalOpen(false)} className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700">Cancel</button>
-                  <button onClick={handleCreateNotification} disabled={!newNotification.subject || !newNotification.message} className="ml-3 px-6 py-3 rounded-lg bg-indigo-600 text-white">Send Notification</button>
+                  <button onClick={() => setIsCreateModalOpen(false)} className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                  <button 
+                    onClick={handleCreateNotification} 
+                    disabled={!newNotification.subject || !newNotification.message || newNotification.deliveryMethod.length === 0} 
+                    className="ml-3 px-6 py-3 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {newNotification.deliveryMethod.includes('Email') ? '📧 ' : ''}
+                    Send Notification
+                  </button>
                 </div>
               </div>
             </div>

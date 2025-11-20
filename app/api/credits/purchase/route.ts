@@ -111,6 +111,8 @@ export async function POST(req: Request) {
     }
 
     // Create Stripe checkout session
+    // Stripe will automatically add their fees on top of this amount
+    // User receives the full credit amount without any deductions
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
@@ -120,9 +122,9 @@ export async function POST(req: Request) {
             currency: 'eur',
             product_data: {
               name: `${credits} Credits`,
-              description: `Purchase ${credits} credits for KickExpert`,
+              description: `Purchase ${credits} credits for KickExpert. Payment processing fees will be added at checkout. You will receive exactly ${credits} credits.`,
             },
-            unit_amount: amount * 100, // Convert to cents
+            unit_amount: amount * 100, // Convert euros to cents
           },
           quantity: 1,
         },

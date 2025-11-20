@@ -481,7 +481,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                       Buy
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Minimum purchase: 20 credits. Fees are determined by Stripe/PayPal and are not collected by KickExpert. Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips.</p>
+                  <p className="text-xs text-gray-500 mt-2">Minimum purchase: 20 credits. Payment processing fees (Stripe/PayPal) are added on top of the credit amount. You will receive the exact number of credits you purchase. Credits are not deposits, do not accrue interest, and do not constitute stored value or gambling chips.</p>
                 </div>
 
                 {/* Info Section */}
@@ -505,7 +505,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                     </li>
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
-                      Fees are determined by Stripe/PayPal and are not collected by KickExpert
+                      Payment processing fees are added to the purchase amount - you receive 100% of credits purchased
                     </li>
                     <li className="flex items-start">
                       <span className="w-2 h-2 bg-lime-500 rounded-full mr-2 mt-2 flex-shrink-0"></span>
@@ -2036,7 +2036,7 @@ const CreditManagement: React.FC = () => {
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-lime-100">
                       <h5 className="font-medium text-lime-900 mb-2">Processing Fees</h5>
-                      <p className="text-lime-800 text-sm">Fees are determined by Stripe/PayPal and are not collected by KickExpert. We do not mark up or absorb payment processing fees.</p>
+                      <p className="text-lime-800 text-sm">Payment processing fees (Stripe/PayPal) are added on top of your purchase. If you buy 200 credits for €200, you will pay €200 plus the payment provider's fees and receive exactly 200 credits in your account.</p>
                     </div>
                   </div>
                 </div>

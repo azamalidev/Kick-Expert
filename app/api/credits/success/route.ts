@@ -53,42 +53,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Calculate net credits after Stripe fees
+    // Use the full credits amount (no fee deduction)
     let creditsToAdd = credits;
-    if (originalAmount > 0) {
-      if (!session.livemode) {
-        // In test mode, Stripe doesn't deduct fees, so simulate them
-        const estimatedFee = originalAmount * 0.029 + 0.30; // 2.9% + €0.30
-        const netAmountEuros = originalAmount - estimatedFee;
-        creditsToAdd = Math.max(1, Math.floor((netAmountEuros / originalAmount) * credits));
-        console.log(`Test mode: Original €${originalAmount}, Estimated fee €${estimatedFee.toFixed(2)}, Net €${netAmountEuros.toFixed(2)}, Credits: ${credits} -> ${creditsToAdd}`);
-      } else if (session.payment_intent) {
-        try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string, { expand: ['charges'] });
-          console.log('PaymentIntent:', (paymentIntent as any).id, 'Charges count:', (paymentIntent as any).charges?.data?.length);
-          if ((paymentIntent as any).charges && (paymentIntent as any).charges.data && (paymentIntent as any).charges.data.length > 0) {
-            const charge = (paymentIntent as any).charges.data[0];
-            console.log('Charge:', charge.id, 'Balance transaction:', charge.balance_transaction);
-            if (charge.balance_transaction) {
-              const balanceTransaction = await stripe.balanceTransactions.retrieve(charge.balance_transaction);
-              const netAmountCents = balanceTransaction.net;
-              const netAmountEuros = netAmountCents / 100;
-              creditsToAdd = Math.floor((netAmountEuros / originalAmount) * credits);
-              console.log(`Live mode: Original amount: €${originalAmount}, Net amount: €${netAmountEuros}, Credits: ${credits} -> ${creditsToAdd}`);
-            } else {
-              console.log('No balance_transaction on charge');
-            }
-          } else {
-            console.log('No charges on payment intent');
-          }
-        } catch (feeError) {
-          console.error('Error calculating net credits:', feeError);
-          // Fall back to original credits if fee calculation fails
-        }
-      }
-    } else {
-      console.log('No originalAmount:', { originalAmount });
-    }
 
     // First check if user has a credit account
     const { data: creditAccount, error: creditAccountError } = await supabase
