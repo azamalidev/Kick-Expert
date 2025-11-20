@@ -132,9 +132,22 @@ export default function ContactSection() {
             </div>
 
             <div className="pt-6 border-t border-gray-200">
-              <p className="text-gray-600">
+              <p className="text-gray-600 mb-4">
                 We value fair play, clear communication, and community-driven growth.<br />
                 We typically respond within 24-48 hours, Monday to Friday.
+              </p>
+              <a
+                href="/contact/track"
+                className="inline-flex items-center justify-center w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                Track My Inquiry
+              </a>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Already submitted? Track your inquiry status using your reference ID
               </p>
             </div>
           </div>
@@ -155,15 +168,31 @@ export default function ContactSection() {
                     <strong>Reference ID:</strong> {contactId}
                   </p>
                   <p className="text-xs text-blue-600 mt-2">
-                    Keep this ID to track your inquiry status.
+                    Save this ID to track your inquiry status.
                   </p>
                 </div>
-                <button
-                  onClick={resetForm}
-                  className="w-full px-6 py-3.5 bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold rounded-lg hover:from-green-700 hover:to-lime-600 transition-all duration-300 shadow-md hover:shadow-lg mt-6"
-                >
-                  Send Another Message
-                </button>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-green-800">
+                    <strong>✅ Confirmation email sent!</strong>
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Check your email (including spam folder) for your reference ID and tracking link.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <a
+                    href={`/contact/track?id=${contactId}`}
+                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all duration-300 shadow-md hover:shadow-lg text-center"
+                  >
+                    Track Inquiry Status
+                  </a>
+                  <button
+                    onClick={resetForm}
+                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold rounded-lg hover:from-green-700 hover:to-lime-600 transition-all duration-300 shadow-md hover:shadow-lg"
+                  >
+                    Send Another Message
+                  </button>
+                </div>
               </div>
             ) : (
               <>

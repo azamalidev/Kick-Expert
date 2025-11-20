@@ -79,6 +79,24 @@ export async function POST(req: Request) {
 
     console.log("✅ Contact saved successfully:", contact.id);
 
+    // Send confirmation email to user
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email/contact-confirmation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          name: name.trim(),
+          topic: topic.trim(),
+          contactId: contact.id,
+        }),
+      });
+      console.log("✅ Confirmation email sent to:", email);
+    } catch (emailError) {
+      console.error("⚠️ Failed to send confirmation email:", emailError);
+      // Don't fail the request if email fails
+    }
+
     return NextResponse.json(
       {
         success: true,

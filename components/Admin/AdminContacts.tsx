@@ -5,10 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 import { Mail, MessageSquare, Clock, CheckCircle, AlertCircle, Search, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Create admin client with service role for proper permissions
+const getSupabaseClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+};
 
 interface Contact {
   id: string;
@@ -41,15 +44,16 @@ export default function AdminContacts() {
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setContacts(data || []);
+      
+      // Use API route to fetch contacts with proper permissions
+      const response = await fetch('/api/admin/contacts/list');
+      const result = await response.json();
+      
+      if (result.success) {
+        setContacts(result.contacts || []);
+      } else {
+        throw new Error(result.error || 'Failed to load contacts');
+      }
     } catch (error) {
       console.error('Error fetching contacts:', error);
       toast.error('Failed to load contacts');
@@ -60,12 +64,14 @@ export default function AdminContacts() {
 
   const updateContactStatus = async (contactId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', contactId);
+      const response = await fetch('/api/admin/contacts/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, status: newStatus }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error);
 
       setContacts(
         contacts.map((c) =>
@@ -84,12 +90,14 @@ export default function AdminContacts() {
 
   const updateContactPriority = async (contactId: string, newPriority: string) => {
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ priority: newPriority, updated_at: new Date().toISOString() })
-        .eq('id', contactId);
+      const response = await fetch('/api/admin/contacts/update-priority', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, priority: newPriority }),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error);
 
       setContacts(
         contacts.map((c) =>
@@ -112,18 +120,45 @@ export default function AdminContacts() {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({
-          response: responseText,
-          responded_at: new Date().toISOString(),
-          status: 'resolved',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', contactId);
+    const contactToUpdate = contacts.find(c => c.id === contactId);
+    if (!contactToUpdate) {
+      toast.error('Contact not found');
+      return;
+    }
 
-      if (error) throw error;
+    try {
+      // Update contact with response via API (do NOT auto-resolve)
+      const updateResponse = await fetch('/api/admin/contacts/send-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          contactId, 
+          response: responseText 
+        }),
+      });
+
+      const updateResult = await updateResponse.json();
+      if (!updateResult.success) throw new Error(updateResult.error);
+
+      // Send email notification to user
+      try {
+        await fetch('/api/email/contact-response', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: contactToUpdate.email,
+            name: contactToUpdate.name,
+            topic: contactToUpdate.topic,
+            contactId: contactToUpdate.id,
+            response: responseText,
+            adminName: 'KickExpert Support',
+          }),
+        });
+        console.log('✅ Response email sent to:', contactToUpdate.email);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send response email:', emailError);
+        // Don't fail if email fails
+      }
 
       setContacts(
         contacts.map((c) =>
@@ -132,7 +167,6 @@ export default function AdminContacts() {
                 ...c,
                 response: responseText,
                 responded_at: new Date().toISOString(),
-                status: 'resolved',
               }
             : c
         )
@@ -142,12 +176,11 @@ export default function AdminContacts() {
           ...selectedContact,
           response: responseText,
           responded_at: new Date().toISOString(),
-          status: 'resolved',
         });
       }
       setResponseText('');
       setRespondingTo(null);
-      toast.success('Response sent');
+      toast.success('Response sent successfully! User will receive an email.');
     } catch (error) {
       console.error('Error sending response:', error);
       toast.error('Failed to send response');
@@ -361,19 +394,25 @@ export default function AdminContacts() {
                     </select>
                   </div>
 
-                  <div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-semibold text-gray-600">Priority</label>
-                    <select
-                      value={selectedContact.priority}
-                      onChange={(e) => updateContactPriority(selectedContact.id, e.target.value)}
-                      className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-500 text-sm"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
+                    <span className="text-xs text-gray-500 italic">Auto-assigned</span>
                   </div>
+                  <select
+                    value={selectedContact.priority}
+                    onChange={(e) => updateContactPriority(selectedContact.id, e.target.value)}
+                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-500 text-sm"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 High priority for payouts/support topics
+                  </p>
+                </div>
                 </div>
 
                 <div className="border-t pt-4">
@@ -383,15 +422,21 @@ export default function AdminContacts() {
 
                 {selectedContact.response ? (
                   <div className="border-t pt-4 bg-green-50 p-3 rounded-lg">
-                    <h4 className="font-semibold text-green-900 mb-2">Response</h4>
+                    <h4 className="font-semibold text-green-900 mb-2">Response Sent ✅</h4>
                     <p className="text-sm text-green-800">{selectedContact.response}</p>
                     <p className="text-xs text-green-600 mt-2">
                       Sent: {new Date(selectedContact.responded_at!).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-2 bg-blue-50 p-2 rounded">
+                      📧 Email notification was sent to the user
                     </p>
                   </div>
                 ) : (
                   <div className="border-t pt-4">
                     <h4 className="font-semibold text-gray-900 mb-2">Send Response</h4>
+                    <p className="text-xs text-gray-600 mb-2">
+                      📧 User will receive an email notification when you send a response
+                    </p>
                     <textarea
                       value={respondingTo === selectedContact.id ? responseText : ''}
                       onChange={(e) => setResponseText(e.target.value)}
@@ -404,8 +449,9 @@ export default function AdminContacts() {
                       onClick={() => sendResponse(selectedContact.id)}
                       className="mt-2 w-full px-4 py-2 bg-lime-500 hover:bg-lime-600 text-white rounded-lg transition-colors font-semibold"
                     >
-                      Send Response
+                      Send Response (Email User)
                     </button>
+               
                   </div>
                 )}
               </div>
