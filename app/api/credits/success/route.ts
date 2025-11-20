@@ -19,10 +19,18 @@ export async function GET(req: NextRequest) {
     }
 
     // Get the session from Stripe to verify the purchase
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['payment_intent']
+    });
 
     if (!session) {
       return NextResponse.redirect(new URL('/credits?error=invalid_session', req.url));
+    }
+
+    // CRITICAL: Only process if payment was actually completed
+    if (session.payment_status !== 'paid') {
+      console.log('Payment not completed:', { sessionId, payment_status: session.payment_status });
+      return NextResponse.redirect(new URL('/credits?error=payment_not_completed', req.url));
     }
 
     const supabase = createClient(
@@ -106,6 +114,9 @@ export async function GET(req: NextRequest) {
         );
       }
     }
+
+    // NOTE: Notification is sent automatically by database trigger when status changes to 'completed'
+    // No need to send notification here to avoid duplicates
 
     // Update transaction status (legacy credit_transactions table)
     const { error: transactionError } = await supabase
