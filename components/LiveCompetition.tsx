@@ -563,29 +563,29 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   <p className="text-center font-bold text-blue-600">{competition.credit_cost} Credits</p>
                 </div>
                 
-                {/* <div className="bg-white rounded-lg border border-lime-200 p-3 shadow-sm">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <Star className="h-4 w-4 text-lime-600" />
-                    <span className="text-xs text-gray-600">Difficulty</span>
-                  </div>
-                  <p className="text-center font-bold text-lime-600">{competition.difficulty}</p>
-                </div> */}
-                
                 <div className="bg-white rounded-lg border border-purple-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Award className="h-4 w-4 text-purple-600" />
-                    <span className="text-xs text-gray-600">Questions</span>
+                    <Clock className="h-4 w-4 text-purple-600" />
+                    <span className="text-xs text-gray-600">Format</span>
                   </div>
-                  <p className="text-center font-bold text-purple-600">{competition.questions}</p>
+                  <p className="text-center font-bold text-purple-600 text-sm">{competition.questions}Q • 30s Each</p>
                 </div>
                 
-                {/* <div className="bg-white rounded-lg border border-orange-200 p-3 shadow-sm">
+                <div className="bg-white rounded-lg border border-green-200 p-3 shadow-sm">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <Award className="h-4 w-4 text-green-600" />
+                    <span className="text-xs text-gray-600">Questions</span>
+                  </div>
+                  <p className="text-center font-bold text-green-600">{competition.questions}</p>
+                </div>
+                
+                <div className="bg-white rounded-lg border border-orange-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Users className="h-4 w-4 text-orange-600" />
-                    <span className="text-xs text-gray-600">Min Players</span>
+                    <span className="text-xs text-gray-600">Type</span>
                   </div>
-                  <p className="text-center font-bold text-orange-600">{competition.minPlayers}</p>
-                </div> */}
+                  <p className="text-center font-bold text-orange-600 text-sm">Time-Limited</p>
+                </div>
               </div>
 
               {/* Prize Pool Card */}
@@ -999,7 +999,12 @@ const handleCompetitionEntry = async (competitionId: string) => {
                            (userCredits.winnings_credits || 0) +
                            (userCredits.purchased_credits || 0);
       if (totalCredits < creditCost) {
-        toast.error(`Insufficient credits. You need ${creditCost} credits to join.`);
+        const creditsNeeded = creditCost - totalCredits;
+        toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
+        // Redirect to credits page with required amount
+        setTimeout(() => {
+          router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
+        }, 2000);
         return;
       }
     }
@@ -1025,7 +1030,12 @@ const handleCompetitionEntry = async (competitionId: string) => {
     const data = await response.json();
     if (!response.ok) {
       if (data.error === 'Insufficient credits') {
-        toast.error(`Insufficient credits. You need ${competition.credit_cost} credits to join.`);
+        const creditsNeeded = creditCost - (data.currentCredits || 0);
+        toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
+        setIsRegistering(false);
+        setTimeout(() => {
+          router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
+        }, 2000);
         return;
       }
       throw new Error(data.error || 'Failed to join competition');
@@ -1281,11 +1291,16 @@ const handleCompetitionEntry = async (competitionId: string) => {
     const start = comp.startTime;
     const timeToStart = start.getTime() - now.getTime();
     const minutesToStart = Math.floor(timeToStart / 1000 / 60);
+    const secondsToStart = Math.floor(timeToStart / 1000);
     
     if (isCompetitionStarted(comp)) {
       return { text: 'Live', color: 'bg-red-500', pulse: true };
     } else if (isRegistrationClosed(comp)) {
-      return { text: 'Closed', color: 'bg-gray-500', pulse: false };
+      const closeTime = new Date(start.getTime() - 5 * 60 * 1000); // 5 minutes before start
+      return { text: `Closed (closed at ${closeTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`, color: 'bg-gray-500', pulse: false };
+    } else if (secondsToStart <= 300) { // Within 5 minutes
+      const minutesLeft = Math.floor(secondsToStart / 60);
+      return { text: `Registration closes in ${minutesLeft}m`, color: 'bg-orange-500', pulse: true };
     } else if (minutesToStart <= 60) {
       return { text: `Starting in ${minutesToStart}m`, color: 'bg-orange-500', pulse: true };
     } else {
@@ -1498,10 +1513,10 @@ const handleCompetitionEntry = async (competitionId: string) => {
                   <span className="text-gray-600">Entry Cost:</span>
                   <span className="font-bold text-blue-600">{comp.credit_cost} Credits</span>
                 </div>
-                <div className="flex justify-between items-center">
+                {/* <div className="flex justify-between items-center">
                   <span className="text-gray-600">Questions:</span>
                   <span className="font-bold">{comp.questions}</span>
-                </div>
+                </div> */}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Difficulty:</span>
                   <div className="flex items-center">
@@ -1518,6 +1533,10 @@ const handleCompetitionEntry = async (competitionId: string) => {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Start Time:</span>
                   <span className="font-bold text-sm">{comp.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Format:</span>
+                  <span className="font-bold text-purple-600 text-sm">{comp.questions} Questions</span>
                 </div>
               </div>
 
@@ -1575,7 +1594,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                     {prizePool.isEstimated && (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
                         <p className="text-xs text-yellow-700 text-center">
-                          * Estimated based on minimum {10} players. Prize pool grows with more entries!
+                          * Estimated prize pool based on minimum 10 players. Actual prize pool grows with more participants!
                         </p>
                       </div>
                     )}
@@ -1709,7 +1728,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
                       className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
                       style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
                     >
-                      {isLoggedIn ? `Join for ${comp.credit_cost} Credits` : 'Sign Up to Join'}
+                      {isLoggedIn ? `Reserve Your Spot - ${comp.credit_cost} Credits` : 'Join Now - Sign Up Required'}
                     </button>
                   )
                 )}
@@ -1725,6 +1744,131 @@ const handleCompetitionEntry = async (competitionId: string) => {
       <div className="w-full mt-16 p-8 bg-white rounded-xl border-2 border-lime-100 shadow-lg">
         <h2 className="text-4xl font-extrabold mb-8 text-lime-600 text-center">Competition Rules</h2>
         <div className="space-y-5">
+
+          {/* Prize Pool Transparency */}
+          <div className="flex items-start p-5 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
+            <div className="p-2.5 mr-4 bg-yellow-500/30 rounded-lg">
+              <Award className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-yellow-800 mb-2">Prize Pool Transparency</h3>
+              <p className="text-gray-700 text-base leading-relaxed mb-3">
+                All prize pools are calculated transparently based on actual player registrations. The estimated amounts shown are based on a minimum of 10 participants to give you a clear idea of potential winnings.
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 font-medium">
+                  💡 <strong>How it works:</strong> Every credit paid by participants goes directly into the prize pool. No hidden fees or deductions - 100% of entry fees are distributed to winners!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Competition Format */}
+          <div className="flex items-start p-5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
+            <div className="p-2.5 mr-4 bg-blue-500/30 rounded-lg">
+              <Clock className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-blue-800 mb-2">Competition Format</h3>
+              <p className="text-gray-700 text-base leading-relaxed mb-3">
+                All KickExpert competitions follow a standardized time-limited, question-based format designed for fair and exciting gameplay.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-white border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold text-blue-800">Time-Limited</span>
+                  </div>
+                  <p className="text-sm text-gray-600">League-specific question counts (15-30 questions), 30 seconds each. Competition duration varies by league type.</p>
+                </div>
+                <div className="bg-white border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Award className="h-4 w-4 text-blue-600" />
+                    <span className="font-semibold text-blue-800">Question-Based</span>
+                  </div>
+                  <p className="text-sm text-gray-600">Multiple choice questions covering football trivia, history, and current events.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Competition Types */}
+          <div className="flex items-start p-5 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-colors border-2 border-indigo-300 shadow-md">
+            <div className="p-2.5 mr-4 bg-indigo-500/30 rounded-lg">
+              <Trophy className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-indigo-800 mb-2">Competition Types</h3>
+              <p className="text-gray-700 text-base leading-relaxed mb-3">
+                Choose from three league tiers, each offering different entry costs, difficulty levels, and prize potentials.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-white border border-indigo-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="font-bold text-green-700">Starter League</span>
+                  </div>
+                  <p className="text-sm text-gray-600">5 Credits • 15 Questions • Easy difficulty • Perfect for beginners</p>
+                </div>
+                <div className="bg-white border border-indigo-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <span className="font-bold text-blue-700">Pro League</span>
+                  </div>
+                  <p className="text-sm text-gray-600">10 Credits • 20 Questions • Medium difficulty • For serious fans</p>
+                </div>
+                <div className="bg-white border border-indigo-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                    <span className="font-bold text-purple-700">Elite League</span>
+                  </div>
+                  <p className="text-sm text-gray-600">20 Credits • 30 Questions • Hard difficulty • Expert level only</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Registration & Participation */}
+          <div className="flex items-start p-5 bg-gradient-to-r from-green-50 to-green-100 rounded-xl hover:from-green-100 hover:to-green-200 transition-colors border-2 border-green-300 shadow-md">
+            <div className="p-2.5 mr-4 bg-green-500/30 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-green-800 mb-2">Registration & Participation</h3>
+              <p className="text-gray-700 text-base leading-relaxed mb-3">
+                Secure your spot in the competition with our streamlined registration process. Early registration ensures you don't miss out on the action.
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg p-3">
+                  <div className="bg-green-100 rounded-full p-2">
+                    <span className="text-green-700 font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-800">Reserve Your Spot</p>
+                    <p className="text-sm text-gray-600">Registration closes 5 minutes before competition start time</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg p-3">
+                  <div className="bg-green-100 rounded-full p-2">
+                    <span className="text-green-700 font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-800">Join Competition</p>
+                    <p className="text-sm text-gray-600">Enter the live competition 2 minutes before start</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg p-3">
+                  <div className="bg-green-100 rounded-full p-2">
+                    <span className="text-green-700 font-bold text-sm">3</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-800">Compete & Win</p>
+                    <p className="text-sm text-gray-600">Answer questions and climb the leaderboard!</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Dynamic Prize Pool System - FEATURED AT TOP */}
           <div className="flex items-start p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
             <div className="p-3 mr-4 bg-yellow-500/30 rounded-lg">

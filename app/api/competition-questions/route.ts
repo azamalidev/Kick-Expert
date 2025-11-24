@@ -54,7 +54,35 @@ export async function POST(req: NextRequest) {
     }, {});
     console.log('📊 Backend total difficulty distribution:', difficultyCount);
 
-    // Select 20 questions with proper distribution: 8 Easy (40%), 8 Medium (40%), 4 Hard (20%)
+    // Determine question count based on competition type
+    let targetQuestionCount = 20; // default
+    if (compRow?.name) {
+      switch (compRow.name) {
+        case 'Starter League':
+          targetQuestionCount = 15;
+          break;
+        case 'Pro League':
+          targetQuestionCount = 20;
+          break;
+        case 'Elite League':
+          targetQuestionCount = 30;
+          break;
+        default:
+          targetQuestionCount = 20;
+      }
+    }
+
+    console.log(`🎯 Target question count for ${compRow?.name}: ${targetQuestionCount}`);
+
+    // Calculate distribution based on target count
+    // Maintain 40% Easy, 40% Medium, 20% Hard ratio
+    const easyCount = Math.ceil(targetQuestionCount * 0.4);
+    const mediumCount = Math.ceil(targetQuestionCount * 0.4);
+    const hardCount = targetQuestionCount - easyCount - mediumCount;
+
+    console.log(`📊 Distribution for ${targetQuestionCount} questions: Easy: ${easyCount}, Medium: ${mediumCount}, Hard: ${hardCount}`);
+
+    // Select questions with proper distribution
     const shuffle = <T,>(arr: T[]): T[] => {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -76,9 +104,9 @@ export async function POST(req: NextRequest) {
 
     // Select the required number from each difficulty
     let finalQs = [
-      ...easyQuestions.slice(0, 8),    // 8 Easy (40%)
-      ...mediumQuestions.slice(0, 8),  // 8 Medium (40%)
-      ...hardQuestions.slice(0, 4),    // 4 Hard (20%)
+      ...easyQuestions.slice(0, easyCount),
+      ...mediumQuestions.slice(0, mediumCount),
+      ...hardQuestions.slice(0, hardCount),
     ];
 
     console.log('📦 Before shuffle - distribution:', {
@@ -89,10 +117,10 @@ export async function POST(req: NextRequest) {
     });
 
     // If we don't have enough questions of a particular difficulty, backfill
-    if (finalQs.length < 20) {
+    if (finalQs.length < targetQuestionCount) {
       const selectedIds = new Set(finalQs.map(q => q.id));
       const remaining = shuffle(allQuestions.filter(q => !selectedIds.has(q.id)));
-      finalQs = [...finalQs, ...remaining.slice(0, 20 - finalQs.length)];
+      finalQs = [...finalQs, ...remaining.slice(0, targetQuestionCount - finalQs.length)];
     }
 
     // Shuffle the final selection so difficulties are mixed

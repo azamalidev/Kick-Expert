@@ -79,6 +79,10 @@ export default function LeaguePage() {
   const [userRank, setUserRank] = useState<number | null>(null);
   const [suspiciousActivity, setSuspiciousActivity] = useState(false);
   const [showCompetitionEndModal, setShowCompetitionEndModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [isLateJoiner, setIsLateJoiner] = useState(false);
+  const [missedQuestions, setMissedQuestions] = useState(0);
+  const [competitionStartTime, setCompetitionStartTime] = useState<number | null>(null);
   const nextCalled = useRef(false);
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
@@ -152,7 +156,8 @@ export default function LeaguePage() {
 
             // Only allow entering quiz if competition has actually started (current time >= start time)
             if (now >= start) {
-              // Competition has started - go directly to quiz
+              // Competition has started - set as late joiner
+              setCompetitionStartTime(start);
               setPhase('quiz');
               setCountdown(0);
             } else if (seconds <= 120) {
@@ -231,6 +236,8 @@ export default function LeaguePage() {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownInterval);
+            // Set competition start time when countdown reaches 0
+            setCompetitionStartTime(Date.now());
             setPhase('quiz');
             return 0;
           }
@@ -258,6 +265,26 @@ export default function LeaguePage() {
             router.push('/livecompetition');
           }, 3000);
           return;
+        }
+
+        // Check if user is joining late (competition has already started)
+        const now = Date.now();
+        const isLate = competitionStartTime && (now > competitionStartTime);
+
+        if (isLate) {
+          // Calculate how many questions have been shown since competition started
+          // Assuming 30 seconds per question + some buffer
+          const timeElapsed = now - competitionStartTime;
+          const questionsShown = Math.floor(timeElapsed / 31000); // 30 seconds + 1 second buffer
+          const missed = Math.max(0, Math.min(questionsShown, 20)); // Max 20 questions
+
+          setIsLateJoiner(true);
+          setMissedQuestions(missed);
+
+          console.log(`🚨 Late Joiner Detected: Missed ${missed} questions, no timer penalty applied`);
+        } else {
+          setIsLateJoiner(false);
+          setMissedQuestions(0);
         }
 
         // Get the authenticated user
@@ -364,35 +391,10 @@ export default function LeaguePage() {
           return;
         }
 
-        const { data: session, error: sessionError } = await supabase
-          .from('competition_sessions')
-          .insert({
-            competition_id: competitionId,
-            user_id: authResponse.data.user.id,
-            questions_played: Math.min(20, (Array.isArray(questionsData) ? questionsData.length : 0)),
-            correct_answers: 0,
-            score_percentage: 0,
-            start_time: new Date().toISOString(),
-            // quiz_type is required by DB (NOT NULL). Use 'competition' for league sessions.
-            quiz_type: 'competition',
-            // compute difficulty breakdown from the questions
-            difficulty_breakdown: ((): any => {
-              const acc: any = { easy: 0, medium: 0, hard: 0 };
-              (normalizedQuestions || []).forEach((q: any) => {
-                const d = (q.difficulty || '').toString().toLowerCase();
-                if (d.includes('easy')) acc.easy += 1;
-                else if (d.includes('medium')) acc.medium += 1;
-                else if (d.includes('hard')) acc.hard += 1;
-              });
-              return acc;
-            })(),
-          })
-          .select()
-          .single();
+        // NOTE: Session creation moved to handleNextQuestion when user actually starts answering
+        // This allows users to enter waiting room without being marked as "played"
 
-        if (sessionError) throw sessionError;
-
-        setSessionId(session.id);
+        setSessionId(null); // No session yet
         // persist registration id for use when saving answers
         // @ts-ignore
         (window as any).__currentCompetitionRegistrationId = registrationId;
@@ -434,7 +436,11 @@ export default function LeaguePage() {
     // Set the start time for this question (for both timer and speed detection)
     timerStartTime.current = Date.now();
     questionStartTime.current = Date.now(); // Track question display time for speed detection
+
+    // All users get full 30 seconds per question (no timer penalties for late joiners)
     const questionDuration = 30000; // 30 seconds in milliseconds
+
+    console.log(`⏱️ Timer setup: All users get ${questionDuration}ms (${questionDuration / 1000}s) per question`);
 
     const timerInterval = setInterval(() => {
       if (!timerStartTime.current) return;
@@ -613,6 +619,56 @@ export default function LeaguePage() {
       return;
     }
 
+    // Create session if it doesn't exist yet (user is starting to participate in the quiz)
+    // This happens when they see questions and either answer or let timer run out
+    if (!sessionId) {
+      try {
+        console.log('Creating competition session - user is participating in quiz');
+        const authData = await supabase.auth.getUser();
+        const userId = authData.data.user?.id;
+        if (!userId) throw new Error('User not authenticated');
+
+        const { data: session, error: sessionError } = await supabase
+          .from('competition_sessions')
+          .insert({
+            competition_id: competitionId,
+            user_id: userId,
+            questions_played: Math.min(20, questions.length),
+            correct_answers: 0,
+            score_percentage: 0,
+            start_time: new Date().toISOString(),
+            // quiz_type is required by DB (NOT NULL). Use 'competition' for league sessions.
+            quiz_type: 'competition',
+            // compute difficulty breakdown from the questions
+            difficulty_breakdown: ((): any => {
+              const acc: any = { easy: 0, medium: 0, hard: 0 };
+              (questions || []).forEach((q: any) => {
+                const d = (q.difficulty || '').toString().toLowerCase();
+                if (d.includes('easy')) acc.easy += 1;
+                else if (d.includes('medium')) acc.medium += 1;
+                else if (d.includes('hard')) acc.hard += 1;
+              });
+              return acc;
+            })(),
+            // Record late joiner information
+            late_joiner: isLateJoiner,
+            missed_questions: missedQuestions,
+            penalty_seconds: 0, // No timer penalty for late joiners
+          })
+          .select()
+          .single();
+
+        if (sessionError) throw sessionError;
+        setSessionId(session.id);
+        console.log('✅ Competition session created:', session.id);
+      } catch (err) {
+        console.error('Failed to create competition session:', err);
+        setError('Failed to start competition session. Please try again.');
+        nextCalled.current = false;
+        return;
+      }
+    }
+
     // Calculate response latency for speed detection
     const answerTime = Date.now();
     let latencyMs = 0;
@@ -748,6 +804,7 @@ export default function LeaguePage() {
       setCurrentQuestionIndex((prev) => prev + 1);
       setSelectedChoice(null);
       setShowResult(false);
+      // Reset timer - all users get full 30 seconds per question
       setTimer(30);
       setTimerKey((prev) => prev + 1);
       // Reset the flag after state updates to allow next question
@@ -1316,6 +1373,21 @@ export default function LeaguePage() {
             </h1>
             <p className="text-gray-600 mb-6">Get ready! Competition starts soon</p>
 
+            {/* Exit Button */}
+            <div className="flex justify-end mb-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowExitModal(true)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-all shadow-sm flex items-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Exit Waiting Room
+              </motion.button>
+            </div>
+
             {/* Countdown Timer */}
             <div className="relative w-32 h-32 mx-auto mb-8">
               <svg className="w-full h-full" viewBox="0 0 100 100">
@@ -1350,6 +1422,35 @@ export default function LeaguePage() {
                 <span className="text-xs text-gray-500 mt-1">minutes</span>
               </div>
             </div>
+
+            {/* Late Joiner Warning - Show when less than 30 seconds remaining */}
+            {countdown < 30 && countdown > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 mb-6 shadow-md"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-red-800 mb-2">⚠️ Late Joiner Warning</h3>
+                    <div className="space-y-2 text-sm text-red-700">
+                      <p className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <strong>Competition starts in {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</strong>
+                      </p>
+                      <p>• If you join after the timer reaches zero, you'll miss the first questions</p>
+                      <p>• Late joiners receive penalties and may not be eligible for prizes</p>
+                      <p>• Make sure you're ready to start when the countdown ends!</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* League Recap */}
             <div className="bg-gradient-to-br from-lime-50 to-lime-100 border-2 border-lime-300 rounded-xl p-6 mb-6 shadow-md">
@@ -1479,7 +1580,9 @@ export default function LeaguePage() {
                   <div className="w-24 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-lime-700 transition-all duration-500"
-                      style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+                      style={{
+                        width: `${((currentQuestionIndex + 1) / questions.length) * 100}%`
+                      }}
                     />
                   </div>
                 </div>
@@ -1500,17 +1603,51 @@ export default function LeaguePage() {
                 </div>
                 <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-hidden relative">
                   <div
-                    className={`h-full transition-all duration-100 ${timer > 20 ? 'bg-green-400' :
-                        timer > 10 ? 'bg-yellow-400' :
-                          'bg-red-400 animate-pulse'
-                      }`}
-                    style={{ width: `${(timer / 30) * 100}%` }}
+                    className={`h-full transition-all duration-100 ${
+                      timer > 20
+                        ? 'bg-green-400'
+                        : timer > 10
+                          ? 'bg-yellow-400'
+                          : 'bg-red-400 animate-pulse'
+                    }`}
+                    style={{
+                      width: `${(timer / 30) * 100}%`
+                    }}
                   />
                 </div>
               </div>
             </div>
 
             <div className="p-6">
+              {/* Late Joiner Penalty Warning */}
+              {isLateJoiner && missedQuestions > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 mb-6 shadow-md"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-red-800 mb-2">🚨 Late Joiner Notice</h3>
+                      <div className="space-y-2 text-sm text-red-700">
+                        <p className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <strong>You missed {missedQuestions} question{missedQuestions !== 1 ? 's' : ''} - counted as incorrect answers</strong>
+                        </p>
+                        <p>• You will receive full 30-second timers for all questions you see</p>
+                        <p>• You may not be eligible for prizes due to late joining</p>
+                        <p>• Answer quickly to catch up with other players!</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentQuestionIndex}
@@ -1689,6 +1826,20 @@ export default function LeaguePage() {
               <p className="text-gray-600 mb-5 sm:mb-6 max-w-md mx-auto text-sm sm:text-base">
                 {getRecommendation().description}
               </p>
+
+              {/* Late Joiner Notice */}
+              {isLateJoiner && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 mb-6 max-w-lg mx-auto">
+                  <p className="text-orange-800 font-semibold flex items-center justify-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Late Joiner Notice
+                  </p>
+                  <p className="text-orange-700 text-sm mt-2 text-center">
+                    You joined {missedQuestions} question{missedQuestions !== 1 ? 's' : ''} late. These were counted as incorrect answers, but you received full timers for questions you saw.
+                    Prize eligibility may be affected.
+                  </p>
+                </div>
+              )}
 
               {/* Competition Status */}
               <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 mb-6 max-w-lg mx-auto">
@@ -1989,6 +2140,71 @@ export default function LeaguePage() {
                 >
                   Got It!
                 </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Exit Confirmation Modal */}
+      <AnimatePresence>
+        {showExitModal && (
+          <div className="fixed inset-0 bg-transparent bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white border border-gray-200 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
+                <div className="flex items-center justify-center mb-2">
+                  <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-center">Exit Waiting Room?</h2>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="text-center mb-6">
+                  <p className="text-gray-700 text-lg mb-4">
+                    Are you sure you want to leave the waiting room?
+                  </p>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <p className="text-yellow-800 text-sm">
+                      <strong>⚠️ Important:</strong> If you exit now, you can still rejoin before the competition starts, but you may miss questions if you're late.
+                    </p>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    You won't be charged any credits for leaving the waiting room.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowExitModal(false)}
+                    className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-all shadow-md"
+                  >
+                    Stay in Waiting Room
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setShowExitModal(false);
+                      router.push('/livecompetition');
+                    }}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold rounded-xl transition-all shadow-lg"
+                  >
+                    Exit Competition
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </div>

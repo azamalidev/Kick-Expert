@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
 import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle, Clock, Shield, CheckCircle2, Lightbulb, Lock } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 interface CreditBalance {
   purchased_credits: number;
@@ -913,6 +914,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, maxAmoun
 
 
 const CreditManagement: React.FC = () => {
+  const searchParams = useSearchParams();
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBuyModalOpen, setBuyModalOpen] = useState(false);
@@ -920,6 +922,17 @@ const CreditManagement: React.FC = () => {
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawMin] = useState(50);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Handle URL parameters for credit requirements
+  const requiredCredits = searchParams?.get('required');
+  const competitionId = searchParams?.get('competition');
+
+  useEffect(() => {
+    if (requiredCredits) {
+      // If redirected with required credits, switch to buy tab and show message
+      setActiveTab('buy');
+    }
+  }, [requiredCredits]);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Zap },
@@ -1418,6 +1431,27 @@ const CreditManagement: React.FC = () => {
                 <h3 className="text-2xl font-semibold text-gray-900 mb-2">Buy Credits</h3>
                 <p className="text-gray-600">Purchase credits to enter competitions and enhance your experience</p>
               </div>
+
+              {/* Required Credits Notice */}
+              {requiredCredits && (
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6 mb-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-semibold text-orange-900">Credits Required</h4>
+                      <p className="text-orange-700">You need <strong>{requiredCredits} more credits</strong> to join the competition</p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-orange-200">
+                    <p className="text-sm text-orange-800">
+                      💡 <strong>Quick solution:</strong> Purchase a package with at least {requiredCredits} credits to proceed immediately.
+                      Your credits will be available instantly after payment.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Quick Purchase Button */}
               <div className="bg-gradient-to-r from-lime-500 to-lime-600 rounded-2xl p-8 text-white text-center shadow-lg mb-8">
