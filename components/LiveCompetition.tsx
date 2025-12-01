@@ -103,7 +103,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
       const res = await fetch('/api/paypal-create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: user.id,
           amount: competition.entry_fee,
           credits: competition.credit_cost
@@ -116,7 +116,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
       }
 
       const result = await res.json();
-      
+
       // Redirect to PayPal approval URL
       if (result.approvalUrl) {
         window.location.href = result.approvalUrl;
@@ -171,7 +171,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
                       You will be redirected to PayPal to complete your payment securely.
                     </p>
                   </div>
-                  
+
                   <div className="flex space-x-4">
                     <button
                       onClick={onClose}
@@ -270,7 +270,7 @@ const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
-                        <path d="M7.2 18c-.3 0-.6-.1-.8-.4L3 14.5c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l2.9 2.9L18.7 5.3c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1L8 17.6c-.2.2-.5.4-.8.4z"/>
+                        <path d="M7.2 18c-.3 0-.6-.1-.8-.4L3 14.5c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0l2.9 2.9L18.7 5.3c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1L8 17.6c-.2.2-.5.4-.8.4z" />
                       </svg>
                     </div>
                     <div className="text-left">
@@ -400,8 +400,8 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
                   <div className="flex-1">
                     <p className="font-semibold text-lime-900 mb-1">Ready to Compete!</p>
                     <p className="text-sm text-lime-800">
-                      {startTime 
-                        ? "We'll notify you when the competition is about to start. Make sure you're ready!" 
+                      {startTime
+                        ? "We'll notify you when the competition is about to start. Make sure you're ready!"
                         : "We'll notify you when it's time to play!"}
                     </p>
                   </div>
@@ -517,7 +517,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
 
             {/* Scrollable Content */}
             <div className="p-6 overflow-y-auto scrollbar-hide flex-1 bg-gradient-to-b from-gray-50 to-white">
-              
+
               {/* Start Date Card */}
               <div className="bg-white rounded-xl border-2 border-lime-200 p-4 mb-4 shadow-sm">
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -533,9 +533,14 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                       day: 'numeric'
                     })}
                   </p>
-                  <p className="text-lg font-bold text-lime-600">
-                    {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <div className="flex flex-col items-center">
+                    <p className="text-lg font-bold text-lime-600">
+                      {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+                    </p>
+                    <p className=" text-gray-500 font-medium">
+                      ({startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' })})
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -562,7 +567,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   </div>
                   <p className="text-center font-bold text-blue-600">{competition.credit_cost} Credits</p>
                 </div>
-                
+
                 <div className="bg-white rounded-lg border border-purple-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Clock className="h-4 w-4 text-purple-600" />
@@ -570,7 +575,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   </div>
                   <p className="text-center font-bold text-purple-600 text-sm">{competition.questions}Q • 30s Each</p>
                 </div>
-                
+
                 <div className="bg-white rounded-lg border border-green-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Award className="h-4 w-4 text-green-600" />
@@ -578,7 +583,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                   </div>
                   <p className="text-center font-bold text-green-600">{competition.questions}</p>
                 </div>
-                
+
                 <div className="bg-white rounded-lg border border-orange-200 p-3 shadow-sm">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <Users className="h-4 w-4 text-orange-600" />
@@ -820,21 +825,21 @@ const LiveCompetition = () => {
     const fetchPlayerCounts = async (comps: Competition[]) => {
       try {
         const counts: { [key: string]: number } = {};
-        
+
         for (const comp of comps) {
           const { count, error } = await supabase
             .from('competition_registrations')
             .select('*', { count: 'exact', head: true })
             .eq('competition_id', comp.id)
             .eq('status', 'confirmed');
-          
+
           if (!error && count !== null) {
             counts[comp.id] = count;
           } else {
             counts[comp.id] = 0;
           }
         }
-        
+
         setPlayerCounts(counts);
       } catch (error) {
         console.error('Error fetching player counts:', error);
@@ -844,18 +849,18 @@ const LiveCompetition = () => {
     const initializeData = async () => {
       const user = await checkUser();
       const competitionsData = await fetchCompetitions();
-      
+
       let registrationsData: CompetitionRegistration[] = [];
       if (user) {
         registrationsData = await fetchRegistrations(user.id);
       }
-      
+
       setCompetitions(competitionsData);
       setRegistrations(registrationsData);
-      
+
       // Fetch player counts for all competitions
       await fetchPlayerCounts(competitionsData);
-      
+
       setIsLoading(false);
     };
 
@@ -865,7 +870,7 @@ const LiveCompetition = () => {
       const currentUser = session?.user || null;
       setIsLoggedIn(!!currentUser);
       setUser(currentUser);
-      
+
       // If user logs in, fetch their registrations
       if (currentUser) {
         const registrationsData = await fetchRegistrations(currentUser.id);
@@ -893,7 +898,7 @@ const LiveCompetition = () => {
         if (!error && data) {
           console.log('Polled competitions:', data); // Debug log
           setCompetitions(data);
-          
+
           // Update player counts
           const counts: { [key: string]: number } = {};
           for (const comp of data) {
@@ -902,7 +907,7 @@ const LiveCompetition = () => {
               .select('*', { count: 'exact', head: true })
               .eq('competition_id', comp.id)
               .eq('status', 'confirmed');
-            
+
             counts[comp.id] = count || 0;
           }
           setPlayerCounts(counts);
@@ -938,143 +943,143 @@ const LiveCompetition = () => {
     setModalOpen(true);
   };
 
-const handleCompetitionEntry = async (competitionId: string) => {
-  if (!user) {
-    toast.error('Please sign up or log in to join the competition.');
-    router.push(`/signup?competition=${competitionId}`);
-    return;
-  }
-
-  const competition = competitions.find(c => c.id === competitionId);
-  if (!competition) {
-    toast.error('Competition not found');
-    return;
-  }
-
-  // Determine the correct credit cost to charge. `selectedCompetition` (set when
-  // opening the modal) carries the display `credit_cost`. The DB row in
-  // `competitions` may not include that computed field, so prefer the selected
-  // competition's value when available.
-  const creditCost = selectedCompetition && selectedCompetition.id === competitionId
-    ? selectedCompetition.credit_cost
-    : getCreditCost(competition.name);
-
-  // Prevent registration if it's already closed (competition here is raw DB row with start_time)
-  if (isRegistrationClosed({ startTime: new Date(competition.start_time) })) {
-    toast.error('Registration is closed for this competition');
-    return;
-  }
-
-  // Check if already registered
-  const registration = registrations.find(reg => 
-    reg.competition_id === competitionId && reg.status === 'confirmed'
-  );
-
-  if (registration) {
-    setAlreadyRegisteredData({
-      competitionName: competition.name,
-      paidAmount: registration.paid_amount,
-      startTime: new Date(competition.start_time),
-      competitionImagePath: getLeagueImage(competition.name)
-    });
-    setModalOpen(false);
-    setAlreadyRegisteredModalOpen(true);
-    return;
-  }
-
-  try {
-    console.log('Attempting to register for competition:', competitionId);
-    setIsRegistering(true);
-    // Optional quick client-side check (helps give immediate feedback)
-    const { data: userCredits, error: creditError } = await supabase
-      .from('user_credits')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (creditError || !userCredits) {
-      // proceed to server which will perform authoritative checks
-    } else {
-      const totalCredits = (userCredits.referral_credits || 0) +
-                           (userCredits.winnings_credits || 0) +
-                           (userCredits.purchased_credits || 0);
-      if (totalCredits < creditCost) {
-        const creditsNeeded = creditCost - totalCredits;
-        toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
-        // Redirect to credits page with required amount
-        setTimeout(() => {
-          router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
-        }, 2000);
-        return;
-      }
+  const handleCompetitionEntry = async (competitionId: string) => {
+    if (!user) {
+      toast.error('Please sign up or log in to join the competition.');
+      router.push(`/signup?competition=${competitionId}`);
+      return;
     }
 
-    // Call server to register and perform credit deduction there
-    const payload = {
-      userId: user.id,
-      competitionId,
-      status: 'confirmed',
-      paid_amount: creditCost,
-      payment_method: 'none',
-      payment_type: 'credits'
-    };
-
-    console.log('Registering competition with payload:', payload);
-
-    const response = await fetch('/api/register-competition', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      if (data.error === 'Insufficient credits') {
-        const creditsNeeded = creditCost - (data.currentCredits || 0);
-        toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
-        setIsRegistering(false);
-        setTimeout(() => {
-          router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
-        }, 2000);
-        return;
-      }
-      throw new Error(data.error || 'Failed to join competition');
+    const competition = competitions.find(c => c.id === competitionId);
+    if (!competition) {
+      toast.error('Competition not found');
+      return;
     }
 
-    // Use server-provided deduction breakdown when available
-    if (data.deductedFrom) {
-      let message = 'Successfully joined competition! Credits used: ';
-      const parts: string[] = [];
-      if (data.deductedFrom.referral > 0) parts.push(`${data.deductedFrom.referral} referral`);
-      if (data.deductedFrom.winnings > 0) parts.push(`${data.deductedFrom.winnings} winnings`);
-      if (data.deductedFrom.purchased > 0) parts.push(`${data.deductedFrom.purchased} purchased`);
-      message += parts.join(', ');
-      toast.success(message);
-    } else {
-      toast.success('Successfully joined competition!');
-    }
+    // Determine the correct credit cost to charge. `selectedCompetition` (set when
+    // opening the modal) carries the display `credit_cost`. The DB row in
+    // `competitions` may not include that computed field, so prefer the selected
+    // competition's value when available.
+    const creditCost = selectedCompetition && selectedCompetition.id === competitionId
+      ? selectedCompetition.credit_cost
+      : getCreditCost(competition.name);
 
-  setModalOpen(false);
-  setIsRegistering(false);
-
-    // Refresh registrations
-    const { data: regs } = await supabase
-      .from('competition_registrations')
-      .select('*')
-      .eq('user_id', user.id);
-
-    if (regs) setRegistrations(regs);
-
-  } catch (error: any) {
-    console.error('Error joining competition:', error);
-    if (error.message && error.message.includes('Registration closed')) {
+    // Prevent registration if it's already closed (competition here is raw DB row with start_time)
+    if (isRegistrationClosed({ startTime: new Date(competition.start_time) })) {
       toast.error('Registration is closed for this competition');
-    } else {
-      toast.error(error.message || 'Failed to join competition');
+      return;
     }
-    setIsRegistering(false);
-  }
-};
+
+    // Check if already registered
+    const registration = registrations.find(reg =>
+      reg.competition_id === competitionId && reg.status === 'confirmed'
+    );
+
+    if (registration) {
+      setAlreadyRegisteredData({
+        competitionName: competition.name,
+        paidAmount: registration.paid_amount,
+        startTime: new Date(competition.start_time),
+        competitionImagePath: getLeagueImage(competition.name)
+      });
+      setModalOpen(false);
+      setAlreadyRegisteredModalOpen(true);
+      return;
+    }
+
+    try {
+      console.log('Attempting to register for competition:', competitionId);
+      setIsRegistering(true);
+      // Optional quick client-side check (helps give immediate feedback)
+      const { data: userCredits, error: creditError } = await supabase
+        .from('user_credits')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (creditError || !userCredits) {
+        // proceed to server which will perform authoritative checks
+      } else {
+        const totalCredits = (userCredits.referral_credits || 0) +
+          (userCredits.winnings_credits || 0) +
+          (userCredits.purchased_credits || 0);
+        if (totalCredits < creditCost) {
+          const creditsNeeded = creditCost - totalCredits;
+          toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
+          // Redirect to credits page with required amount
+          setTimeout(() => {
+            router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
+          }, 2000);
+          return;
+        }
+      }
+
+      // Call server to register and perform credit deduction there
+      const payload = {
+        userId: user.id,
+        competitionId,
+        status: 'confirmed',
+        paid_amount: creditCost,
+        payment_method: 'none',
+        payment_type: 'credits'
+      };
+
+      console.log('Registering competition with payload:', payload);
+
+      const response = await fetch('/api/register-competition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        if (data.error === 'Insufficient credits') {
+          const creditsNeeded = creditCost - (data.currentCredits || 0);
+          toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
+          setIsRegistering(false);
+          setTimeout(() => {
+            router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
+          }, 2000);
+          return;
+        }
+        throw new Error(data.error || 'Failed to join competition');
+      }
+
+      // Use server-provided deduction breakdown when available
+      if (data.deductedFrom) {
+        let message = 'Successfully joined competition! Credits used: ';
+        const parts: string[] = [];
+        if (data.deductedFrom.referral > 0) parts.push(`${data.deductedFrom.referral} referral`);
+        if (data.deductedFrom.winnings > 0) parts.push(`${data.deductedFrom.winnings} winnings`);
+        if (data.deductedFrom.purchased > 0) parts.push(`${data.deductedFrom.purchased} purchased`);
+        message += parts.join(', ');
+        toast.success(message);
+      } else {
+        toast.success('Successfully joined competition!');
+      }
+
+      setModalOpen(false);
+      setIsRegistering(false);
+
+      // Refresh registrations
+      const { data: regs } = await supabase
+        .from('competition_registrations')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (regs) setRegistrations(regs);
+
+    } catch (error: any) {
+      console.error('Error joining competition:', error);
+      if (error.message && error.message.includes('Registration closed')) {
+        toast.error('Registration is closed for this competition');
+      } else {
+        toast.error(error.message || 'Failed to join competition');
+      }
+      setIsRegistering(false);
+    }
+  };
 
   const handleStripeRegister = async (priceId: string, competitionId: string) => {
     const toastId = toast.loading('Redirecting to payment...');
@@ -1084,15 +1089,15 @@ const handleCompetitionEntry = async (competitionId: string) => {
       toast.error('Please sign up or log in to proceed with payment.', { id: toastId });
       return;
     }
-    
+
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          priceId, 
-          competitionId, 
-          userId: user.id 
+        body: JSON.stringify({
+          priceId,
+          competitionId,
+          userId: user.id
         }),
       });
 
@@ -1106,8 +1111,8 @@ const handleCompetitionEntry = async (competitionId: string) => {
       const result = await res.json();
       if (result.url) {
         toast.success('Redirecting to Stripe...', { id: toastId });
-        setTimeout(() => { 
-          window.location.href = result.url; 
+        setTimeout(() => {
+          window.location.href = result.url;
         }, 1000);
       } else {
         toast.error('Unable to start payment. Please try again.', { id: toastId });
@@ -1126,13 +1131,13 @@ const handleCompetitionEntry = async (competitionId: string) => {
           .from('competition_registrations')
           .select('*')
           .eq('user_id', user.id);
-        
+
         if (data) {
           setRegistrations(data);
         }
       }
     };
-    
+
     fetchRegistrations();
     setPaypalModalOpen(false);
     setModalOpen(false);
@@ -1232,7 +1237,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
 
   // Check if user is registered for a competition
   const isUserRegistered = (competitionId: string) => {
-    return registrations.some(reg => 
+    return registrations.some(reg =>
       reg.competition_id === competitionId && reg.status === 'confirmed'
     );
   };
@@ -1240,7 +1245,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
   // Check if user has already completed a competition
   const hasCompletedCompetition = async (competitionId: string) => {
     if (!user) return false;
-    
+
     try {
       const { data, error } = await supabase
         .from('competition_sessions')
@@ -1248,7 +1253,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
         .eq('competition_id', competitionId)
         .eq('user_id', user.id)
         .maybeSingle();
-      
+
       return !!data; // Returns true if session exists
     } catch (err) {
       console.error('Error checking competition completion:', err);
@@ -1292,7 +1297,7 @@ const handleCompetitionEntry = async (competitionId: string) => {
     const timeToStart = start.getTime() - now.getTime();
     const minutesToStart = Math.floor(timeToStart / 1000 / 60);
     const secondsToStart = Math.floor(timeToStart / 1000);
-    
+
     if (isCompetitionStarted(comp)) {
       return { text: 'Live', color: 'bg-red-500', pulse: true };
     } else if (isRegistrationClosed(comp)) {
@@ -1323,18 +1328,16 @@ const handleCompetitionEntry = async (competitionId: string) => {
   };
 
   // Calculate dynamic prize pool
-  const calculateDynamicPrizePool = (competitionId: string, creditCost: number) => {
+  const calculateDynamicPrizePool = (competitionId: string, creditCost: number, minPlayers: number = 10) => {
     const playerCount = playerCounts[competitionId] || 0;
     const totalRevenue = playerCount * creditCost;
-    
-    // If no players yet, show minimum prize pool based on min players
-    const minPlayers = 10; // minimum players needed
     const fallbackRevenue = minPlayers * creditCost;
+
+    // Show real-time pool if players > 0, otherwise show fallback (estimated min)
     const displayRevenue = playerCount > 0 ? totalRevenue : fallbackRevenue;
-    
-    // Prize pool is 100% of total revenue
+
     const prizePool = displayRevenue;
-    
+
     return {
       total: totalRevenue,
       totalDisplay: displayRevenue,
@@ -1342,7 +1345,9 @@ const handleCompetitionEntry = async (competitionId: string) => {
       first: Math.ceil(prizePool * 0.2),
       second: Math.ceil(prizePool * (playerCount < 50 ? 0.12 : playerCount < 100 ? 0.12 : 0.1)),
       third: Math.ceil(prizePool * (playerCount < 50 ? 0.08 : 0.07)),
-      isEstimated: playerCount === 0
+      isEstimated: playerCount < minPlayers,
+      isFinalized: playerCount >= minPlayers, // Flag for finalized message
+      minPool: fallbackRevenue
     };
   };
 
@@ -1361,11 +1366,11 @@ const handleCompetitionEntry = async (competitionId: string) => {
         const prizePoolRaw = Number(comp.prize_pool || 0);
         const fallbackRevenue = getCreditCost(comp.name) * 10;
         const totalRevenue = prizePoolRaw > 0 ? prizePoolRaw : fallbackRevenue;
-        
+
         // Calculate pool percentage (default to 40% for <50 players)
         const poolPercentage = 0.4;
         const prizePool = Math.floor(totalRevenue * poolPercentage);
-        
+
         return [
           `1st: ${Math.ceil(prizePool * 0.2)} Credits`,
           `2nd: ${Math.ceil(prizePool * 0.12)} Credits`,
@@ -1478,264 +1483,275 @@ const handleCompetitionEntry = async (competitionId: string) => {
             const prizePool = calculateDynamicPrizePool(comp.id, comp.credit_cost);
             const xpReward = getXPReward(comp.name);
             const playerCount = playerCounts[comp.id] || 0;
-            
-            return (
-            <div
-              key={comp.id}
-              className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col"
-              style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
-            >
-              {/* Status Badge */}
-              <span className={`absolute top-3 left-3 ${status.color} text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 flex items-center gap-1 ${status.pulse ? 'animate-pulse' : ''}`}>
-                {status.pulse && <span className="w-1.5 h-1.5 bg-white rounded-full"></span>}
-                {status.text}
-              </span>
-              
-              {/* Trophy Icon at Top - use designer images from public/ipublic/images */}
-              <div className="flex flex-col items-center mt-6 mb-4">
-                <img
-                  src={getLeagueImage(comp.name)}
-                  alt={`${comp.name} trophy`}
-                  className="h-12 w-12 mb-3 object-contain"
-                />
-                <h2 className="text-xl font-extrabold text-gray-800">{comp.name}</h2>
-                <p className="text-sm text-gray-600">
-                  {comp.name === 'Starter League' ? 'Perfect for beginners' :
-                    comp.name === 'Pro League' ? 'For serious fans' : 'Expert level only'}
-                </p>
-              </div>
 
-              {/* Card Content - Flex grow to push bottom section down */}
-              <div className="flex-grow">
-                {/* Competition Details */}
-                <div className="space-y-2 text-sm font-semibold mb-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Entry Cost:</span>
-                  <span className="font-bold text-blue-600">{comp.credit_cost} Credits</span>
+            return (
+              <div
+                key={comp.id}
+                className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col"
+                style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
+              >
+                {/* Status Badge */}
+                <span className={`absolute top-3 left-3 ${status.color} text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow transition-all duration-200 flex items-center gap-1 ${status.pulse ? 'animate-pulse' : ''}`}>
+                  {status.pulse && <span className="w-1.5 h-1.5 bg-white rounded-full"></span>}
+                  {status.text}
+                </span>
+
+                {/* Trophy Icon at Top - use designer images from public/ipublic/images */}
+                <div className="flex flex-col items-center mt-6 mb-4">
+                  <img
+                    src={getLeagueImage(comp.name)}
+                    alt={`${comp.name} trophy`}
+                    className="h-12 w-12 mb-3 object-contain"
+                  />
+                  <h2 className="text-xl font-extrabold text-gray-800">{comp.name}</h2>
+                  <p className="text-sm text-gray-600">
+                    {comp.name === 'Starter League' ? 'Perfect for beginners' :
+                      comp.name === 'Pro League' ? 'For serious fans' : 'Expert level only'}
+                  </p>
                 </div>
-                {/* <div className="flex justify-between items-center">
+
+                {/* Card Content - Flex grow to push bottom section down */}
+                <div className="flex-grow">
+                  {/* Competition Details */}
+                  <div className="space-y-2 text-sm font-semibold mb-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Entry Cost:</span>
+                      <span className="font-bold text-blue-600">{comp.credit_cost} Credits</span>
+                    </div>
+                    {/* <div className="flex justify-between items-center">
                   <span className="text-gray-600">Questions:</span>
                   <span className="font-bold">{comp.questions}</span>
                 </div> */}
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Difficulty:</span>
-                  <div className="flex items-center">
-                    <Star className="h-4 w-4 text-lime-500 mr-1.5" />
-                    <span className="font-bold text-lime-500">{comp.difficulty}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Difficulty:</span>
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 text-lime-500 mr-1.5" />
+                        <span className="font-bold text-lime-500">{comp.difficulty}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 flex items-center">
+                        Players Registered:
+                      </span>
+                      <span className="font-bold text-lime-600">{playerCount}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Start Time:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm">{comp.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
+                        <span className="text-gray-500">({comp.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' })})</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Format:</span>
+                      <span className="font-bold text-purple-600 text-sm">{comp.questions} Questions</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 flex items-center">
-                    Players Registered:
-                  </span>
-                  <span className="font-bold text-lime-600">{playerCount}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Start Time:</span>
-                  <span className="font-bold text-sm">{comp.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Format:</span>
-                  <span className="font-bold text-purple-600 text-sm">{comp.questions} Questions</span>
-                </div>
-              </div>
 
-              {/* Dynamic Prize Pool - Expandable */}
-              <div>
-                <button
-                  onClick={() => setExpandedPrizes(prev => ({ ...prev, [comp.id]: !prev[comp.id] }))}
-                  className="w-full flex items-center justify-between bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg px-3 py-2 hover:from-yellow-100 hover:to-yellow-200 transition-all"
-                >
-                  <div className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-yellow-600" />
-                    <span className="text-sm font-bold text-yellow-800">
-                      Prize Pool: {prizePool.pool} Credits
-                      {prizePool.isEstimated && <span className="text-xs font-normal ml-1">(Est.)</span>}
-                    </span>
-                  </div>
-                  {expandedPrizes[comp.id] ? (
-                    <ChevronUp className="h-4 w-4 text-yellow-600" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-yellow-600" />
-                  )}
-                </button>
-                
-                {expandedPrizes[comp.id] && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="mt-2 space-y-2"
-                  >
-                    <div className="flex items-center justify-between bg-white border border-yellow-100 rounded-lg px-3 py-2 shadow-sm">
+                  {/* Dynamic Prize Pool - Expandable */}
+                  <div>
+                    <button
+                      onClick={() => setExpandedPrizes(prev => ({ ...prev, [comp.id]: !prev[comp.id] }))}
+                      className="w-full flex items-center justify-between bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg px-3 py-2 hover:from-yellow-100 hover:to-yellow-200 transition-all"
+                    >
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">🥇</span>
-                        <span className="text-sm font-semibold text-gray-700">1st Place</span>
-                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
+                        <Award className="h-5 w-5 text-yellow-600" />
+                        <span className="text-sm font-bold text-yellow-800">
+                          Prize Pool: {prizePool.pool} Credits
+                          {prizePool.isEstimated && <span className="text-xs font-normal ml-1">(Est.)</span>}
+                        </span>
                       </div>
-                      <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🥈</span>
-                        <span className="text-sm font-semibold text-gray-700">2nd Place</span>
-                        <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '12%' : playerCount < 100 ? '12%' : '10%'}</span>
-                      </div>
-                      <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🥉</span>
-                        <span className="text-sm font-semibold text-gray-700">3rd Place</span>
-                        <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '8%' : playerCount < 100 ? '7%' : '7%'}</span>
-                      </div>
-                      <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
-                    </div>
-                    {prizePool.isEstimated && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
-                        <p className="text-xs text-yellow-700 text-center">
-                          * Estimated prize pool based on minimum 10 players. Actual prize pool grows with more participants!
-                        </p>
-                      </div>
+                      {expandedPrizes[comp.id] ? (
+                        <ChevronUp className="h-4 w-4 text-yellow-600" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-yellow-600" />
+                      )}
+                    </button>
+
+                    {expandedPrizes[comp.id] && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="mt-2 space-y-2"
+                      >
+                        <div className="flex items-center justify-between bg-white border border-yellow-100 rounded-lg px-3 py-2 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🥇</span>
+                            <span className="text-sm font-semibold text-gray-700">1st Place</span>
+                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
+                          </div>
+                          <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🥈</span>
+                            <span className="text-sm font-semibold text-gray-700">2nd Place</span>
+                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '12%' : playerCount < 100 ? '12%' : '10%'}</span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🥉</span>
+                            <span className="text-sm font-semibold text-gray-700">3rd Place</span>
+                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '8%' : playerCount < 100 ? '7%' : '7%'}</span>
+                          </div>
+                          <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
+                        </div>
+                        {prizePool.isEstimated && (
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
+                            <p className="text-xs text-yellow-700 text-center">
+                              * Estimated prize pool based on minimum 10 players. Actual prize pool grows with more participants!
+                            </p>
+                          </div>
+                        )}
+                        {prizePool.isFinalized && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+                            <p className="text-xs text-green-700 text-center font-semibold flex items-center justify-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Prize Pool Active! Growing with every new player.
+                            </p>
+                          </div>
+                        )}
+                      </motion.div>
                     )}
-                  </motion.div>
-                )}
-              </div>
-              </div>
-
-              {/* Bottom Section - Fixed at bottom */}
-              <div className="mt-auto pt-4">
-              {/* XP & Trophy Rewards */}
-              <div className="flex gap-2 mb-3">
-                <div className="flex-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
-                  <Zap className="h-4 w-4 text-blue-600" />
-                  <span className="text-xs font-semibold text-blue-700">+{xpReward} XP</span>
+                  </div>
                 </div>
-                <div className="flex-1 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
-                  <Trophy className="h-4 w-4 text-purple-600" />
-                  <span className="text-xs font-semibold text-purple-700">Trophy Chance</span>
+
+                {/* Bottom Section - Fixed at bottom */}
+                <div className="mt-auto pt-4">
+                  {/* XP & Trophy Rewards */}
+                  <div className="flex gap-2 mb-3">
+                    <div className="flex-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
+                      <Zap className="h-4 w-4 text-blue-600" />
+                      <span className="text-xs font-semibold text-blue-700">+{xpReward} XP</span>
+                    </div>
+                    <div className="flex-1 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
+                      <Trophy className="h-4 w-4 text-purple-600" />
+                      <span className="text-xs font-semibold text-purple-700">Trophy Chance</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="mt-3">
+                    {/* Determine button state based on time and registration */}
+                    {isCompetitionStarted(comp) ? (
+                      // Competition has already started
+                      comp.isRegistered ? (
+                        <button
+                          onClick={async () => {
+                            // Check if user has already completed this competition
+                            const hasCompleted = await hasCompletedCompetition(comp.id);
+                            if (hasCompleted) {
+                              toast.error('You have already completed this competition!');
+                              return;
+                            }
+
+                            // Start competition on server and redirect to league page
+                            try {
+                              const res = await fetch('/api/start-competition', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ competitionId: comp.id }),
+                              });
+                              const data = await res.json();
+                              // Redirect to league with competition id
+                              router.push(`/league?competitionId=${comp.id}`);
+                            } catch (err) {
+                              console.error('Failed to start or join competition', err);
+                              toast.error('Unable to join competition. Please try again.');
+                            }
+                          }}
+                          className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
+                          style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                        >
+                          Join Competition
+                        </button>
+                      ) : (
+                        <button className="w-full mt-2 py-2 bg-gray-500 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
+                          Not Registered
+                        </button>
+                      )
+                    ) : canEnterCompetition(comp) ? (
+                      // Within 2 minutes before start - registered users can enter
+                      comp.isRegistered ? (
+                        <button
+                          onClick={async () => {
+                            // Check if user has already completed this competition
+                            const hasCompleted = await hasCompletedCompetition(comp.id);
+                            if (hasCompleted) {
+                              toast.error('You have already completed this competition!');
+                              return;
+                            }
+
+                            // Redirect to league page
+                            router.push(`/league?competitionId=${comp.id}`);
+                          }}
+                          className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200 animate-pulse"
+                          style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                        >
+                          Join Competition
+                        </button>
+                      ) : (
+                        <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
+                          Registration Closed
+                        </button>
+                      )
+                    ) : isRegistrationClosed(comp) ? (
+                      // 5 to 2 minutes before start - registration closed, waiting period
+                      comp.isRegistered ? (
+                        <button
+                          className="w-full mt-2 py-2 bg-orange-500 text-white rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+                          disabled
+                        >
+                          <Clock className="h-4 w-4" />
+                          Registration Closed
+                        </button>
+                      ) : (
+                        <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
+                          Registration Closed
+                        </button>
+                      )
+                    ) : (
+                      // More than 5 minutes before start - registration open
+                      comp.isRegistered ? (
+                        <button
+                          onClick={() => {
+                            if (!isLoggedIn || !user) {
+                              toast.error('Please sign up or log in to view your registration.');
+                              router.push(`/signup?competition=${comp.name.toLowerCase().replace(' ', '-')}`);
+                              return;
+                            }
+
+                            const reg = registrations.find(r => r.competition_id === comp.id && r.status === 'confirmed');
+                            setAlreadyRegisteredData({
+                              competitionName: comp.name,
+                              paidAmount: reg ? reg.paid_amount : 0,
+                              startTime: comp.startTime || null,
+                              competitionImagePath: getLeagueImage(comp.name)
+                            });
+                            setAlreadyRegisteredModalOpen(true);
+                          }}
+                          className="w-full mt-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Already Registered
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenModal(comp)}
+                          className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
+                          style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
+                        >
+                          {isLoggedIn ? `Reserve Your Spot - ${comp.credit_cost} Credits` : 'Join Now - Sign Up Required'}
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
-
-              {/* Action Button */}
-              <div className="mt-3">
-                {/* Determine button state based on time and registration */}
-                {isCompetitionStarted(comp) ? (
-                  // Competition has already started
-                  comp.isRegistered ? (
-                    <button
-                      onClick={async () => {
-                        // Check if user has already completed this competition
-                        const hasCompleted = await hasCompletedCompetition(comp.id);
-                        if (hasCompleted) {
-                          toast.error('You have already completed this competition!');
-                          return;
-                        }
-
-                        // Start competition on server and redirect to league page
-                        try {
-                          const res = await fetch('/api/start-competition', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ competitionId: comp.id }),
-                          });
-                          const data = await res.json();
-                          // Redirect to league with competition id
-                          router.push(`/league?competitionId=${comp.id}`);
-                        } catch (err) {
-                          console.error('Failed to start or join competition', err);
-                          toast.error('Unable to join competition. Please try again.');
-                        }
-                      }}
-                      className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
-                      style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
-                    >
-                      Join Competition
-                    </button>
-                  ) : (
-                    <button className="w-full mt-2 py-2 bg-gray-500 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
-                      Not Registered
-                    </button>
-                  )
-                ) : canEnterCompetition(comp) ? (
-                  // Within 2 minutes before start - registered users can enter
-                  comp.isRegistered ? (
-                    <button
-                      onClick={async () => {
-                        // Check if user has already completed this competition
-                        const hasCompleted = await hasCompletedCompetition(comp.id);
-                        if (hasCompleted) {
-                          toast.error('You have already completed this competition!');
-                          return;
-                        }
-
-                        // Redirect to league page
-                        router.push(`/league?competitionId=${comp.id}`);
-                      }}
-                      className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200 animate-pulse"
-                      style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
-                    >
-                      Join Competition
-                    </button>
-                  ) : (
-                    <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
-                      Registration Closed
-                    </button>
-                  )
-                ) : isRegistrationClosed(comp) ? (
-                  // 5 to 2 minutes before start - registration closed, waiting period
-                  comp.isRegistered ? (
-                    <button
-                      className="w-full mt-2 py-2 bg-orange-500 text-white rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
-                      disabled
-                    >
-                      <Clock className="h-4 w-4" />
-                      Registration Closed
-                    </button>
-                  ) : (
-                    <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
-                      Registration Closed
-                    </button>
-                  )
-                ) : (
-                  // More than 5 minutes before start - registration open
-                  comp.isRegistered ? (
-                    <button
-                      onClick={() => {
-                        if (!isLoggedIn || !user) {
-                          toast.error('Please sign up or log in to view your registration.');
-                          router.push(`/signup?competition=${comp.name.toLowerCase().replace(' ', '-')}`);
-                          return;
-                        }
-
-                        const reg = registrations.find(r => r.competition_id === comp.id && r.status === 'confirmed');
-                        setAlreadyRegisteredData({
-                          competitionName: comp.name,
-                          paidAmount: reg ? reg.paid_amount : 0,
-                          startTime: comp.startTime || null,
-                          competitionImagePath: getLeagueImage(comp.name)
-                        });
-                        setAlreadyRegisteredModalOpen(true);
-                      }}
-                      className="w-full mt-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Already Registered
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleOpenModal(comp)}
-                      className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
-                      style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
-                    >
-                      {isLoggedIn ? `Reserve Your Spot - ${comp.credit_cost} Credits` : 'Join Now - Sign Up Required'}
-                    </button>
-                  )
-                )}
-              </div>
-              </div>
-            </div>
-          );
+            );
           })
         )}
       </div>

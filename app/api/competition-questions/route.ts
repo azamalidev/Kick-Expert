@@ -29,23 +29,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ questions: [] });
     }
 
-    // Fetch from `competition_questions` table for the specific competition (only active ones).
-    // Include global (competition_id IS NULL) questions as a fallback so competitions with no assigned
-    // competition-specific rows can still use the shared pool.
+    // Fetch from main `questions` table to ensure we have enough questions for proper distribution
+    // We need sufficient questions in each difficulty to maintain 40-40-20 ratio
     const { data: qsData, error: qsErr } = await supabase
-      .from('competition_questions')
+      .from('questions')
       .select('*')
-      .or(`competition_id.eq.${competitionId},competition_id.is.null`)
-      .eq('status', true); // Only fetch enabled questions
+      .eq('status', true); // Only fetch active questions
 
     if (qsErr) {
-      console.error('Error fetching competition_questions table:', qsErr);
+      console.error('Error fetching questions table:', qsErr);
       return NextResponse.json({ questions: [] });
     }
 
     let allQuestions = (qsData || []) as any[];
-    console.log(`🔍 competition-questions: found ${allQuestions.length} total rows for competitionId=${competitionId}`);
-  
+    console.log(`🔍 questions: found ${allQuestions.length} total rows`);
+
     // Log difficulty distribution from database
     const difficultyCount = allQuestions.reduce((acc: any, q: any) => {
       const diff = q.difficulty || 'unknown';
@@ -76,27 +74,53 @@ export async function POST(req: NextRequest) {
 
     // Calculate distribution based on target count
     // Maintain 40% Easy, 40% Medium, 20% Hard ratio
-    const easyCount = Math.ceil(targetQuestionCount * 0.4);
-    const mediumCount = Math.ceil(targetQuestionCount * 0.4);
-    const hardCount = targetQuestionCount - easyCount - mediumCount;
+    const easyCount = Math.round(targetQuestionCount * 0.4);
+    const mediumCount = Math.round(targetQuestionCount * 0.4);
+    const hardCount = targetQuestionCount - easyCount - mediumCount; // Ensures total is exact
 
     console.log(`📊 Distribution for ${targetQuestionCount} questions: Easy: ${easyCount}, Medium: ${mediumCount}, Hard: ${hardCount}`);
 
-    // Select questions with proper distribution
-    const shuffle = <T,>(arr: T[]): T[] => {
+    // Seeded shuffle function - same seed produces same order for all users
+    const seededShuffle = <T,>(arr: T[], seed: string): T[] => {
       const a = [...arr];
+
+      // Better hash function for seed
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        const char = seed.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+
+      // LCG (Linear Congruential Generator) for better randomization
+      const seededRandom = (seed: number): number => {
+        const a = 1664525;
+        const c = 1013904223;
+        const m = Math.pow(2, 32);
+        seed = (a * seed + c) % m;
+        return seed / m;
+      };
+
+      let currentSeed = Math.abs(hash);
+
+      // Fisher-Yates shuffle with seeded random
       for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        currentSeed = seededRandom(currentSeed) * Math.pow(2, 32);
+        const j = Math.floor((currentSeed / Math.pow(2, 32)) * (i + 1));
         [a[i], a[j]] = [a[j], a[i]];
       }
+
       return a;
     };
 
-    const easyQuestions = shuffle(allQuestions.filter(q => q.difficulty === 'Easy'));
-    const mediumQuestions = shuffle(allQuestions.filter(q => q.difficulty === 'Medium'));
-    const hardQuestions = shuffle(allQuestions.filter(q => q.difficulty === 'Hard'));
+    // Use competition ID as seed - all users in same competition get same order
+    const seed = competitionId;
 
-    console.log('� Available by difficulty:', {
+    const easyQuestions = seededShuffle(allQuestions.filter(q => q.difficulty === 'Easy'), seed + '-easy');
+    const mediumQuestions = seededShuffle(allQuestions.filter(q => q.difficulty === 'Medium'), seed + '-medium');
+    const hardQuestions = seededShuffle(allQuestions.filter(q => q.difficulty === 'Hard'), seed + '-hard');
+
+    console.log('📊 Available by difficulty:', {
       Easy: easyQuestions.length,
       Medium: mediumQuestions.length,
       Hard: hardQuestions.length
@@ -116,15 +140,14 @@ export async function POST(req: NextRequest) {
       Hard: finalQs.filter(q => q.difficulty === 'Hard').length
     });
 
-    // If we don't have enough questions of a particular difficulty, backfill
-    if (finalQs.length < targetQuestionCount) {
-      const selectedIds = new Set(finalQs.map(q => q.id));
-      const remaining = shuffle(allQuestions.filter(q => !selectedIds.has(q.id)));
-      finalQs = [...finalQs, ...remaining.slice(0, targetQuestionCount - finalQs.length)];
+    // Verify we got the correct distribution
+    if (finalQs.length !== targetQuestionCount) {
+      console.error(`⚠️ Warning: Expected ${targetQuestionCount} questions but got ${finalQs.length}`);
+      console.error('Not enough questions in database for proper distribution!');
     }
 
-    // Shuffle the final selection so difficulties are mixed
-    finalQs = shuffle(finalQs);
+    // Shuffle the final selection so difficulties are mixed (using same seed for all users)
+    finalQs = seededShuffle(finalQs, seed + '-final');
 
     console.log('✅ After shuffle - final distribution:', {
       total: finalQs.length,
@@ -136,20 +159,27 @@ export async function POST(req: NextRequest) {
     // Don't mark questions as used here - they should be marked when actually displayed to user
     // This will be handled in league.tsx when each question is shown
 
-    const normalized = finalQs.map((q: any, idx: number) => ({
-      competition_question_id: q.id, // uuid from competition_questions
-      competition_id: competitionId,
-      question_id: null, // not from questions table
-      source_question_id: q.source_question_id,
-      question_text: q.question_text,
-      choices: q.choices,
-      correct_answer: q.correct_answer,
-      explanation: q.explanation,
-      difficulty: q.difficulty,
-      category: q.category,
-      question_order: idx + 1,
-      created_at: q.created_at ?? null,
-    }));
+    const normalized = finalQs.map((q: any, idx: number) => {
+      // Shuffle choices for this question using its ID as seed
+      // All users will get the same shuffled order for this question
+      const choiceSeed = `${competitionId}-${q.id}-choices`;
+      const shuffledChoices = seededShuffle(q.choices || [], choiceSeed);
+
+      return {
+        competition_question_id: q.id, // uuid from competition_questions
+        competition_id: competitionId,
+        question_id: null, // not from questions table
+        source_question_id: q.source_question_id,
+        question_text: q.question_text,
+        choices: shuffledChoices, // NOW SHUFFLED!
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        category: q.category,
+        question_order: idx + 1,
+        created_at: q.created_at ?? null,
+      };
+    });
 
     return NextResponse.json({ questions: normalized });
   } catch (err) {

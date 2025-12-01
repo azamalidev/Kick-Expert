@@ -4,18 +4,48 @@ import { createClient } from '@supabase/supabase-js';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
 export async function POST(req: NextRequest) {
-  const { competitionId } = await req.json();
+  const { competitionId, userId } = await req.json();
   // Set competition status to 'running' so triggers and checks treat it as active
   await supabase.from('competitions').update({ status: 'running' }).eq('id', competitionId);
 
   // Mark confirmed registrations as entered so participation tracking begins
   try {
-    await supabase
+    // 1. Bulk update for all eligible users
+    const { data: updateResult, error: updateError } = await supabase
       .from('competition_registrations')
-      .update({ participation_status: 'entered', entered_at: new Date().toISOString() })
+      .update({
+        participation_status: 'entered',
+        status: 'confirmed', // ✅ Fixed: 'active' is invalid, must be 'confirmed'
+        entered_at: new Date().toISOString()
+      })
       .eq('competition_id', competitionId)
-      .eq('status', 'confirmed')
-      .eq('participation_status', 'registered');
+      .or('status.eq.confirmed,status.eq.registered'); // Accept both confirmed and registered statuses
+
+    if (updateError) {
+      console.error('Failed to mark registrations as entered:', updateError);
+    } else {
+      console.log(`✅ Updated registrations to confirmed status`);
+    }
+
+    // 2. Force update for specific user if provided (Critical fallback)
+    if (userId) {
+      console.log(`👤 Forcing activation for user: ${userId}`);
+      const { error: userUpdateError } = await supabase
+        .from('competition_registrations')
+        .update({
+          participation_status: 'entered',
+          status: 'confirmed', // ✅ Fixed: 'active' is invalid, must be 'confirmed'
+          entered_at: new Date().toISOString()
+        })
+        .eq('competition_id', competitionId)
+        .eq('user_id', userId);
+
+      if (userUpdateError) {
+        console.error('Failed to force activate user:', userUpdateError);
+      } else {
+        console.log(`✅ User ${userId} forced to active status`);
+      }
+    }
   } catch (err) {
     console.error('Failed to mark registrations as entered:', err);
   }

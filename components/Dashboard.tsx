@@ -256,10 +256,11 @@ export default function Dashboard() {
         return;
       }
 
-      const { data, error } = await supabase.rpc(
-        "get_user_transaction_history",
-        { target_user_id: user.id }
-      );
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Error fetching transactions:", error);
@@ -465,11 +466,15 @@ export default function Dashboard() {
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "reward":
-        return <span className="text-green-500">📈</span>;
+        return <span className="text-green-500">🏆</span>;
+      case "referral_reward":
+        return <span className="text-blue-500">👥</span>;
+      case "topup":
+        return <span className="text-green-500">💰</span>;
+      case "entry_fee":
+        return <span className="text-red-500">🎯</span>;
       case "withdrawal":
         return <span className="text-red-500">💸</span>;
-      case "bonus":
-        return <span className="text-blue-500">🎁</span>;
       default:
         return <span className="text-gray-500">💰</span>;
     }
@@ -1419,9 +1424,9 @@ export default function Dashboard() {
                                   </div>
                                   <div className="text-right">
                                     <p className={`text-lg font-bold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                      {transaction.amount >= 0 ? "+" : ""}${Math.abs(transaction.amount).toFixed(2)}
+                                      {transaction.amount >= 0 ? "+" : ""}{Math.abs(transaction.amount).toFixed(2)} Credits
                                     </p>
-                                    <p className="text-sm text-gray-500 capitalize">{transaction.type}</p>
+                                    <p className="text-sm text-gray-500 capitalize">{transaction.type.replace('_', ' ')}</p>
                                   </div>
                                 </div>
                               </div>
