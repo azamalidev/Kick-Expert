@@ -9,7 +9,29 @@ function ClientWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <SupabaseProvider>
-      <Toaster position="top-center" />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 2500,
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 3000,
+          },
+          loading: {
+            duration: Infinity,
+          },
+        }}
+      />
       {children}
     </SupabaseProvider>
   );

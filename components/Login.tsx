@@ -4,9 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Link from "next/link";
-import { SupabaseUser } from '@/types/user';
 import { 
   getBrowserFingerprint, 
   getDeviceInfo, 
@@ -77,11 +76,11 @@ export default function Login() {
   // Check if we should show verification screen from query params
   useEffect(() => {
     const verify = searchParams ? searchParams.get('verify') : null;
-    const email = searchParams ? searchParams.get('email') : null;
+    const emailParam = searchParams ? searchParams.get('email') : null;
     
-    if (verify === 'true' && email) {
+    if (verify === 'true' && emailParam) {
       setShowVerificationScreen(true);
-      setVerificationEmail(email as string);
+      setVerificationEmail(emailParam as string);
     }
   }, [searchParams]);
 
@@ -319,8 +318,12 @@ export default function Login() {
     const toastId = toast.loading('Sending verification email...');
     
     try {
-        const r = await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: verificationEmail }) });
-        if (!r.ok) throw new Error('Resend failed');
+      const r = await fetch('/api/auth/resend', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ email: verificationEmail }) 
+      });
+      if (!r.ok) throw new Error('Resend failed');
       
       toast.success('Verification email sent! Please check your inbox.', { id: toastId });
     } catch (error: any) {
@@ -333,108 +336,48 @@ export default function Login() {
   if (showVerificationScreen) {
     return (
       <div className="min-h-screen flex bg-gradient-to-br from-lime-50 to-gray-100">
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              duration: 8000,
-            },
-            loading: {
-              duration: Infinity,
-            },
-          }}
-        />
-
-        {/* Left side with image */}
-        <div className="hidden lg:flex w-1/2 relative">
-          <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
-            <Image
-              src="/images/slide1.jpg"
-              alt="Verification Background"
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20"></div>
-          </div>
-        </div>
-
-        {/* Right side with verification content */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8">
-          <div className="w-full max-w-md">
-            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-100">
-              {/* Logo */}
-              <div className="flex justify-center mb-6">
-                <Link href="/" className="flex items-center">
-                  <div className="flex items-center">
-                    <Image
-                      src="/logo.png"
-                      alt="KickExpert Logo"
-                      width={48}
-                      height={48}
-                      className="w-12 h-12"
-                    />
-                    <span className="ml-2 text-lime-500 font-bold text-2xl">
-                      Kick<span className="text-gray-800">Expert</span>
-                    </span>
-                  </div>
-                </Link>
+        <div className="w-full flex items-center justify-center p-8">
+          <div className="max-w-md w-full">
+            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+              <div className="text-center mb-8">
+                <Image
+                  src="/logo.png"
+                  alt="KickExpert Logo"
+                  width={180}
+                  height={180}
+                  className="mx-auto mb-4"
+                />
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  Verify Your Email
+                </h1>
+                <p className="text-gray-600">
+                  We've sent a verification email to
+                </p>
+                <p className="text-lime-600 font-semibold mt-2">
+                  {verificationEmail}
+                </p>
               </div>
 
-              <div className="text-center">
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-lime-100">
-                  <svg className="h-6 w-6 text-lime-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h1 className="text-2xl font-bold text-gray-800 mt-4">Verify Your Email</h1>
-                <p className="text-gray-600 mt-2">
-                  We've sent a verification link to <span className="font-medium">{verificationEmail}</span>
-                </p>
-                
-                <div className="mt-6 bg-lime-50 p-4 rounded-lg">
+              <div className="space-y-4 text-center">
+                <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
-                    Please check your inbox and click the verification link to activate your account.
+                    Please check your email and click the verification link to activate your account.
                   </p>
                 </div>
 
-                <div className="mt-6">
-                  <button
-                    onClick={handleResendVerification}
-                    className="w-full py-3 px-6 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                  >
-                    Resend Verification Email
-                  </button>
-                </div>
+                <button
+                  onClick={handleResendVerification}
+                  className="w-full py-3 px-4 bg-lime-600 hover:bg-lime-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Resend Verification Email
+                </button>
 
-                <div className="mt-4">
-                  <button
-                    onClick={() => {
-                      setShowVerificationScreen(false);
-                      setVerificationEmail("");
-                    }}
-                    className="text-sm text-lime-600 hover:text-lime-700 font-medium"
-                  >
-                    Back to Login
-                  </button>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
-                    Didn't receive the email? Check your spam folder or contact support if the problem persists.
-                  </p>
-                </div>
+                <button
+                  onClick={() => router.push('/login')}
+                  className="w-full py-3 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium rounded-lg transition-colors"
+                >
+                  Back to Login
+                </button>
               </div>
             </div>
           </div>
@@ -446,30 +389,7 @@ export default function Login() {
   // Regular login screen
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-lime-50 to-gray-100">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 8000,
-          },
-          loading: {
-            duration: Infinity,
-          },
-        }}
-      />
-
-      {/* Left side with image */}
+      {/* Left side - Image */}
       <div className="hidden lg:flex w-1/2 relative">
         <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
           <Image
@@ -489,7 +409,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right side with form */}
+      {/* Right side - Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-md">
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-100">

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Image from "next/image";
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
@@ -362,7 +362,23 @@ export default function Profile() {
         } else {
           const profile = profileData as any;
           setUserProfile(profile);
-          setNationality(profile.nationality || "");
+          
+          // Parse nationality - handle if it's stored as JSON array or string
+          let parsedNationality = profile.nationality || "";
+          if (parsedNationality) {
+            try {
+              // Check if it's a JSON string
+              if (typeof parsedNationality === 'string' && parsedNationality.startsWith('[')) {
+                const parsed = JSON.parse(parsedNationality);
+                parsedNationality = Array.isArray(parsed) ? parsed[0] : parsedNationality;
+              }
+            } catch (e) {
+              console.warn('Failed to parse nationality:', e);
+            }
+          }
+          console.log('Nationality from DB:', profile.nationality, '-> Parsed:', parsedNationality);
+          
+          setNationality(parsedNationality);
           setAvatarUrl(profile.avatar_url || "");
           setTotalWins(profile.total_wins || 0);
           setTotalGames(profile.total_games || 0);
@@ -744,31 +760,29 @@ export default function Profile() {
   };
 
   const getCountryCode = (countryName: string) => {
-    const country = countries.find(c => c.name === countryName);
-    return country ? country.code : '';
+    if (!countryName) {
+      console.log('getCountryCode: empty countryName');
+      return '';
+    }
+    
+    // Check if it's already a 2-letter country code
+    if (countryName.length === 2) {
+      console.log('getCountryCode: already 2-letter code:', countryName.toUpperCase());
+      return countryName.toUpperCase();
+    }
+    
+    // Try to find by name (case-insensitive)
+    const country = countries.find(c => 
+      c.name.toLowerCase() === countryName.toLowerCase()
+    );
+    
+    const code = country ? country.code : '';
+    console.log('getCountryCode: input:', countryName, '-> output:', code, '(found:', !!country, ')');
+    return code;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 4000,
-          },
-        }}
-      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {loading ? (
           <div className="flex justify-center py-20">

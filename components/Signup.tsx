@@ -4,9 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Link from "next/link";
-import { SupabaseUser } from '@/types/user';
 
 // Resolve auth callback URL: prefer NEXT_PUBLIC_SITE_URL, fallback to window origin
 const getAuthCallbackUrl = () => {
@@ -15,6 +14,25 @@ const getAuthCallbackUrl = () => {
   return '/auth/callback';
 };
 
+interface SupabaseUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
+  email_confirmed: boolean;
+  date_of_birth: string;
+  age: number;
+  gender: string;
+  accepted_terms: boolean;
+  terms_accepted_at: string;
+  email_opt_in: boolean;
+  email_opt_in_at: string | null;
+  is_sso_user: boolean;
+  is_anonymous: boolean;
+  parent_id?: string | null;
+}
+
 export default function Signup() {
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -22,47 +40,32 @@ export default function Signup() {
   const [dateOfBirth, setDateOfBirth] = useState<string>("");
   const [gender, setGender] = useState<string>("");
   const [acceptTerms, setAcceptTerms] = useState<boolean>(false);
-  const [emailOptIn, setEmailOptIn] = useState<boolean>(false); // Changed to false by default as per specification
+  const [emailOptIn, setEmailOptIn] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
-  const router = useRouter();
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [referrerId, setReferrerId] = useState<string | null>(null);
 
-  // Effect to clear referrerId after successful signup
+  const router = useRouter();
+
+  // Handle referrer ID from URL or localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRef = params.get("ref");
+    const storedReferrerId = localStorage.getItem("referrerId");
+
+    if (urlRef) {
+      localStorage.setItem("referrerId", urlRef);
+    }
+
+    setReferrerId(storedReferrerId || urlRef || null);
+  }, []);
+
+  // Clear referrerId from localStorage after successful signup
   useEffect(() => {
     if (signupSuccess) {
       localStorage.removeItem("referrerId");
     }
   }, [signupSuccess]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get("ref");
-    if (ref) {
-      localStorage.setItem("referrerId", ref);
-    }
-  }, []);
-  interface SupabaseUser {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    created_at: string;
-    email_confirmed: boolean;
-    date_of_birth: string;
-    age: number;
-    gender: string;
-    accepted_terms: boolean;
-    terms_accepted_at: string;
-    email_opt_in: boolean;
-    email_opt_in_at: string | null;
-    is_sso_user: boolean;
-    is_anonymous: boolean;
-  
-    // ✅ new optional column
-    parent_id?: string | null;
-  }
-  
-  
 
   const validateForm = useCallback(() => {
     if (!name.trim()) {
@@ -81,7 +84,7 @@ export default function Signup() {
     
     // Disposable email validation
     const disposableDomains = ["mailinator.com", "tempmail.com", "10minutemail.com"];
-    if (disposableDomains.some(domain => email.endsWith(domain))) {
+    if (disposableDomains.some(domain => email.endsWith(`@${domain}`))) {
       toast.error("Disposable emails are not allowed");
       return false;
     }
@@ -98,7 +101,8 @@ export default function Signup() {
       toast.error('Date of Birth is required');
       return false;
     }
-    // Calculate age from date of birth
+
+    // Calculate age
     const birthDate = new Date(dateOfBirth);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -135,7 +139,7 @@ export default function Signup() {
     }
   };
 
-  // Function to record user consents
+  // Record user consents (terms, privacy, email opt-in)
   const recordUserConsents = async (userId: string) => {
     try {
       const userIP = await getUserIP();
@@ -148,7 +152,7 @@ export default function Signup() {
           {
             user_id: userId,
             consent_type: 'terms',
-            version: '1.0', // You might want to dynamically set this based on your current terms version
+            version: '1.0',
             accepted_at: currentDate,
             ip_address: userIP
           }
@@ -163,7 +167,7 @@ export default function Signup() {
           {
             user_id: userId,
             consent_type: 'privacy',
-            version: '1.0', // You might want to dynamically set this based on your current privacy policy version
+            version: '1.0',
             accepted_at: currentDate,
             ip_address: userIP
           }
@@ -172,8 +176,8 @@ export default function Signup() {
       if (privacyError) throw privacyError;
       
       if (emailOptIn) {
-        console.log('Attempting to insert email consent for user:', userId, 'email:', email, 'optIn:', emailOptIn); // Debug log
-        const { data, error: emailConsentError } = await supabase
+        console.log('Attempting to insert email consent for user:', userId);
+        const { error: emailConsentError } = await supabase
           .from('email_consents')
           .insert([
             {
@@ -185,64 +189,42 @@ export default function Signup() {
               ip_address: userIP,
               status: 'active'
             }
-          ])
+          ]);
 
         if (emailConsentError) {
           console.error('Email consent insert failed:', emailConsentError);
-          toast.error(`Email consent failed: ${emailConsentError.message || 'Unknown error'}`); // User-visible error
-          throw emailConsentError;  
+          toast.error(`Email consent failed: ${emailConsentError.message || 'Unknown error'}`);
+          throw emailConsentError;
         }
 
-        // Sync with Brevo marketing list
-        console.log(`🔄 Starting Brevo sync for user: ${name} (${email})`);
+        // Sync with Brevo
         try {
           const brevoResponse = await fetch('/api/brevo/add-contact', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email,
-              name,
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name }),
           });
 
           if (brevoResponse.ok) {
             const brevoData = await brevoResponse.json();
-            console.log(`✅ User "${name}" (${email}) successfully added to Brevo marketing list during signup`, brevoData);
+            console.log(`✅ User "${name}" (${email}) added to Brevo`, brevoData);
           } else {
             const errorData = await brevoResponse.json().catch(() => ({ error: 'Unknown error' }));
-            console.error(`❌ Failed to add user "${name}" (${email}) to Brevo marketing list:`, errorData);
+            console.error(`❌ Brevo sync failed:`, errorData);
           }
         } catch (brevoError) {
-          console.error(`❌ Failed to add user "${name}" (${email}) to Brevo marketing list:`, brevoError);
-          // Don't throw error here as signup should still succeed even if Brevo fails
+          console.error(`❌ Brevo sync error:`, brevoError);
         }
       } else {
-        console.log('Email opt-in not checked, skipping email_consents insert and Brevo sync');
+        console.log('Email opt-in not checked, skipping email_consents and Brevo sync');
       }
 
       console.log('User consents recorded successfully');
     } catch (error) {
       console.error('Error recording user consents:', error);
-      // Don't throw the error here as we don't want to block the signup process
-      // You might want to log this to an error tracking service
+      // Non-blocking: signup should still succeed
     }
   };
-
-   // In handleSignup, before insert
-
-// Create a state for referrerId
-const [referrerId, setReferrerId] = useState<string | null>(null);
-
-// Handle referrerId in useEffect
-useEffect(() => {
-  const storedReferrerId = localStorage.getItem("referrerId");
-  const params = new URLSearchParams(window.location.search);
-  const urlRef = params.get("ref");
-  
-  setReferrerId(storedReferrerId || urlRef || null);
-}, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,7 +235,7 @@ useEffect(() => {
     const toastId = toast.loading("Creating your account...");
 
     try {
-      // ✅ Step 1: Check if user already exists
+      // Step 1: Check if user already exists
       const { data: existingUser, error: lookupError } = await supabase
         .from("users")
         .select("id, email_confirmed")
@@ -266,15 +248,18 @@ useEffect(() => {
         if (existingUser.email_confirmed) {
           throw { code: "user_already_exists" };
         } else {
-          // Resend confirmation email using server endpoint (branded)
-            const r = await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name }) });
-            if (!r.ok) throw new Error('Resend failed');
-            toast.success("Confirmation email resent! Please check your inbox.", { id: toastId });
+          const r = await fetch('/api/auth/resend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name })
+          });
+          if (!r.ok) throw new Error('Resend failed');
+          toast.success("Confirmation email resent! Please check your inbox.", { id: toastId });
           return;
         }
       }
 
-      // ✅ Step 2: Create auth account via server so we send KickExpert-branded verification
+      // Step 2: Create auth account via server endpoint (branded email)
       const signupResp = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,7 +269,7 @@ useEffect(() => {
       if (!signupResp.ok) throw new Error(signupBody?.error || 'Signup failed');
       const user = { id: signupBody.userId, email };
 
-      // ✅ Step 3: Calculate age
+      // Step 3: Calculate age
       const birthDate = new Date(dateOfBirth);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -293,10 +278,7 @@ useEffect(() => {
         age--;
       }
 
-      // ✅ Step 4: Use referrerId from state
-      // referrerId is already available from state
-
-      // ✅ Step 5: Insert into users table
+      // Step 4: Prepare user data
       const userData: SupabaseUser = {
         id: user.id,
         email: user.email || email,
@@ -313,28 +295,25 @@ useEffect(() => {
         email_opt_in_at: emailOptIn ? new Date().toISOString() : null,
         is_sso_user: false,
         is_anonymous: false,
-        parent_id: referrerId || null, // ✅ Save referral
+        parent_id: referrerId || null,
       };
 
       console.log("Saving referral ID:", referrerId);
 
-      // Use upsert by id to update any existing row created by auth triggers
-      const { data: upsertedUser, error: dbError } = await supabase
+      // Step 5: Upsert into users table
+      const { error: dbError } = await supabase
         .from('users')
-        .upsert([userData], { onConflict: 'id' })
-        .select();
+        .upsert([userData], { onConflict: 'id' });
 
       if (dbError) {
-        // If duplicate key (race) slipped through, log and continue; otherwise throw
         if (dbError?.code === '23505' || dbError?.message?.includes('already exists')) {
-          console.warn('User row already exists (race) — continuing');
+          console.warn('User row already exists (race condition) — continuing');
         } else {
           throw dbError;
         }
       }
 
-      // To be extra-safe (RLS/policy could prevent upsert from updating certain columns),
-      // explicitly update the user row fields we expect to be persisted.
+      // Extra safety: update fields explicitly
       const { error: userUpdateError } = await supabase
         .from('users')
         .update({
@@ -354,7 +333,7 @@ useEffect(() => {
         console.warn('Non-fatal: failed to update users table columns:', userUpdateError);
       }
 
-      // ✅ Step 6: Create or update profile
+      // Step 6: Upsert profile
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert([
@@ -371,17 +350,14 @@ useEffect(() => {
 
       if (profileError) console.error('Profile upsert error:', profileError);
 
-      // Record consents after user insertion
+      // Step 7: Record consents
       await recordUserConsents(user.id);
 
       toast.success("Check your email for the confirmation link!", { id: toastId });
-      
-      // Set signup success to trigger cleanup effect
       setSignupSuccess(true);
-      
-      // ✅ Step 8: Redirect
+
+      // Step 8: Redirect after delay
       setTimeout(() => {
-        // Persist credentials temporarily so the complete-profile flow can auto-login the user
         try {
           if (typeof window !== 'undefined') {
             sessionStorage.setItem('signup_email', email);
@@ -394,7 +370,7 @@ useEffect(() => {
         router.push(`/login?verify=true&email=${encodeURIComponent(email)}`);
       }, 2000);
     } catch (error: any) {
-      console.error("Signup Error:", error.code, error.message);
+      console.error("Signup Error:", error);
       let errorMessage = "Signup failed. Please try again.";
       switch (error.code) {
         case "user_already_exists":
@@ -417,32 +393,10 @@ useEffect(() => {
       setLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-lime-50 to-gray-100">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 4000,
-          },
-          loading: {
-            duration: Infinity,
-          },
-        }}
-      />
-
-      {/* Left side with image */}
+      {/* Left side - Image */}
       <div className="hidden lg:flex w-1/2 relative">
         <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
           <Image
@@ -466,7 +420,7 @@ useEffect(() => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-md">
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-gray-100">
-            {/* Logo inside the form */}
+            {/* Logo */}
             <div className="flex justify-center mb-6">
               <Link href="/" className="flex items-center">
                 <div className="flex items-center">
@@ -505,6 +459,7 @@ useEffect(() => {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 text-gray-700 placeholder-gray-400 transition duration-200"
                 />
               </div>
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700">
                   Email Address
@@ -520,6 +475,7 @@ useEffect(() => {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 text-gray-700 placeholder-gray-400 transition duration-200"
                 />
               </div>
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700">
                   Password
@@ -535,6 +491,7 @@ useEffect(() => {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 text-gray-700 placeholder-gray-400 transition duration-200"
                 />
               </div>
+
               <div>
                 <label htmlFor="dateOfBirth" className="block text-sm font-medium mb-2 text-gray-700">
                   Date of Birth
@@ -551,6 +508,7 @@ useEffect(() => {
                 />
                 <p className="text-xs text-gray-500 mt-1">You must be at least 13 years old</p>
               </div>
+
               <div>
                 <label htmlFor="gender" className="block text-sm font-medium mb-2 text-gray-700">
                   Gender
@@ -572,8 +530,8 @@ useEffect(() => {
                 </select>
                 <p className="text-xs text-gray-500 mt-1">For community analytics purposes</p>
               </div>
-              
-              {/* Terms and Conditions Checkbox */}
+
+              {/* Terms Checkbox */}
               <div className="flex items-start mt-4">
                 <div className="flex items-center h-5">
                   <input
@@ -670,17 +628,14 @@ useEffect(() => {
             <div className="mt-6 text-center">
               <p className="text-gray-600">
                 Already have an account?{' '}
-                <Link
-                  href="/login"
-                  className="text-lime-600 hover:text-lime-700 font-medium"
-                >
+                <Link href="/login" className="text-lime-600 hover:text-lime-700 font-medium">
                   Log in
                 </Link>
               </p>
             </div>
           </div>
         </div>
-      </div> 
+      </div>
     </div>
   );
 }

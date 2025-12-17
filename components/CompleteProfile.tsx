@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Link from "next/link";
 import ReactCountryFlag from "react-country-flag";
 
@@ -401,29 +401,6 @@ export default function CompleteProfile() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 4000,
-          },
-          loading: {
-            duration: Infinity,
-          },
-        }}
-      />
-
       {/* Left side - Image */}
       <div className="hidden lg:flex w-1/2 relative">
         <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">

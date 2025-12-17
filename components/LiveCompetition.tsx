@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { createClient } from '@supabase/supabase-js';
 import { Trophy, CheckCircle, Star, Calendar, Clock, Award, Users, X, CreditCard, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { Shield, User, Wifi, Clock as ClockIcon, Trophy as PrizeTrophy, LifeBuoy, Lock } from 'lucide-react';
@@ -1001,28 +1001,34 @@ const LiveCompetition = () => {
     try {
       console.log('Attempting to register for competition:', competitionId);
       setIsRegistering(true);
-      // Optional quick client-side check (helps give immediate feedback)
+      
+      // Client-side check for credits to provide immediate feedback
       const { data: userCredits, error: creditError } = await supabase
         .from('user_credits')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() to handle 0 or 1 row without error
 
-      if (creditError || !userCredits) {
-        // proceed to server which will perform authoritative checks
-      } else {
-        const totalCredits = (userCredits.referral_credits || 0) +
+      // Calculate total credits (default to 0 if no record exists)
+      let totalCredits = 0;
+      if (userCredits && !creditError) {
+        totalCredits = (userCredits.referral_credits || 0) +
           (userCredits.winnings_credits || 0) +
           (userCredits.purchased_credits || 0);
-        if (totalCredits < creditCost) {
-          const creditsNeeded = creditCost - totalCredits;
-          toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
-          // Redirect to credits page with required amount
-          setTimeout(() => {
-            router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
-          }, 2000);
-          return;
-        }
+      }
+
+      // If insufficient credits, redirect immediately
+      if (totalCredits < creditCost) {
+        const creditsNeeded = creditCost - totalCredits;
+        console.log(`Insufficient credits: has ${totalCredits}, needs ${creditCost}, missing ${creditsNeeded}`);
+        
+        toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting...`);
+        setIsRegistering(false);
+        setModalOpen(false);
+        
+        // Immediate redirect without setTimeout to avoid stuck state
+        router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
+        return;
       }
 
       // Call server to register and perform credit deduction there
@@ -1047,11 +1053,12 @@ const LiveCompetition = () => {
       if (!response.ok) {
         if (data.error === 'Insufficient credits') {
           const creditsNeeded = creditCost - (data.currentCredits || 0);
-          toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting to purchase page...`);
+          toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting...`);
           setIsRegistering(false);
-          setTimeout(() => {
-            router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
-          }, 2000);
+          setModalOpen(false);
+          
+          // Immediate redirect to prevent stuck state
+          router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
           return;
         }
         throw new Error(data.error || 'Failed to join competition');
@@ -1089,6 +1096,7 @@ const LiveCompetition = () => {
         toast.error(error.message || 'Failed to join competition');
       }
       setIsRegistering(false);
+      setModalOpen(false); // Ensure modal closes on any error to prevent stuck state
     }
   };
 
@@ -1344,8 +1352,9 @@ const LiveCompetition = () => {
     const totalRevenue = playerCount * creditCost;
     const fallbackRevenue = minPlayers * creditCost;
 
-    // Show real-time pool if players > 0, otherwise show fallback (estimated min)
-    const displayRevenue = playerCount > 0 ? totalRevenue : fallbackRevenue;
+    // FIXED: Prize pool stays at minimum (10 players) until 10 participants are reached
+    // From 11 participants onwards, it updates dynamically
+    const displayRevenue = playerCount >= minPlayers ? totalRevenue : fallbackRevenue;
 
     const prizePool = displayRevenue;
 
@@ -1433,16 +1442,6 @@ const LiveCompetition = () => {
 
   return (
     <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: { background: '#363636', color: '#fff' },
-          success: { duration: 3000, iconTheme: { primary: '#10b981', secondary: '#fff' } },
-          error: { duration: 4000 },
-          loading: { duration: 2000 },
-        }}
-      />
-
       {selectedCompetition && (
         <CompetitionModal
           isOpen={modalOpen}
@@ -1922,7 +1921,11 @@ const LiveCompetition = () => {
                     <p className="text-xs text-yellow-600 font-bold">50% Pool</p>
                   </div>
                 </div>
-                <p className="text-sm mt-3 bg-yellow-50 p-2 rounded border border-yellow-200"><strong>Distribution:</strong> 1st: 20% | 2nd: 12% | 3rd: 8%</p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>&lt;50 Players (Top 3) Distribution:</strong> 1st: 50% | 2nd: 30% | 3rd: 20%</p>
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>50-100 Players (Top 5) Distribution:</strong> 1st: 30% | 2nd: 20% | 3rd: 17% | 4th: 17% | 5th: 16%</p>
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>100+ Players (Top 10) Distribution:</strong> 1st: 20% | 2nd: 15% | 3rd: 12% | 4th: 10% | 5th: 9% | 6th: 8% | 7th: 7% | 8th: 7% | 9th: 6% | 10th: 6%</p>
+                </div>
               </div>
             </div>
           </div>

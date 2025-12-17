@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { createClient } from "@supabase/supabase-js";
 import { TrophyService } from "../utils/trophyService";
 import {
@@ -495,8 +495,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-fit mt-15 bg-gray-50 text-gray-800 flex items-center justify-center p-6">
-      <Toaster position="top-right" />
-
       {loading ? (
         <div className="flex items-center justify-center min-h-[400px] w-full">
           <div className="text-center">
