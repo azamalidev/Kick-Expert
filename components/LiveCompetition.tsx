@@ -76,6 +76,13 @@ interface CompetitionModalProps {
   startTime: Date;
   isRegistering?: boolean;
   competitionImagePath?: string;
+  dynamicPrizePool?: {
+    pool: number;
+    first: number;
+    second: number;
+    third: number;
+    isEstimated: boolean;
+  };
 }
 
 interface AlreadyRegisteredModalProps {
@@ -438,7 +445,8 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
   onJoinCompetition,
   startTime,
   isRegistering = false,
-  competitionImagePath
+  competitionImagePath,
+  dynamicPrizePool
 }) => {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -608,7 +616,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                         <p className="text-xs text-gray-500">50% of pool</p>
                       </div>
                     </div>
-                    <span className="text-base font-bold text-yellow-700">{competition.prizes[0].split(': ')[1]}</span>
+                    <span className="text-base font-bold text-yellow-700">{dynamicPrizePool ? `${dynamicPrizePool.first} Credits` : competition.prizes[0].split(': ')[1]}</span>
                   </div>
                   <div className="flex items-center justify-between bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200">
                     <div className="flex items-center gap-3">
@@ -618,7 +626,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                         <p className="text-xs text-gray-500">30% of pool</p>
                       </div>
                     </div>
-                    <span className="text-base font-bold text-gray-600">{competition.prizes[1].split(': ')[1]}</span>
+                    <span className="text-base font-bold text-gray-600">{dynamicPrizePool ? `${dynamicPrizePool.second} Credits` : competition.prizes[1].split(': ')[1]}</span>
                   </div>
                   <div className="flex items-center justify-between bg-white rounded-lg px-4 py-3 shadow-sm border border-amber-200">
                     <div className="flex items-center gap-3">
@@ -628,12 +636,14 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                         <p className="text-xs text-gray-500">20% of pool</p>
                       </div>
                     </div>
-                    <span className="text-base font-bold text-amber-600">{competition.prizes[2].split(': ')[1]}</span>
+                    <span className="text-base font-bold text-amber-600">{dynamicPrizePool ? `${dynamicPrizePool.third} Credits` : competition.prizes[2].split(': ')[1]}</span>
                   </div>
                 </div>
                 <div className="mt-3 bg-yellow-200 bg-opacity-50 rounded-lg px-3 py-2">
                   <p className="text-xs text-yellow-800 text-center font-medium">
-                    💡 Prize pool grows with each player entry!
+                    {dynamicPrizePool?.isEstimated
+                      ? '* Estimated prize pool based on minimum 10 players. Actual prize pool grows with more participants!'
+                      : '💡 Prize pool grows with each player entry!'}
                   </p>
                 </div>
               </div>
@@ -748,6 +758,7 @@ const LiveCompetition = () => {
   const [paypalModalOpen, setPaypalModalOpen] = useState(false);
   const [alreadyRegisteredModalOpen, setAlreadyRegisteredModalOpen] = useState(false);
   const [selectedCompetition, setSelectedCompetition] = useState<any>(null);
+  const [selectedPrizePool, setSelectedPrizePool] = useState<any>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [registrations, setRegistrations] = useState<CompetitionRegistration[]>([]);
@@ -929,7 +940,7 @@ const LiveCompetition = () => {
     return () => clearInterval(interval);
   }, [user]);
 
-  const handleOpenModal = async (competition: any) => {
+  const handleOpenModal = async (competition: any, prizePool: any) => {
     // Ensure user is logged in before showing modal
     if (!isLoggedIn || !user) {
       toast.error('Please sign up or log in to join the competition.');
@@ -937,9 +948,9 @@ const LiveCompetition = () => {
       return;
     }
 
-    // Set the selected competition and open the modal. Registration will occur when
-    // the user clicks the "Join Competition" button inside the modal.
+    // Set the selected competition and prize pool, then open the modal
     setSelectedCompetition(competition);
+    setSelectedPrizePool(prizePool);
     setModalOpen(true);
   };
 
@@ -1342,9 +1353,9 @@ const LiveCompetition = () => {
       total: totalRevenue,
       totalDisplay: displayRevenue,
       pool: prizePool, // Full prize pool (100% of revenue)
-      first: Math.ceil(prizePool * 0.2),
-      second: Math.ceil(prizePool * (playerCount < 50 ? 0.12 : playerCount < 100 ? 0.12 : 0.1)),
-      third: Math.ceil(prizePool * (playerCount < 50 ? 0.08 : 0.07)),
+      first: Math.ceil(prizePool * 0.5),  // 50% for 1st place
+      second: Math.ceil(prizePool * 0.3), // 30% for 2nd place
+      third: Math.ceil(prizePool * 0.2),  // 20% for 3rd place
       isEstimated: playerCount < minPlayers,
       isFinalized: playerCount >= minPlayers, // Flag for finalized message
       minPool: fallbackRevenue
@@ -1367,14 +1378,13 @@ const LiveCompetition = () => {
         const fallbackRevenue = getCreditCost(comp.name) * 10;
         const totalRevenue = prizePoolRaw > 0 ? prizePoolRaw : fallbackRevenue;
 
-        // Calculate pool percentage (default to 40% for <50 players)
-        const poolPercentage = 0.4;
-        const prizePool = Math.floor(totalRevenue * poolPercentage);
+        // Use 100% of revenue for prize pool to match card display
+        const prizePool = totalRevenue;
 
         return [
-          `1st: ${Math.ceil(prizePool * 0.2)} Credits`,
-          `2nd: ${Math.ceil(prizePool * 0.12)} Credits`,
-          `3rd: ${Math.ceil(prizePool * 0.08)} Credits`
+          `1st: ${Math.ceil(prizePool * 0.5)} Credits`,  // 50% for 1st place
+          `2nd: ${Math.ceil(prizePool * 0.3)} Credits`,  // 30% for 2nd place
+          `3rd: ${Math.ceil(prizePool * 0.2)} Credits`   // 20% for 3rd place
         ];
       })(),
       startTime: new Date(comp.start_time),
@@ -1442,6 +1452,7 @@ const LiveCompetition = () => {
           isRegistering={isRegistering}
           startTime={selectedCompetition ? selectedCompetition.startTime : new Date()}
           competitionImagePath={getLeagueImage(selectedCompetition.name)}
+          dynamicPrizePool={selectedPrizePool}
         />
       )}
 
@@ -1579,7 +1590,7 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥇</span>
                             <span className="text-sm font-semibold text-gray-700">1st Place</span>
-                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
+                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">50%</span>
                           </div>
                           <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
                         </div>
@@ -1587,7 +1598,7 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥈</span>
                             <span className="text-sm font-semibold text-gray-700">2nd Place</span>
-                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '12%' : playerCount < 100 ? '12%' : '10%'}</span>
+                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">30%</span>
                           </div>
                           <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
                         </div>
@@ -1595,7 +1606,7 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥉</span>
                             <span className="text-sm font-semibold text-gray-700">3rd Place</span>
-                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">{playerCount < 50 ? '8%' : playerCount < 100 ? '7%' : '7%'}</span>
+                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">20%</span>
                           </div>
                           <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
                         </div>
@@ -1740,7 +1751,7 @@ const LiveCompetition = () => {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleOpenModal(comp)}
+                          onClick={() => handleOpenModal(comp, prizePool)}
                           className="w-full mt-2 py-2 text-white rounded-lg font-semibold transition-all duration-200"
                           style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
                         >
