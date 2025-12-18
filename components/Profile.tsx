@@ -428,13 +428,13 @@ export default function Profile() {
     }
   };
 
-  // If referrals table is empty, try to estimate effective referrals from referral_rewards as a fallback
+  // Count only referrals where the referred user actually registered/joined a competition.
+  // If referrals rows exist prefer counting `competition_joined`. Otherwise fall back
+  // to an estimate based on referral_rewards data.
   const computeEffectiveReferrals = () => {
-    // Prefer referrals table when any referred users exist.
     if (referredUsers && referredUsers.length > 0) {
-      // Show total referred users when they exist. If you prefer only confirmed/joined
-      // referrals, we can switch this to count(r => r.email_confirmed || r.competition_joined).
-      return { count: referredUsers.length, source: 'referrals' };
+      const joinedCount = referredUsers.filter(r => r.competition_joined).length;
+      return { count: joinedCount, source: 'referrals' };
     }
 
     // fallback: estimate from referral_rewards when no referredUsers rows are present
@@ -443,7 +443,6 @@ export default function Profile() {
         .filter(r => r.credited)
         .reduce((sum, r) => sum + (r.milestone || 0), 0);
       if (creditedMilestonesTotal > 0) return { count: creditedMilestonesTotal, source: 'referral_rewards' };
-      // or use number of pending rewards as an estimate
       return { count: referralRewards.length, source: 'referral_rewards_pending' };
     }
 
@@ -466,15 +465,48 @@ export default function Profile() {
   };
 
   const claimRewards = async (userId: string) => {
-    const milestones = [
-      { count: 3, reward_type: 'Starter Wallet Credit', credits: 10 },
-      { count: 5, reward_type: 'Pro Wallet Credit', credits: 25 },
-      { count: 10, reward_type: 'Elite Wallet Credit', credits: 50 },
+    // New business rules:
+    // - XP: first approved referral = 50 XP, second approved referral = 100 XP
+    // - Wallet credits by milestone: 3 -> 5 credits, 5 -> 10 credits, 10 -> 20 credits
+    const xpMilestones = [
+      { count: 1, reward_type: 'Experience', xp: 50 },
+      { count: 2, reward_type: 'Experience', xp: 100 },
     ];
-    const effectiveCount = referredUsers.filter(r => r.email_confirmed && r.competition_joined).length;
+    const milestones = [
+      { count: 3, reward_type: 'Starter Wallet Credit', credits: 5 },
+      { count: 5, reward_type: 'Pro Wallet Credit', credits: 10 },
+      { count: 10, reward_type: 'Elite Wallet Credit', credits: 20 },
+    ];
+    const effectiveCount = referredUsers.filter(r => r.competition_joined).length;
     const existingMilestones = referralRewards.map(r => r.milestone);
     try {
       let rewardsClaimed = false;
+      // Insert XP reward rows idempotently for first and second approved referrals
+      for (const xpM of xpMilestones) {
+        if (effectiveCount >= xpM.count && !existingMilestones.includes(xpM.count)) {
+          const { error } = await supabase
+            .from('referral_rewards')
+            .insert({
+              id: crypto.randomUUID(),
+              user_id: userId,
+              milestone: xpM.count,
+              reward_type: xpM.reward_type,
+              xp_awarded: true,
+              xp_amount: xpM.xp,
+              credited: false,
+              created_at: new Date().toISOString(),
+            });
+          if (error) {
+            if (error.code === '23505') {
+              // duplicate - already exists
+            } else {
+              throw error;
+            }
+          } else {
+            rewardsClaimed = true;
+          }
+        }
+      }
       for (const milestone of milestones) {
         if (effectiveCount >= milestone.count && !existingMilestones.includes(milestone.count)) {
           const { error } = await supabase
@@ -484,12 +516,13 @@ export default function Profile() {
               user_id: userId,
               milestone: milestone.count,
               reward_type: milestone.reward_type,
+              credit_value: milestone.credits,
               credited: false,
               created_at: new Date().toISOString(),
             });
           if (error) {
             if (error.code === '23505') {
-              toast.error(`Reward for ${milestone.count} referrals already exists`);
+              // duplicate - already exists
               continue;
             }
             throw error;
@@ -500,7 +533,8 @@ export default function Profile() {
       if (rewardsClaimed) {
         // Send milestone achievement emails for each new milestone reached
         try {
-          for (const milestone of milestones) {
+          // Notify for both XP and wallet milestones that were newly created
+          for (const milestone of [...xpMilestones, ...milestones]) {
             if (effectiveCount >= milestone.count && !existingMilestones.includes(milestone.count)) {
               await fetch('/api/email/milestone-achieved', {
                 method: 'POST',
@@ -509,23 +543,20 @@ export default function Profile() {
                   referrerId: userId,
                   milestone: milestone.count,
                   rewardType: milestone.reward_type,
-                  credits: milestone.credits,
+                  credits: (milestone as any).credits || null,
+                  xp: (milestone as any).xp || null,
                   totalReferrals: effectiveCount,
-                  nextMilestone: milestones.find(m => effectiveCount < m.count)?.count || null
+                  nextMilestone: [...milestones].find(m => effectiveCount < m.count)?.count || null
                 }),
               });
             }
           }
         } catch (emailError) {
           console.error('Failed to send milestone achievement email:', emailError);
-          // Don't show error to user as this is not critical
         }
-        
-        toast.success("New rewards added successfully!", { style: { background: '#363636', color: '#fff' } });
-      } else {
-        toast("No new rewards available to add", { icon: 'ℹ️', style: { background: '#363636', color: '#fff' } });
       }
       await fetchReferralRewards(userId);
+      toast.success(rewardsClaimed ? "Rewards claimed successfully!" : "No new rewards available", { style: { background: '#363636', color: '#fff' } });
     } catch (error: any) {
       console.error("Error adding rewards:", error);
       toast.error(error.message || "Failed to add rewards", { style: { background: '#363636', color: '#fff' } });
@@ -1102,7 +1133,7 @@ export default function Profile() {
                     </svg>
                     Referral Program
                     <span className="ml-2 bg-lime-100 text-lime-800 text-xs font-medium px-2 py-1 rounded-full">
-                      {referredUsers.length}
+                      {getReferralProgress().effectiveCount}
                     </span>
                   </h3>
                   <div className="mb-6 bg-gradient-to-r from-lime-50 to-green-50 p-4 rounded-lg border border-lime-200">
@@ -1140,7 +1171,7 @@ export default function Profile() {
                     </div>
 
                     <p className="text-xs text-lime-600 mt-2">
-                      Invite friends to earn competition credits! Get +10 credits for every friend who registers.
+                      A referral counts only when your friend registers for a competition. Earn <strong>50 XP</strong> for your 1st approved referral and <strong>100 XP</strong> for your 2nd. Wallet credits are awarded at milestones: <strong>3 → 5 credits</strong>, <strong>5 → 10 credits</strong>, <strong>10 → 20 credits</strong>.
                     </p>
                   </div>
                   <div className="mb-6">
@@ -1223,7 +1254,12 @@ export default function Profile() {
                           <div>
                             <p className="text-sm"><span className="font-medium text-gray-700">Milestone:</span> {reward.milestone} referrals</p>
                             <p className="text-sm"><span className="font-medium text-gray-700">Reward Type:</span> {reward.reward_type}</p>
-                            <p className="text-sm"><span className="font-medium text-gray-700">Value:</span> {reward.credit_value ?? '-'}</p>
+                            {reward.xp_amount ? (
+                              <p className="text-sm"><span className="font-medium text-gray-700">XP:</span> {reward.xp_amount}</p>
+                            ) : (
+                              <p className="text-sm"><span className="font-medium text-gray-700">Value:</span> {reward.credit_value ?? '-'}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">Status: {reward.credited ? 'Credited' : 'Pending'}</p>
                           </div>
 
                         </li>

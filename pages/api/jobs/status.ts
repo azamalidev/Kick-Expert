@@ -4,6 +4,17 @@ import { emailQueue } from '@/lib/queue';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405);
 
+  if (!emailQueue) {
+    return res.status(200).json({
+      error: 'Email queue not configured',
+      message: 'REDIS_URL environment variable is not set properly',
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
+    });
+  }
+
   try {
     const waiting = await emailQueue.getWaiting();
     const active = await emailQueue.getActive();
@@ -23,6 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error) {
     console.error('Jobs status error', error);
-    return res.status(500);
+    return res.status(500).json({ error: 'Failed to get job status' });
   }
 }
