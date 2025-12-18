@@ -19,24 +19,36 @@ function getRedisConnection() {
   
   // Check if Redis is configured
   if (!redisUrl || !redisUrl.startsWith('redis')) {
-    console.warn('⚠️  REDIS_URL not configured properly. Email queue will not work.');
-    console.warn('   Please set REDIS_URL in your .env.local file');
-    console.warn('   Example: REDIS_URL=rediss://default:password@your-redis-host:6379');
+    console.warn('⚠️  REDIS_URL not configured. Emails will be sent directly (no queue).');
     return null;
   }
 
   console.log('✓ Redis connection configured');
-  return { url: redisUrl };
+  return { 
+    url: redisUrl,
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times: number) => {
+      if (times > 3) {
+        console.error('❌ Redis connection failed after 3 retries. Disabling queue.');
+        return null; // Stop retrying
+      }
+      return Math.min(times * 100, 3000);
+    },
+    enableReadyCheck: false,
+    lazyConnect: true,
+  };
 }
 
 const redisConnection = getRedisConnection();
 
-export const emailQueue = redisConnection 
-  ? new Queue('emailQueue', { connection: redisConnection })
-  : null;
+let emailQueue: Queue | null = null;
+let emailWorker: Worker | null = null;
 
-export const emailWorker = redisConnection
-  ? new Worker(
+try {
+  if (redisConnection) {
+    emailQueue = new Queue('emailQueue', { connection: redisConnection });
+    
+    emailWorker = new Worker(
       'emailQueue',
       async (job: Job) => {
         const { userId, eventType, template, dynamicData } = job.data;
@@ -66,8 +78,25 @@ export const emailWorker = redisConnection
         console.log('Email sent:', eventType, user.email);
       },
       { connection: redisConnection }
-    )
-  : null;
+    );
+
+    // Handle worker errors gracefully
+    emailWorker.on('error', (error) => {
+      console.error('❌ Email worker error:', error.message);
+    });
+
+    emailWorker.on('failed', (job, error) => {
+      console.error(`❌ Job ${job?.id} failed:`, error.message);
+    });
+  }
+} catch (error: any) {
+  console.error('❌ Failed to initialize Redis queue:', error.message);
+  console.warn('⚠️  Falling back to direct email sending');
+  emailQueue = null;
+  emailWorker = null;
+}
+
+export { emailQueue, emailWorker };
 
 export async function enqueueEmail(
   userId: string,
