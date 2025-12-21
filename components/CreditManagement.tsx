@@ -2,9 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 import { CreditCard, Gift, Trophy, RefreshCw, X, DollarSign, Coins, Zap, Plus, Sparkles, HelpCircle, Clock, Shield, CheckCircle2, Lightbulb, Lock } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+
+interface PendingWithdraw {
+  amount?: number;
+  credits?: number;
+  status?: string;
+  created_at?: string;
+  id?: string;
+}
 
 interface CreditBalance {
   purchased_credits: number;
@@ -20,6 +28,12 @@ interface PaymentMethodModalProps {
   amount: number;
 }
 
+interface BuyCreditModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectPurchase: (price: number, credits: number, method: 'stripe' | 'paypal') => void;
+}
+
 interface PayPalPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,25 +42,17 @@ interface PayPalPaymentModalProps {
   onPaymentSuccess: () => void;
 }
 
-interface BuyCreditModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectPurchase: (price: number, credits: number, method: 'stripe' | 'paypal') => void;
-}
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
   isOpen,
   onClose,
   amount,
-  credits,
-  onPaymentSuccess
+  credits
+  // onPaymentSuccess is not used as PayPal redirects externally
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Use amount to avoid linting warning
+  const paymentAmount = amount;
 
   const handlePayPalPayment = async () => {
     setIsProcessing(true);
@@ -56,6 +62,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
       
       if (!session) {
         toast.error('Please sign in to purchase credits');
+        window.location.href = '/login';
         return;
       }
 
@@ -63,6 +70,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
       const userId = session.user?.id;
       if (!userId) {
         toast.error('User session is invalid');
+        window.location.href = '/login';
         return;
       }
 
@@ -73,7 +81,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({ 
-          amount: amount,
+          amount: paymentAmount,
           credits: credits,
           userId: userId
         }),
@@ -124,7 +132,7 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600">Payment for <span className="font-semibold">{credits} Credits</span></p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">${amount}</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">${paymentAmount}</p>
               </div>
 
               {isProcessing ? (
@@ -171,7 +179,6 @@ const PayPalPaymentModal: React.FC<PayPalPaymentModalProps> = ({
 interface PayPalWithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
-  amount: number; // not used, amount is entered by user
   credits: number; // available winnings credits
   onSubmit: (amount: number, paypalEmail: string) => Promise<void>;
 }
@@ -473,7 +480,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
                           return;
                         }
                         const pkg = { id: 'custom', credits: Number(customAmount), price: Number(customAmount), description: 'Custom amount' };
-                        setSelectedPackage(pkg as any);
+                        setSelectedPackage(pkg);
                         setShowPaymentMethods(true);
                       }}
                       className="px-4 py-3 bg-lime-600 text-white rounded-lg font-semibold hover:bg-lime-700 transition-colors flex items-center"
@@ -528,7 +535,7 @@ const BuyCreditModal: React.FC<BuyCreditModalProps> = ({
         <PaymentMethodModal
           isOpen={showPaymentMethods}
           onClose={() => setShowPaymentMethods(false)}
-          onSelectMethod={(method) => {
+          onSelectMethod={(method: 'stripe' | 'paypal') => {
             setShowPaymentMethods(false);
             onSelectPurchase(selectedPackage.price, selectedPackage.credits, method);
           }}
@@ -925,7 +932,6 @@ const CreditManagement: React.FC = () => {
 
   // Handle URL parameters for credit requirements
   const requiredCredits = searchParams?.get('required');
-  const competitionId = searchParams?.get('competition');
 
   useEffect(() => {
     if (requiredCredits) {
@@ -964,6 +970,8 @@ const CreditManagement: React.FC = () => {
       
       if (!session) {
         toast.error('Please sign in to view credits');
+        // Redirect to login page
+        window.location.href = '/login';
         return;
       }
       
@@ -990,7 +998,7 @@ const CreditManagement: React.FC = () => {
   const [showPayPalModal, setShowPayPalModal] = useState(false);
   const [showPayPalWithdrawModal, setShowPayPalWithdrawModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<{ price: number; credits: number } | null>(null);
-  const [pendingWithdraw, setPendingWithdraw] = useState<any | null>(null);
+  const [pendingWithdraw, setPendingWithdraw] = useState<PendingWithdraw | null>(null);
   const [isWithdrawMethodOpen, setIsWithdrawMethodOpen] = useState(false);
   const [withdrawMethod, setWithdrawMethod] = useState<'stripe' | 'paypal' | null>(null);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
@@ -1013,6 +1021,7 @@ const CreditManagement: React.FC = () => {
       
       if (!userSession) {
         toast.error('Please sign in to purchase credits');
+        window.location.href = '/login';
         return;
       }
 
@@ -1060,7 +1069,9 @@ const CreditManagement: React.FC = () => {
       // Ensure session
       const { data: { session: userSession } } = await supabase.auth.getSession();
       if (!userSession) {
-        throw new Error('Please sign in to request a withdrawal');
+        toast.error('Please sign in to request a withdrawal');
+        window.location.href = '/login';
+        return;
       }
 
       if (method === 'stripe') {
@@ -1098,16 +1109,16 @@ const CreditManagement: React.FC = () => {
       }
 
       // Optimistically update UI: deduct winnings credits and notify the user
-      setBalance((prev) => {
+      setBalance((prev: CreditBalance | null) => {
         if (!prev) return prev;
         const current = prev.winnings_credits || 0;
         return { ...prev, winnings_credits: Math.max(0, current - amount) };
       });
       // Try to parse server response to show details in confirmation modal
-      let respJson: any = null;
+      let respJson: PendingWithdraw | null = null;
       try {
         respJson = await response.json().catch(() => null);
-      } catch (e) {
+      } catch {
         respJson = null;
       }
 
@@ -1128,7 +1139,9 @@ const CreditManagement: React.FC = () => {
     try {
       const { data: { session: userSession } } = await supabase.auth.getSession();
       if (!userSession) {
-        throw new Error('Please sign in to request a refund');
+        toast.error('Please sign in to request a refund');
+        window.location.href = '/login';
+        return;
       }
 
       // ===== CHECK KYC STATUS BEFORE REFUND =====
@@ -1172,7 +1185,7 @@ const CreditManagement: React.FC = () => {
 
       const refundData = await response.json();
       setPendingRefund(refundData);
-      setBalance((prev) => {
+      setBalance((prev: CreditBalance | null) => {
         if (!prev) return prev;
         const current = prev.purchased_credits || 0;
         return { ...prev, purchased_credits: Math.max(0, current - amount) };
@@ -2070,7 +2083,7 @@ const CreditManagement: React.FC = () => {
                     </div>
                     <div className="bg-white rounded-lg p-4 border border-lime-100">
                       <h5 className="font-medium text-lime-900 mb-2">Processing Fees</h5>
-                      <p className="text-lime-800 text-sm">Payment processing fees (Stripe/PayPal) are added on top of your purchase. If you buy 200 credits for €200, you will pay €200 plus the payment provider's fees and receive exactly 200 credits in your account.</p>
+                      <p className="text-lime-800 text-sm">Payment processing fees (Stripe/PayPal) are added on top of your purchase. If you buy 200 credits for €200, you will pay €200 plus the payment provider&apos;s fees and receive exactly 200 credits in your account.</p>
                     </div>
                   </div>
                 </div>
@@ -2158,7 +2171,7 @@ const CreditManagement: React.FC = () => {
       <PaymentMethodModal
         isOpen={isWithdrawMethodOpen}
         onClose={() => setIsWithdrawMethodOpen(false)}
-        onSelectMethod={(method) => {
+        onSelectMethod={(method: 'stripe' | 'paypal') => {
           // For withdraw flow: if PayPal chosen, open PayPal withdraw modal to collect email + amount
           if (method === 'paypal') {
             setWithdrawMethod('paypal');
@@ -2179,7 +2192,6 @@ const CreditManagement: React.FC = () => {
       <PayPalWithdrawModal
         isOpen={showPayPalWithdrawModal}
         onClose={() => setShowPayPalWithdrawModal(false)}
-        amount={0}
         credits={balance?.winnings_credits || 0}
         onSubmit={async (amount: number, paypalEmail: string) => {
           // Delegate to the shared handler
@@ -2210,7 +2222,7 @@ const CreditManagement: React.FC = () => {
                   <ul className="text-sm text-gray-600 mt-2 space-y-2">
                     <li>• Admin will review your request and either approve or reject it.</li>
                     <li>• If approved, the payout will be sent to your connected account (may take a few business days).</li>
-                    <li>• You'll receive a notification when the request status changes.</li>
+                    <li>• You&apos;ll receive a notification when the request status changes.</li>
                   </ul>
                 </div>
 
@@ -2270,7 +2282,7 @@ const CreditManagement: React.FC = () => {
                     <li>• Admin will review your refund request and verify your KYC status.</li>
                     <li>• If approved, funds will be sent to your original payment method.</li>
                     <li>• Processing typically takes 1-3 business days.</li>
-                    <li>• You'll receive a notification when the status changes.</li>
+                    <li>• You&apos;ll receive a notification when the status changes.</li>
                   </ul>
                 </div>
 

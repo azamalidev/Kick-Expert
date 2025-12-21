@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@supabase/supabase-js";
 import { TrophyService } from "../utils/trophyService";
@@ -46,6 +46,37 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+// Utility functions moved outside component to prevent recreation
+const getTransactionIcon = (type: string) => {
+  switch (type) {
+    case "reward":
+      return <span className="text-green-500">🏆</span>;
+    case "referral_reward":
+      return <span className="text-blue-500">👥</span>;
+    case "topup":
+      return <span className="text-green-500">💰</span>;
+    case "entry_fee":
+      return <span className="text-red-500">🎯</span>;
+    case "withdrawal":
+      return <span className="text-red-500">💸</span>;
+    default:
+      return <span className="text-gray-500">💰</span>;
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "open":
+      return "bg-yellow-100 text-yellow-800";
+    case "in_progress":
+      return "bg-blue-100 text-blue-800";
+    case "closed":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
 
 interface ProfileData {
   username: string;
@@ -107,7 +138,7 @@ interface DashboardProps {
   userEmail: string;
 }
 
-export default function Dashboard({
+export default React.memo(function Dashboard({
   initialProfileData,
   initialCredits,
   initialTransactions,
@@ -121,7 +152,7 @@ export default function Dashboard({
   const [purchasedCredits, setPurchasedCredits] = useState<number>(initialCredits.purchased);
   const [winningsCredits, setWinningsCredits] = useState<number>(initialCredits.winnings);
   const [referralCredits, setReferralCredits] = useState<number>(initialCredits.referral);
-  const [totalCredits, setTotalCredits] = useState<number>(initialCredits.purchased + initialCredits.winnings);
+  const totalCredits = useMemo(() => purchasedCredits + winningsCredits, [purchasedCredits, winningsCredits]);
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(initialLeaderboard);
   const [transactions, setTransactions] = useState<TransactionEntry[]>(initialTransactions);
@@ -136,22 +167,22 @@ export default function Dashboard({
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setLoading(true);
     router.refresh();
     setTimeout(() => setLoading(false), 1000); // Simple timeout to simulate loading state for UX
-  };
+  }, [router]);
 
   // Fallback states for when data is loading
   const [username, setUsername] = useState<string>(initialProfileData?.username || "User");
   const [rankLabel, setRankLabel] = useState<string>(initialProfileData?.rank_label || "Rookie");
   const [entryCredits, setEntryCredits] = useState<number>(2);
   const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(initialProfileData?.total_games || 0);
-  const [winPercentage, setWinPercentage] = useState<number>(
-    initialProfileData && initialProfileData.total_games > 0
-      ? Math.round((initialProfileData.total_wins / initialProfileData.total_games) * 100)
+  const winPercentage = useMemo(() => 
+    profileData && profileData.total_games > 0
+      ? Math.round((profileData.total_wins / profileData.total_games) * 100)
       : 0
-  );
+  , [profileData]);
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
   const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
   // default to history tab
@@ -233,7 +264,7 @@ export default function Dashboard({
 
   // Withdraw functionality removed - credits management handled via user_credits
 
-  const handleSupportSubmit = async (e: React.FormEvent) => {
+  const handleSupportSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supportTopic.trim() || !supportDescription.trim()) {
       toast.error("Please fill in all required fields with valid input");
@@ -289,16 +320,16 @@ export default function Dashboard({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [supportTopic, supportDescription, supportTickets]);
 
-  const handleViewResponse = async (ticket: SupportTicket) => {
+  const handleViewResponse = useCallback(async (ticket: SupportTicket) => {
     setSelectedTicket(ticket);
     const responses = await fetchTicketResponses(ticket.id);
     setTicketResponses(responses);
     setShowResponseModal(true);
-  };
+  }, []);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedTicket) {
       toast.error("Please enter a message");
@@ -343,37 +374,7 @@ export default function Dashboard({
     } finally {
       setSendingMessage(false);
     }
-  };
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case "reward":
-        return <span className="text-green-500">🏆</span>;
-      case "referral_reward":
-        return <span className="text-blue-500">👥</span>;
-      case "topup":
-        return <span className="text-green-500">💰</span>;
-      case "entry_fee":
-        return <span className="text-red-500">🎯</span>;
-      case "withdrawal":
-        return <span className="text-red-500">💸</span>;
-      default:
-        return <span className="text-gray-500">💰</span>;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-yellow-100 text-yellow-800";
-      case "in_progress":
-        return "bg-blue-100 text-blue-800";
-      case "closed":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+  }, [newMessage, selectedTicket]);
 
   return (
     <div className="min-h-fit mt-15 bg-gray-50 text-gray-800 flex items-center justify-center p-6">
@@ -1631,4 +1632,4 @@ export default function Dashboard({
       )}
     </div>
   );
-}
+});

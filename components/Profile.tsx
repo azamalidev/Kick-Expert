@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from "@/lib/supabaseClient";
 import toast from 'react-hot-toast';
@@ -51,7 +51,7 @@ const ranks = [
   { label: 'Champion', minXP: 2000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
 ];
 
-export default function Profile() {
+export default memo(function Profile() {
   const router = useRouter();
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -621,18 +621,6 @@ export default function Profile() {
     }
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    setAvatarFile(file);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setAvatarUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   const uploadAvatar = async () => {
     if (!avatarFile) return;
@@ -668,7 +656,60 @@ export default function Profile() {
     }
   };
 
-  const handleProfileSave = async () => {
+
+
+
+  const getReferralProgress = () => {
+    const estimated = computeEffectiveReferrals();
+    const effectiveCount = estimated.count;
+    const milestones = [3, 5, 10];
+    const nextMilestone = milestones.find(m => effectiveCount < m) || 10;
+    const progress = (effectiveCount / nextMilestone) * 100;
+    return { effectiveCount, nextMilestone, progress, source: estimated.source };
+  };
+
+  const getCountryCode = (countryName: string) => {
+    if (!countryName) {
+      console.log('getCountryCode: empty countryName');
+      return '';
+    }
+    
+    // Check if it's already a 2-letter country code
+    if (countryName.length === 2) {
+      console.log('getCountryCode: already 2-letter code:', countryName.toUpperCase());
+      return countryName.toUpperCase();
+    }
+    
+    // Try to find by name (case-insensitive)
+    const country = countries.find(c => 
+      c.name.toLowerCase() === countryName.toLowerCase()
+    );
+    
+    const code = country ? country.code : '';
+    console.log('getCountryCode: input:', countryName, '-> output:', code, '(found:', !!country, ')');
+    return code;
+  };
+
+  // Memoized values for performance
+  const currentRank = useMemo(() => getRankFromXP(xp), [xp]);
+  const referralProgress = useMemo(() => getReferralProgress(), [referredUsers, referralRewards]);
+  const effectiveReferrals = useMemo(() => computeEffectiveReferrals(), [referredUsers, referralRewards]);
+
+  // Memoized callbacks for performance
+  const handleAvatarUploadCallback = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setAvatarUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleProfileSaveCallback = useCallback(async () => {
     if (!newName.trim()) {
       toast.error("Name cannot be empty", { style: { background: '#363636', color: '#fff' } });
       return;
@@ -683,10 +724,9 @@ export default function Profile() {
         .from("users")
         .upsert(
           {
-            id: user.id, // required because it's PK + FK to auth.users
+            id: user.id,
             email: user.email,
             name: newName.trim(),
-            // age, // Removed because 'age' is not defined
             accepted_terms: true,
             updated_at: new Date().toISOString(),
           },
@@ -715,9 +755,9 @@ export default function Profile() {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile", { style: { background: '#363636', color: '#fff' } });
     }
-  };
+  }, [newName, nationality, publicProfile, avatarFile, userProfile]);
 
-  const handlePasswordChange = async () => {
+  const handlePasswordChangeCallback = useCallback(async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error("Please fill in all password fields", { style: { background: '#363636', color: '#fff' } });
       return;
@@ -751,27 +791,27 @@ export default function Profile() {
       console.error("Error updating password:", error.message);
       toast.error(error.message || "Failed to update password", { style: { background: '#363636', color: '#fff' } });
     }
-  };
+  }, [currentPassword, newPassword, confirmPassword, email]);
 
-  const shareReferralToFacebook = () => {
+  const shareReferralToFacebookCallback = useCallback(() => {
     const text = encodeURIComponent(`Join me on this awesome platform and earn rewards! 🚀 Use my referral link: ${referralLink}`);
     const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  }, [referralLink]);
 
-  const shareReferralToX = () => {
+  const shareReferralToXCallback = useCallback(() => {
     const text = encodeURIComponent(`Join me and earn rewards! 🚀 ${referralLink}`);
     const url = `https://twitter.com/intent/tweet?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  }, [referralLink]);
 
-  const shareReferralToWhatsApp = () => {
+  const shareReferralToWhatsAppCallback = useCallback(() => {
     const text = encodeURIComponent(`Join me on this platform and earn rewards! 🚀 ${referralLink}`);
     const url = `https://api.whatsapp.com/send?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  }, [referralLink]);
 
-  const shareReferralToInstagram = async () => {
+  const shareReferralToInstagramCallback = useCallback(async () => {
     const text = `Join me on this platform and earn rewards! 🚀 ${referralLink}`;
     try {
       await navigator.clipboard.writeText(text);
@@ -779,38 +819,7 @@ export default function Profile() {
     } catch (error) {
       toast.error('Failed to copy referral link', { style: { background: '#363636', color: '#fff' } });
     }
-  };
-
-  const getReferralProgress = () => {
-    const estimated = computeEffectiveReferrals();
-    const effectiveCount = estimated.count;
-    const milestones = [3, 5, 10];
-    const nextMilestone = milestones.find(m => effectiveCount < m) || 10;
-    const progress = (effectiveCount / nextMilestone) * 100;
-    return { effectiveCount, nextMilestone, progress, source: estimated.source };
-  };
-
-  const getCountryCode = (countryName: string) => {
-    if (!countryName) {
-      console.log('getCountryCode: empty countryName');
-      return '';
-    }
-    
-    // Check if it's already a 2-letter country code
-    if (countryName.length === 2) {
-      console.log('getCountryCode: already 2-letter code:', countryName.toUpperCase());
-      return countryName.toUpperCase();
-    }
-    
-    // Try to find by name (case-insensitive)
-    const country = countries.find(c => 
-      c.name.toLowerCase() === countryName.toLowerCase()
-    );
-    
-    const code = country ? country.code : '';
-    console.log('getCountryCode: input:', countryName, '-> output:', code, '(found:', !!country, ')');
-    return code;
-  };
+  }, [referralLink]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -898,7 +907,7 @@ export default function Profile() {
                               id="avatar-upload"
                               type="file"
                               accept="image/*"
-                              onChange={handleAvatarUpload}
+                              onChange={handleAvatarUploadCallback}
                               className="hidden"
                             />
                           </>
@@ -994,7 +1003,7 @@ export default function Profile() {
                             </div>
                           </div>
                           <button
-                            onClick={handleProfileSave}
+                            onClick={handleProfileSaveCallback}
                             disabled={isUploading}
                             className="mt-4 px-4 py-2 bg-lime-500 hover:bg-lime-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
                           >
@@ -1133,7 +1142,7 @@ export default function Profile() {
                     </svg>
                     Referral Program
                     <span className="ml-2 bg-lime-100 text-lime-800 text-xs font-medium px-2 py-1 rounded-full">
-                      {getReferralProgress().effectiveCount}
+                      {referralProgress.effectiveCount}
                     </span>
                   </h3>
                   <div className="mb-6 bg-gradient-to-r from-lime-50 to-green-50 p-4 rounded-lg border border-lime-200">
@@ -1154,19 +1163,19 @@ export default function Profile() {
                     </div> */}
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-lime-700">
-                        Effective Referrals: {getReferralProgress().effectiveCount}
+                        Effective Referrals: {referralProgress.effectiveCount}
                       </span>
                       <span className="text-sm text-lime-700">
-                        Next Milestone: {getReferralProgress().nextMilestone} referrals
+                        Next Milestone: {referralProgress.nextMilestone} referrals
                       </span>
                     </div>
-                    {getReferralProgress().source !== 'referrals' && (
+                    {referralProgress.source !== 'referrals' && (
                       <p className="text-xs text-gray-500 mt-1">Showing estimated referrals from rewards data (fall-back).</p>
                     )}
                     <div className="w-full bg-lime-200 rounded-full h-2">
                       <div
                         className="bg-lime-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${getReferralProgress().progress}%` }}
+                        style={{ width: `${referralProgress.progress}%` }}
                       ></div>
                     </div>
 
@@ -1207,22 +1216,22 @@ export default function Profile() {
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold text-gray-700 mb-2">Share Your Referral Link</h4>
                     <div className="flex space-x-3">
-                      <button onClick={shareReferralToFacebook} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
+                      <button onClick={shareReferralToFacebookCallback} title="Share on Facebook" className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
                         </svg>
                       </button>
-                      <button onClick={shareReferralToX} title="Share on X" className="p-2 bg-black rounded-full hover:bg-gray-800 transition-colors">
+                      <button onClick={shareReferralToXCallback} title="Share on X" className="p-2 bg-black rounded-full hover:bg-gray-800 transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                         </svg>
                       </button>
-                      <button onClick={shareReferralToWhatsApp} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
+                      <button onClick={shareReferralToWhatsAppCallback} title="Share on WhatsApp" className="p-2 bg-[#25D366] rounded-full hover:bg-[#20BA56] transition-colors">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448-2.207 1.526-4.874 2.589-7.7 2.654zm8.21-19.701c-2.207 0-4.003 1.796-4.003 4.003 0 .884.335 1.696.892 2.31l-.958 3.492 3.586-.926c.609.53 1.39.834 2.212.834 2.207 0 4.003-1.796 4.003-4.003 0-2.207-1.796-4.003-4.003-4.003zm3.04 6.373c.128.07.174.224.104.348-.047.083-.293.382-1.006 1.095-1.001 1-1.83 1.047-2.2-2.136 0-1.023.79-1.767 1.116-2.044.093-.07.186-.093.279-.093h.279c.093 0 .186 0 .232.14.047.14 .186.372.511.977.093.186.186.372.232.511.047.14.07.232 0 .326-.07.093-.14.279-.186.418-.047.14-.07.279 0 .372.07.093.558.93 1.209 1.488.837.651 1.488.93 1.674 1.023.186.093.279.093.372-.047.093-.14.418-.558.558-.744.14-.186.279-.14.372-.093.093.047.651.325.977.511.326.186.558.279.651.325.093.047.14.07.14.186 0 .116-.07.279-.186.372z" />
                         </svg>
                       </button>
-                      <button onClick={shareReferralToInstagram} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
+                      <button onClick={shareReferralToInstagramCallback} title="Share on Instagram" className="p-2 bg-gradient-to-br from-pink-500 to-orange-400 rounded-full hover:brightness-105 transition">
                         <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.332.014 7.052.072 2.95.272.16 3.057 0 7.163 0 8.412 0 8.741 0 12c0 3.259 0 3.668 0 4.948 0 4.106 2.787 6.891 6.893 6.891 1.28 0 1.609 0 4.948 0 3.259 0 3.668 0 4.948 0 4.106 0 6.891-2.785 6.891-6.891 0-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0-4.106-2.785-6.891-6.891-6.891-1.28 0-1.609 0-4.948 0-3.259 0-3.668 0-4.948 0zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
                         </svg>
@@ -1407,13 +1416,13 @@ export default function Profile() {
                   <div className="mt-4 bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
-                        <div className={`p-2 ${getRankFromXP(xp).bgColor} rounded-full mr-3`}>
-                          <span className="text-xl">{getRankFromXP(xp).icon}</span>
+                        <div className={`p-2 ${currentRank.bgColor} rounded-full mr-3`}>
+                          <span className="text-xl">{currentRank.icon}</span>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-yellow-700">Current Rank</p>
-                          <p className={`text-xl font-bold ${getRankFromXP(xp).color}`}>
-                            {getRankFromXP(xp).label}
+                          <p className={`text-xl font-bold ${currentRank.color}`}>
+                            {currentRank.label}
                           </p>
                         </div>
                       </div>
@@ -1690,7 +1699,7 @@ export default function Profile() {
                     />
                   </div>
                   <button
-                    onClick={handlePasswordChange}
+                    onClick={handlePasswordChangeCallback}
                     className="w-full py-2 sm:py-3 px-4 sm:px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-sm sm:text-base"
                   >
                     Update Password
@@ -1717,4 +1726,4 @@ export default function Profile() {
       </div>
     </div>
   );
-}
+});
