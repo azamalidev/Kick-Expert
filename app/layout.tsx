@@ -1,41 +1,8 @@
-'use client';
-
-import { SupabaseProvider } from '../lib/supabase/provider';
 import './globals.css';
-import { Toaster } from 'react-hot-toast';
 import { metadata } from './metadata';
+import Providers from '@/components/Providers';
 
-function ClientWrapper({ children }: { children: React.ReactNode }) {
-
-  return (
-    <SupabaseProvider>
-      <Toaster 
-        position="top-center"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 2500,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 3000,
-          },
-          loading: {
-            duration: Infinity,
-          },
-        }}
-      />
-      {children}
-    </SupabaseProvider>
-  );
-}
+export { metadata };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -50,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#000000" />
       </head>
       <body>
-        <ClientWrapper>{children}</ClientWrapper>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

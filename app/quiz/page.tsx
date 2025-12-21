@@ -1,13 +1,17 @@
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import Quiz from "@/components/Quiz";
+import { getQuizQuestions } from "@/app/actions/quiz";
 
+export const dynamic = 'force-dynamic';
 
-export default function LoginPage() {
+export default async function QuizPage() {
+    const questions = await getQuizQuestions();
+
     return (
-        <div >
+        <div>
             <Navbar />
-            <Quiz />
+            <Quiz initialQuestions={questions} />
             <Footer />
         </div>
     );

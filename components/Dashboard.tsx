@@ -11,6 +11,7 @@ import {
 } from "../utils/rankSystem";
 import { Trophy, TrophyStats } from "../types/trophy";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Rank definitions
 const ranks = [
@@ -72,34 +73,66 @@ interface SupportTicket {
   created_at: string;
 }
 
-export default function Dashboard() {
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [purchasedCredits, setPurchasedCredits] = useState<number>(0);
-  const [winningsCredits, setWinningsCredits] = useState<number>(0);
-  const [referralCredits, setReferralCredits] = useState<number>(0);
-  const [totalCredits, setTotalCredits] = useState<number>(0);
+interface DashboardProps {
+  initialProfileData: ProfileData | null;
+  initialCredits: {
+    purchased: number;
+    winnings: number;
+    referral: number;
+  };
+  initialTransactions: TransactionEntry[];
+  initialLeaderboard: LeaderboardEntry[];
+  initialUserTrophies: Trophy[];
+  initialTrophyStats: TrophyStats | null;
+  initialSupportTickets: SupportTicket[];
+  userEmail: string;
+}
+
+export default function Dashboard({
+  initialProfileData,
+  initialCredits,
+  initialTransactions,
+  initialLeaderboard,
+  initialUserTrophies,
+  initialTrophyStats,
+  initialSupportTickets,
+  userEmail
+}: DashboardProps) {
+  const [profileData, setProfileData] = useState<ProfileData | null>(initialProfileData);
+  const [purchasedCredits, setPurchasedCredits] = useState<number>(initialCredits.purchased);
+  const [winningsCredits, setWinningsCredits] = useState<number>(initialCredits.winnings);
+  const [referralCredits, setReferralCredits] = useState<number>(initialCredits.referral);
+  const [totalCredits, setTotalCredits] = useState<number>(initialCredits.purchased + initialCredits.winnings);
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false);
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
-    []
-  );
-  const [transactions, setTransactions] = useState<TransactionEntry[]>([]);
-  const [userTrophies, setUserTrophies] = useState<Trophy[]>([]);
-  const [trophyStats, setTrophyStats] = useState<TrophyStats | null>(null);
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(initialLeaderboard);
+  const [transactions, setTransactions] = useState<TransactionEntry[]>(initialTransactions);
+  const [userTrophies, setUserTrophies] = useState<Trophy[]>(initialUserTrophies);
+  const [trophyStats, setTrophyStats] = useState<TrophyStats | null>(initialTrophyStats);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(initialSupportTickets);
+  const [loading, setLoading] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [trophiesLoading, setTrophiesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+
+  const handleRefresh = () => {
+    setLoading(true);
+    router.refresh();
+    setTimeout(() => setLoading(false), 1000); // Simple timeout to simulate loading state for UX
+  };
 
   // Fallback states for when data is loading
-  const [username, setUsername] = useState<string>("Loading...");
-  const [userEmail, setUserEmail] = useState<string>("Loading...");
-  const [rankLabel, setRankLabel] = useState<string>("Rookie");
+  const [username, setUsername] = useState<string>(initialProfileData?.username || "User");
+  const [rankLabel, setRankLabel] = useState<string>(initialProfileData?.rank_label || "Rookie");
   const [entryCredits, setEntryCredits] = useState<number>(2);
-  const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(0);
-  const [winPercentage, setWinPercentage] = useState<number>(0);
+  const [competitionsPlayed, setCompetitionsPlayed] = useState<number>(initialProfileData?.total_games || 0);
+  const [winPercentage, setWinPercentage] = useState<number>(
+    initialProfileData && initialProfileData.total_games > 0
+      ? Math.round((initialProfileData.total_wins / initialProfileData.total_games) * 100)
+      : 0
+  );
   const [totalEarnings, setTotalEarnings] = useState<number>(0);
   const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
   // default to history tab
@@ -124,187 +157,7 @@ export default function Dashboard() {
     setMounted(true);
   }, []);
 
-  // Fetch user data on component mount
-  useEffect(() => {
-    if (mounted) {
-      fetchUserData();
-      fetchLeaderboardData();
-      fetchTransactions();
-      fetchUserTrophies();
-      fetchSupportTickets();
-    }
-  }, [mounted]);
-
-  const fetchUserData = async () => {
-    try {
-      setLoading(true);
-
-      // Get current user
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error("User not authenticated:", userError);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch profile data
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("username, xp, total_games, total_wins, rank_label, avatar_url")
-        .eq("user_id", user.id)
-        .single();
-
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-      } else if (profile) {
-        setProfileData({
-          username: profile.username || "User",
-          email: user.email || "",
-          xp: profile.xp || 0,
-          total_games: profile.total_games || 0,
-          total_wins: profile.total_wins || 0,
-          rank_label: profile.rank_label || "Rookie",
-          avatar_url: profile.avatar_url,
-        });
-
-        // Update state variables
-        setUsername(profile.username || "User");
-        setUserEmail(user.email || "");
-        setRankLabel(profile.rank_label || "Rookie");
-        setCompetitionsPlayed(profile.total_games || 0);
-
-        // Calculate win percentage
-        const winPercent =
-          profile.total_games > 0
-            ? Math.round((profile.total_wins / profile.total_games) * 100)
-            : 0;
-        setWinPercentage(winPercent);
-      }
-
-      // We're not using the `wallets` table anymore. Credits are shown from
-      // the `user_credits` table below.
-
-      // Fetch user credits (new table `user_credits`) if available
-      try {
-        const { data: creditsData, error: creditsError } = await supabase
-          .from('user_credits')
-          .select('purchased_credits, winnings_credits, referral_credits')
-          .eq('user_id', user.id)
-          .single();
-
-        if (creditsError) {
-          // If table doesn't exist or permission error, log and continue
-          console.warn('user_credits fetch error (table may be missing):', creditsError.message || creditsError);
-        } else if (creditsData) {
-          const purchased = Number(creditsData.purchased_credits) || 0;
-          const winnings = Number(creditsData.winnings_credits) || 0;
-          // We intentionally do NOT surface referral credits in the main UI
-          setPurchasedCredits(purchased);
-          setWinningsCredits(winnings);
-          setReferralCredits(Number(creditsData.referral_credits) || 0); // keep in state but don't display
-          // Total shown to users should exclude referral credits per request
-          setTotalCredits(purchased + winnings);
-        }
-      } catch (err) {
-        console.warn('Unexpected error fetching user_credits:', err);
-      }
-
-      // We no longer show Total Earnings as part of the dashboard. Keep
-      // transactions fetch for history only (fetchTransactions handles history).
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchLeaderboardData = async () => {
-    try {
-      setLeaderboardLoading(true);
-
-      const { data, error } = await supabase.rpc("get_top_users_leaderboard");
-
-      if (error) {
-        console.error("Error fetching leaderboard:", error);
-        return;
-      }
-
-      if (data) {
-        setLeaderboardData(data);
-      }
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error);
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      setTransactionsLoading(true);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("User not authenticated");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching transactions:", error);
-        toast.error("Failed to load transactions");
-        return;
-      }
-
-      if (data) {
-        setTransactions(data);
-        setCurrentPage(1);
-      }
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
-      toast.error("Failed to load transactions");
-    } finally {
-      setTransactionsLoading(false);
-    }
-  };
-
-  const fetchUserTrophies = async () => {
-    try {
-      setTrophiesLoading(true);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        console.error("User not authenticated");
-        return;
-      }
-
-      // Fetch user trophies
-      const trophies = await TrophyService.getUserTrophies(user.id);
-      setUserTrophies(trophies);
-
-      // Fetch trophy stats
-      const stats = await TrophyService.getTrophyStats(user.id);
-      setTrophyStats(stats);
-    } catch (error) {
-      console.error("Error fetching user trophies:", error);
-    } finally {
-      setTrophiesLoading(false);
-    }
-  };
+  // Fetch functions removed as data is now passed via props
 
   const fetchSupportTickets = async () => {
     try {
@@ -398,7 +251,17 @@ export default function Dashboard() {
       toast.success("Support ticket submitted successfully!");
       setSupportTopic("");
       setSupportDescription("");
-      fetchSupportTickets();
+      // fetchSupportTickets(); // Removed fetch, we can manually update state if needed or just let user refresh
+      // Manually update state to show new ticket immediately
+      const newTicket: SupportTicket = {
+        id: "temp-" + Date.now(), // Temporary ID until refresh
+        user_id: user.id,
+        topic: supportTopic.trim(),
+        description: supportDescription.trim(),
+        status: "open",
+        created_at: new Date().toISOString()
+      };
+      setSupportTickets([newTicket, ...supportTickets]);
     } catch (error: any) {
       console.error("Unexpected error submitting support ticket:", error);
       toast.error(
@@ -451,7 +314,7 @@ export default function Dashboard() {
 
 
       setNewMessage("");
-      
+
       // Refresh the conversation
       const responses = await fetchTicketResponses(selectedTicket.id);
       setTicketResponses(responses);
@@ -676,7 +539,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-          
+
               </div>
 
               {/* Winnings-only card */}
@@ -824,11 +687,11 @@ export default function Dashboard() {
                   </span>
                 </h3>
                 <button
-                  onClick={fetchUserTrophies}
-                  disabled={trophiesLoading}
+                  onClick={handleRefresh}
+                  disabled={loading}
                   className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {trophiesLoading ? (
+                  {loading ? (
                     <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     "Refresh"
@@ -932,7 +795,7 @@ export default function Dashboard() {
                     })}
                   </div>
 
-           
+
                 </>
               )}
             </div>
@@ -1035,11 +898,11 @@ export default function Dashboard() {
                   Top Players Leaderboard
                 </h3>
                 <button
-                  onClick={fetchLeaderboardData}
-                  disabled={leaderboardLoading}
+                  onClick={handleRefresh}
+                  disabled={loading}
                   className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {leaderboardLoading ? (
+                  {loading ? (
                     <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     "Refresh"
@@ -1189,11 +1052,10 @@ export default function Dashboard() {
                   {/* History Button */}
                   <button
                     onClick={() => setActiveTab("history")}
-                    className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors ${
-                      activeTab === "history"
-                        ? "bg-lime-400 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors ${activeTab === "history"
+                      ? "bg-lime-400 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     <svg
                       className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2"
@@ -1242,11 +1104,10 @@ export default function Dashboard() {
                   {/* Support Button */}
                   <button
                     onClick={() => setActiveTab("support")}
-                    className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors ${
-                      activeTab === "support"
-                        ? "bg-lime-400 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    className={`px-3 py-2 text-sm md:px-4 md:py-2 md:text-base rounded-full flex items-center justify-center transition-colors ${activeTab === "support"
+                      ? "bg-lime-400 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
                   >
                     <svg
                       className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2"
@@ -1367,14 +1228,14 @@ export default function Dashboard() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-800">
-                       History
+                      History
                     </h3>
                     <button
-                      onClick={fetchTransactions}
-                      disabled={transactionsLoading}
+                      onClick={handleRefresh}
+                      disabled={loading}
                       className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
                     >
-                      {transactionsLoading ? (
+                      {loading ? (
                         <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
                         "Refresh"
@@ -1437,7 +1298,7 @@ export default function Dashboard() {
                               </div>
 
                               <div className="flex items-center space-x-2">
-                            
+
                                 <button
                                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                   disabled={currentPage === 1}
@@ -1464,7 +1325,7 @@ export default function Dashboard() {
                                 >
                                   Next ›
                                 </button>
-                    
+
                               </div>
                             </div>
                           </>
@@ -1679,7 +1540,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="mb-2 flex-shrink-0">
-           
+
               <p className="text-xs text-gray-400 ">
                 Submitted: {new Date(selectedTicket.created_at).toLocaleDateString()}
               </p>
@@ -1690,11 +1551,10 @@ export default function Dashboard() {
                   {ticketResponses.map((response) => (
                     <div
                       key={response.id}
-                      className={`p-3 rounded-lg max-w-[80%] ${
-                        response.sender === 'user'
-                          ? 'bg-gray-100 border border-gray-200 self-start'
-                          : 'bg-indigo-500 text-white self-end ml-auto'
-                      }`}
+                      className={`p-3 rounded-lg max-w-[80%] ${response.sender === 'user'
+                        ? 'bg-gray-100 border border-gray-200 self-start'
+                        : 'bg-indigo-500 text-white self-end ml-auto'
+                        }`}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">{response.message}</p>
                       <span className="block text-xs mt-1 opacity-70">

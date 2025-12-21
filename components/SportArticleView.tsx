@@ -1,24 +1,34 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import { articles } from "./SportsArticle";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-export default function SportArticleView() {
+interface Article {
+  id: number;
+  category: string;
+  image: string;
+  authorImage: string;
+  author: string;
+  date: string;
+  title: string;
+  desc: string;
+  paragraphs: string[];
+}
+
+interface SportArticleViewProps {
+  article: Article;
+}
+
+export default function SportArticleView({ article }: SportArticleViewProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const id = searchParams?.get('id');
-  
-  // Find the article with the matching ID
-  const article = articles.find(item => item.id.toString() === id);
 
   if (!article) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center p-10">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Article not found</h1>
-          <button 
+          <button
             onClick={() => router.push('/')}
             className="bg-lime-500 hover:bg-lime-600 text-white px-6 py-2 rounded-md transition-colors"
           >
@@ -104,7 +114,7 @@ export default function SportArticleView() {
       </div>
 
       <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">{article.title}</h1>
-      
+
       <div className="flex items-center space-x-3 text-sm text-gray-600 mb-8">
         <Image
           src={article.authorImage}
@@ -157,26 +167,26 @@ export default function SportArticleView() {
         const rest = article.paragraphs.slice(sideCount);
         if (rest.length === 0) return null;
         return (
-            <div className="mt-8 -mx-4 sm:-mx-6">
-              <div className="px-4 sm:px-6 space-y-8">
-                {rest.map((para, index) => (
-                  <p
-                    key={index}
-                    className={`relative text-gray-800 leading-relaxed text-lg tracking-normal max-w-none w-full pl-4 md:pl-8
+          <div className="mt-8 -mx-4 sm:-mx-6">
+            <div className="px-4 sm:px-6 space-y-8">
+              {rest.map((para, index) => (
+                <p
+                  key={index}
+                  className={`relative text-gray-800 leading-relaxed text-lg tracking-normal max-w-none w-full pl-4 md:pl-8
                       before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-lime-400
                     `}
-                  >
-                    {para}
-                  </p>
-                ))}
-              </div>
+                >
+                  {para}
+                </p>
+              ))}
             </div>
+          </div>
         );
       })()}
 
       <div className="mt-12 border-t border-gray-200 pt-8">
         <div className="flex justify-end items-center">
-          <button 
+          <button
             onClick={() => router.back()}
             className="bg-lime-500 hover:bg-lime-400 px-6 py-2 rounded-md transition-colors flex items-center gap-2 text-white font-medium"
           >

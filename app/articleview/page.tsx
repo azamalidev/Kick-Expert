@@ -1,17 +1,15 @@
-import Footer from "@/components/Footer";
-import Navbar from "@/components/Navbar";
-import SportArticleView from "@/components/SportArticleView";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
+export default async function ArticleViewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { id } = await searchParams;
 
-export default function LoginPage() {
-  return (
-    <div className="">
-        <Navbar/>
-      <Suspense fallback={<div className="text-center py-20">Loading article...</div>}>
-        <SportArticleView />
-      </Suspense>
-      <Footer/>
-    </div>
-  );
+  if (id) {
+    redirect(`/articleview/${id}`);
+  }
+
+  redirect("/");
 }
