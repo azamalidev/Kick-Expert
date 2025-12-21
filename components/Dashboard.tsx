@@ -13,6 +13,25 @@ import { Trophy, TrophyStats } from "../types/trophy";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+// Utility function for consistent date formatting (prevents hydration mismatch)
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const formatDateTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+
 // Rank definitions
 const ranks = [
   { label: 'Rookie', minXP: 0, maxXP: 199, color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '🌱' },
@@ -1174,9 +1193,7 @@ export default function Dashboard({
                               </p>
                               <p className="text-sm text-gray-500 mt-1">
                                 {transaction.source} •{" "}
-                                {new Date(
-                                  transaction.created_at
-                                ).toLocaleDateString()}
+                                {formatDate(transaction.created_at)}
                               </p>
                               <span
                                 className={`inline-block px-2 py-1 rounded-full text-xs font-semibold mt-1 ${
@@ -1272,7 +1289,7 @@ export default function Dashboard({
                                         {transaction.description}
                                       </p>
                                       <p className="text-sm text-gray-500 mt-1">
-                                        {transaction.source} • {new Date(transaction.created_at).toLocaleDateString()}
+                                        {transaction.source} • {formatDate(transaction.created_at)}
                                       </p>
                                       <div className="mt-2">
                                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${transaction.status === "completed" ? "bg-green-100 text-green-800" : transaction.status === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
@@ -1485,9 +1502,7 @@ export default function Dashboard({
                                   </p>
                                   <p className="text-xs text-gray-400 mt-1">
                                     Submitted:{" "}
-                                    {new Date(
-                                      ticket.created_at
-                                    ).toLocaleDateString()}
+                                    {formatDate(ticket.created_at)}
                                   </p>
                                 </div>
                                 <div className="flex flex-col items-end space-y-2">
@@ -1542,7 +1557,7 @@ export default function Dashboard({
             <div className="mb-2 flex-shrink-0">
 
               <p className="text-xs text-gray-400 ">
-                Submitted: {new Date(selectedTicket.created_at).toLocaleDateString()}
+                Submitted: {formatDate(selectedTicket.created_at)}
               </p>
             </div>
             <div className="flex-1 overflow-y-auto mb-4">
@@ -1558,7 +1573,7 @@ export default function Dashboard({
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">{response.message}</p>
                       <span className="block text-xs mt-1 opacity-70">
-                        {new Date(response.created_at).toLocaleString()}
+                        {formatDateTime(response.created_at)}
                       </span>
                     </div>
                   ))}

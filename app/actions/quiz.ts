@@ -3,7 +3,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 
 export async function getQuizQuestions() {
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     try {
         const [easyQuestions, mediumQuestions, hardQuestions] = await Promise.all([

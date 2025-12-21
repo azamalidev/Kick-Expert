@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseClient';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createServerClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
     const { competitionId, credits } = await req.json();
 
     // Initialize Supabase client with auth context
-    const supabase = createServerComponentClient({ cookies });
-    
+    const supabase = await createServerClient();
+
     // Get current session (single call)
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -48,9 +47,9 @@ export async function POST(req: NextRequest) {
     const requiredCredits = competition.credit_cost;
 
     // Calculate total available credits
-    const totalCredits = (userCredits.purchased_credits || 0) + 
-                        (userCredits.winnings_credits || 0) + 
-                        (userCredits.referral_credits || 0);
+    const totalCredits = (userCredits.purchased_credits || 0) +
+      (userCredits.winnings_credits || 0) +
+      (userCredits.referral_credits || 0);
 
     if (totalCredits < requiredCredits) {
       return NextResponse.json(
@@ -143,7 +142,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       message: 'Successfully registered for competition',
       deductedFrom: creditsUsed,
