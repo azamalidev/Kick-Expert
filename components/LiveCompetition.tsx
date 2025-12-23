@@ -1,19 +1,14 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 import { Trophy, CheckCircle, Star, Calendar, Clock, Award, Users, X, CreditCard, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { Shield, User, Wifi, Clock as ClockIcon, Trophy as PrizeTrophy, LifeBuoy, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import Image from 'next/image';
 
 // Declare PayPal types
 declare global {
@@ -329,11 +324,14 @@ const AlreadyRegisteredModal: React.FC<AlreadyRegisteredModalProps> = ({
             <div className="bg-gradient-to-br from-lime-500 via-lime-600 to-green-600 p-6 text-white relative flex-shrink-0">
               <div className="flex items-center justify-center mb-2">
                 {competitionImagePath ? (
-                  <img
-                    src={competitionImagePath}
-                    alt={`${competitionName} trophy`}
-                    className="h-12 w-12 object-contain"
-                  />
+                  <div className="relative h-12 w-12">
+                    <Image
+                      src={competitionImagePath}
+                      alt={`${competitionName} trophy`}
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
                 ) : (
                   <div className=" bg-opacity-20 rounded-full p-3">
                     <CheckCircle className="h-8 w-8 text-white" />
@@ -504,11 +502,14 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
             <div className="bg-gradient-to-br from-lime-500 via-lime-600 to-green-600 p-6 text-white relative flex-shrink-0">
               <div className="flex items-center justify-center mb-2">
                 {competitionImagePath ? (
-                  <img
-                    src={competitionImagePath}
-                    alt={`${competition.name} trophy`}
-                    className="h-12 w-12 object-contain"
-                  />
+                  <div className="relative h-12 w-12">
+                    <Image
+                      src={competitionImagePath}
+                      alt={`${competition.name} trophy`}
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
                 ) : (
                   <Trophy className="h-8 w-8 text-yellow-300" />
                 )}
@@ -776,14 +777,32 @@ const LiveCompetition = () => {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setIsLoggedIn(!!user);
-        setUser(user);
-        return user;
+        // Check session from local storage first for immediate feedback
+        const { data: { session } } = await supabase.auth.getSession();
+        let currentUser = session?.user || null;
+
+        if (currentUser) {
+          setIsLoggedIn(true);
+          setUser(currentUser);
+        }
+
+        // Verify with server in background to ensure token validity
+        // We don't await this to prevent blocking the UI if it's slow
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            setIsLoggedIn(true);
+            setUser(user);
+          } else if (!currentUser) {
+            // Only convert to logged out if we didn't have a session user either
+            setIsLoggedIn(false);
+            setUser(null);
+          }
+        });
+
+        return currentUser;
       } catch (error) {
         console.error('Error checking user:', error);
-        setIsLoggedIn(false);
-        setUser(null);
+        // Don't reset state here if we have a session user
         return null;
       }
     };
@@ -837,7 +856,8 @@ const LiveCompetition = () => {
       try {
         const counts: { [key: string]: number } = {};
 
-        for (const comp of comps) {
+        // Run fetches in parallel to reduce loading time
+        await Promise.all(comps.map(async (comp) => {
           const { count, error } = await supabase
             .from('competition_registrations')
             .select('*', { count: 'exact', head: true })
@@ -849,7 +869,7 @@ const LiveCompetition = () => {
           } else {
             counts[comp.id] = 0;
           }
-        }
+        }));
 
         setPlayerCounts(counts);
       } catch (error) {
@@ -912,7 +932,7 @@ const LiveCompetition = () => {
 
           // Update player counts
           const counts: { [key: string]: number } = {};
-          for (const comp of data) {
+          await Promise.all(data.map(async (comp) => {
             const { count } = await supabase
               .from('competition_registrations')
               .select('*', { count: 'exact', head: true })
@@ -920,7 +940,7 @@ const LiveCompetition = () => {
               .eq('status', 'confirmed');
 
             counts[comp.id] = count || 0;
-          }
+          }));
           setPlayerCounts(counts);
         }
 
@@ -1001,7 +1021,7 @@ const LiveCompetition = () => {
     try {
       console.log('Attempting to register for competition:', competitionId);
       setIsRegistering(true);
-      
+
       // Client-side check for credits to provide immediate feedback
       const { data: userCredits, error: creditError } = await supabase
         .from('user_credits')
@@ -1021,11 +1041,11 @@ const LiveCompetition = () => {
       if (totalCredits < creditCost) {
         const creditsNeeded = creditCost - totalCredits;
         console.log(`Insufficient credits: has ${totalCredits}, needs ${creditCost}, missing ${creditsNeeded}`);
-        
+
         toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting...`);
         setIsRegistering(false);
         setModalOpen(false);
-        
+
         // Immediate redirect without setTimeout to avoid stuck state
         router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
         return;
@@ -1056,7 +1076,7 @@ const LiveCompetition = () => {
           toast.error(`Insufficient credits. You need ${creditsNeeded} more credits to join. Redirecting...`);
           setIsRegistering(false);
           setModalOpen(false);
-          
+
           // Immediate redirect to prevent stuck state
           router.push(`/credits?required=${creditsNeeded}&competition=${competitionId}`);
           return;
@@ -1162,13 +1182,7 @@ const LiveCompetition = () => {
     setModalOpen(false);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-lime-600"></div>
-      </div>
-    );
-  }
+
 
   // Helper function to get entry fee based on competition name
   const getEntryFee = (name: string) => {
@@ -1372,7 +1386,7 @@ const LiveCompetition = () => {
   };
 
   // Transform competitions data for display
-  const competitionData = competitions
+  const competitionData = React.useMemo(() => competitions
     .map((comp, index) => ({
       id: comp.id,
       name: comp.name,
@@ -1408,10 +1422,25 @@ const LiveCompetition = () => {
         'Elite League': 3
       };
       return (order[a.name] || 999) - (order[b.name] || 999);
-    });
+    }), [competitions, registrations, playerCounts]);
+
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Time helpers
   const secondsUntil = (date: Date) => Math.max(0, Math.floor((date.getTime() - new Date().getTime()) / 1000));
+
+  if (!mounted || isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-lime-600"></div>
+      </div>
+    );
+  }
 
   const isRegistrationClosed = (comp: any) => {
     if (!comp.startTime) return false;
@@ -1508,11 +1537,14 @@ const LiveCompetition = () => {
 
                 {/* Trophy Icon at Top - use designer images from public/ipublic/images */}
                 <div className="flex flex-col items-center mt-6 mb-4">
-                  <img
-                    src={getLeagueImage(comp.name)}
-                    alt={`${comp.name} trophy`}
-                    className="h-12 w-12 mb-3 object-contain"
-                  />
+                  <div className="relative h-12 w-12 mb-3">
+                    <Image
+                      src={getLeagueImage(comp.name)}
+                      alt={`${comp.name} trophy`}
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
                   <h2 className="text-xl font-extrabold text-gray-800">{comp.name}</h2>
                   <p className="text-sm text-gray-600">
                     {comp.name === 'Starter League' ? 'Perfect for beginners' :
