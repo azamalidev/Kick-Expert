@@ -29,20 +29,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ questions: [] });
     }
 
-    // Fetch from main `questions` table to ensure we have enough questions for proper distribution
-    // We need sufficient questions in each difficulty to maintain 40-40-20 ratio
+    // Fetch from competition_questions table (NOT questions table!)
+    // This table has 2400+ questions specifically for competitions
     const { data: qsData, error: qsErr } = await supabase
-      .from('questions')
+      .from('competition_questions')
       .select('*')
       .eq('status', true); // Only fetch active questions
 
     if (qsErr) {
-      console.error('Error fetching questions table:', qsErr);
-      return NextResponse.json({ questions: [] });
+      console.error('❌ Error fetching competition_questions table:', qsErr);
+      return NextResponse.json({ 
+        questions: [], 
+        error: 'Failed to fetch questions from database',
+        details: qsErr.message 
+      });
     }
 
     let allQuestions = (qsData || []) as any[];
-    console.log(`🔍 questions: found ${allQuestions.length} total rows`);
+    console.log(`🔍 competition_questions: found ${allQuestions.length} total rows`);
+
+    // If no questions found, return error with details
+    if (allQuestions.length === 0) {
+      console.error('❌ No active questions found in competition_questions table!');
+      return NextResponse.json({ 
+        questions: [], 
+        error: 'No active questions available in competition_questions table',
+        details: 'Please ensure questions are added and marked as active (status=true)' 
+      });
+    }
 
     // Log difficulty distribution from database
     const difficultyCount = allQuestions.reduce((acc: any, q: any) => {
@@ -140,10 +154,23 @@ export async function POST(req: NextRequest) {
       Hard: finalQs.filter(q => q.difficulty === 'Hard').length
     });
 
-    // Verify we got the correct distribution
-    if (finalQs.length !== targetQuestionCount) {
-      console.error(`⚠️ Warning: Expected ${targetQuestionCount} questions but got ${finalQs.length}`);
-      console.error('Not enough questions in database for proper distribution!');
+    // If we don't have enough questions, fill with available questions
+    if (finalQs.length < targetQuestionCount) {
+      console.warn(`⚠️ Warning: Expected ${targetQuestionCount} questions but got ${finalQs.length}`);
+      console.warn('Filling remaining slots with available questions...');
+      
+      // Calculate how many more we need
+      const needed = targetQuestionCount - finalQs.length;
+      
+      // Get all unused questions
+      const usedIds = new Set(finalQs.map(q => q.id));
+      const unusedQuestions = allQuestions.filter(q => !usedIds.has(q.id));
+      
+      // Shuffle and take what we need
+      const additionalQuestions = seededShuffle(unusedQuestions, seed + '-additional').slice(0, needed);
+      finalQs = [...finalQs, ...additionalQuestions];
+      
+      console.log(`✅ Added ${additionalQuestions.length} additional questions to reach ${finalQs.length} total`);
     }
 
     // Shuffle the final selection so difficulties are mixed (using same seed for all users)
@@ -166,14 +193,14 @@ export async function POST(req: NextRequest) {
       const shuffledChoices = seededShuffle(q.choices || [], choiceSeed);
 
       return {
-        competition_question_id: q.id, // uuid from competition_questions
-        competition_id: competitionId,
-        question_id: null, // not from questions table
-        source_question_id: q.source_question_id,
+        competition_question_id: q.id, // uuid from competition_questions table
+        competition_id: q.competition_id || competitionId,
+        question_id: null, // not used anymore
+        source_question_id: q.source_question_id || null,
         question_text: q.question_text,
-        choices: shuffledChoices, // NOW SHUFFLED!
+        choices: shuffledChoices, // Shuffled choices
         correct_answer: q.correct_answer,
-        explanation: q.explanation,
+        explanation: q.explanation || '',
         difficulty: q.difficulty,
         category: q.category,
         question_order: idx + 1,

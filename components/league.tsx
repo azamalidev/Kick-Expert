@@ -1,19 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Award, Star, Clock, Users, ChevronRight, Home, RotateCcw, Shield } from 'lucide-react';
 import { handleFingerprintCheck, logCheatAction } from '@/utils/fingerprint';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 interface Question {
   id: number | string;
@@ -30,6 +24,7 @@ interface AnswerRecord {
   question_id: number | string;
   is_correct: boolean;
   difficulty: string;
+  selected_answer?: string | null; // Store user's selected answer
 }
 
 interface Player {
@@ -61,7 +56,7 @@ interface CompetitionDetails {
 export default function LeaguePage() {
   const [countdown, setCountdown] = useState(120);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [phase, setPhase] = useState<'waiting' | 'quiz' | 'results' | 'leaderboard'>('waiting');
+  const [phase, setPhase] = useState<'waiting' | 'quiz' | 'results' | 'leaderboard' | 'detailed-results'>('waiting');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
@@ -93,6 +88,7 @@ export default function LeaguePage() {
   const [showLateJoinerWarning, setShowLateJoinerWarning] = useState(false);
   const [showQuizLateJoinerWarning, setShowQuizLateJoinerWarning] = useState(false);
   const [competitionTimeWarning, setCompetitionTimeWarning] = useState<string | null>(null);
+  const [resultsLoading, setResultsLoading] = useState(false); // Loading state for results calculation
   const nextCalled = useRef(false);
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
@@ -105,11 +101,18 @@ export default function LeaguePage() {
   // Fetch competition detail
   useEffect(() => {
     const fetchCompetitionDetails = async () => {
-      if (!competitionId) return;
+      if (!competitionId) {
+        console.error('❌ No competition ID provided');
+        return;
+      }
+
+      console.log('🔍 Fetching competition details for ID:', competitionId);
 
       try {
         // First, check if user is authenticated
         const authResponse = await supabase.auth.getUser();
+        console.log('👤 Auth check:', authResponse.data.user ? 'Logged in' : 'Not logged in');
+        
         if (authResponse.data.user) {
           // 🔒 STEP 2: Browser Fingerprint Check
           console.log('🔍 Checking device fingerprint...');
@@ -267,16 +270,9 @@ export default function LeaguePage() {
   useEffect(() => {
     if (phase === 'waiting' && competitionId) {
       const countdownInterval = setInterval(() => {
-        // Check if competition has ended before continuing countdown
-        if (hasCompetitionEnded()) {
-          clearInterval(countdownInterval);
-          setError('This competition has ended. You cannot participate anymore.');
-          setTimeout(() => {
-            router.push('/livecompetition');
-          }, 3000);
-          return;
-        }
-
+        // Don't check if competition has ended during waiting phase
+        // Only check after competition has started
+        
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownInterval);
@@ -317,8 +313,9 @@ export default function LeaguePage() {
       try {
         setLoading(true);
 
-        // Check if competition has ended before starting quiz
-        if (hasCompetitionEnded()) {
+        // Only check if competition has ended if it's already running
+        // Don't block quiz initialization if competition just started
+        if (competitionDetails?.status === 'completed' || competitionDetails?.status === 'cancelled') {
           setError('This competition has ended. You cannot participate anymore.');
           setLoading(false);
           setTimeout(() => {
@@ -341,32 +338,90 @@ export default function LeaguePage() {
         setMissedQuestions(0); // Not tracking missed questions - global sync handles this
 
         // Get the authenticated user
+        console.log('🔐 Checking user authentication...');
         const authResponse = await supabase.auth.getUser();
-        if (!authResponse.data.user) {
-          throw new Error('User not authenticated');
+        console.log('👤 Auth response:', {
+          hasUser: !!authResponse.data.user,
+          userId: authResponse.data.user?.id,
+          error: authResponse.error
+        });
+
+        if (authResponse.error) {
+          console.error('❌ Auth error:', authResponse.error);
+          setError('Authentication error. Please log in again.');
+          setLoading(false);
+          setTimeout(() => {
+            router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
+          }, 2000);
+          return;
         }
 
+        if (!authResponse.data.user) {
+          console.error('❌ No user found in auth response');
+          setError('You must be logged in to participate. Redirecting to login...');
+          setLoading(false);
+          setTimeout(() => {
+            router.push('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search));
+          }, 2000);
+          return;
+        }
+
+        console.log('✅ User authenticated:', authResponse.data.user.id);
+
         // Call the local route which merges competition_questions with questions
+        console.log('🚀 Fetching questions for competition:', competitionId);
+        
         const routeRes = await fetch('/api/competition-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ competitionId }),
         });
 
+        console.log('📡 API Response Status:', routeRes.status, routeRes.statusText);
+
+        if (!routeRes.ok) {
+          console.error('❌ Failed to fetch questions - HTTP', routeRes.status);
+          const errorText = await routeRes.text();
+          console.error('❌ Error response:', errorText);
+          setError(`Failed to load questions (HTTP ${routeRes.status}). Please try again.`);
+          setLoading(false);
+          return;
+        }
+
         const routeJson = await routeRes.json();
+        console.log('📦 Full API Response:', routeJson);
+        
+        // Check if API returned an error
+        if (routeJson.error) {
+          console.error('❌ API returned error:', routeJson.error);
+          console.error('❌ Error details:', routeJson.details);
+          setError(routeJson.error || 'Failed to load questions');
+          setLoading(false);
+          return;
+        }
+
         const questionsData = routeJson?.questions ?? [];
 
         console.log('🌐 Received from API:', questionsData.length, 'questions');
-        console.log('📊 Difficulty breakdown:',
-          questionsData.reduce((acc: any, q: any) => {
-            const d = q.difficulty || 'unknown';
-            acc[d] = (acc[d] || 0) + 1;
-            return acc;
-          }, {})
-        );
+        
+        if (questionsData.length > 0) {
+          console.log('📊 First question sample:', questionsData[0]);
+          console.log('📊 Difficulty breakdown:',
+            questionsData.reduce((acc: any, q: any) => {
+              const d = q.difficulty || 'unknown';
+              acc[d] = (acc[d] || 0) + 1;
+              return acc;
+            }, {})
+          );
+        }
 
         if (!questionsData || questionsData.length === 0) {
-          setError('No questions are configured for this competition.');
+          console.error('❌ No questions returned from API');
+          console.error('❌ This usually means:');
+          console.error('   1. No questions in database with status=true');
+          console.error('   2. Database connection issue');
+          console.error('   3. Questions table is empty');
+          setError('No questions are configured for this competition. Please check database.');
           setLoading(false);
           return;
         }
@@ -533,7 +588,13 @@ export default function LeaguePage() {
         (window as any).__currentCompetitionRegistrationId = registrationId;
         setLoading(false);
       } catch (err) {
-        setError('Failed to load quiz');
+        console.error('❌❌❌ CRITICAL ERROR in initializeQuiz:', err);
+        console.error('❌ Error details:', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : 'No stack trace',
+          error: err
+        });
+        setError(`Failed to load quiz: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setLoading(false);
       }
     };
@@ -624,8 +685,18 @@ export default function LeaguePage() {
 
         // Check if competition has ended
         if (hasCompetitionEnded()) {
-          console.log('Competition ended - timer expired');
-          setPhase('results');
+          console.log('Competition ended - timer expired, completing quiz...');
+          if (sessionId && !quizCompleted) {
+            completeQuiz().then(() => {
+              setQuizCompleted(true);
+              setPhase('results');
+            }).catch(err => {
+              console.error('Error completing quiz:', err);
+              setPhase('results'); // Still show results even if error
+            });
+          } else {
+            setPhase('results');
+          }
           return;
         }
 
@@ -646,6 +717,8 @@ export default function LeaguePage() {
         }
 
         // ALWAYS move to next question when timer hits 0
+        console.log(`⏰ Timer expired - Question ${currentQuestionIndex + 1}/${questions.length}`);
+        console.log(`   Is last question: ${currentQuestionIndex === questions.length - 1}`);
         handleNextQuestion();
       }
     }, 100);
@@ -664,22 +737,27 @@ export default function LeaguePage() {
   // The previous useEffect that called handleNextQuestion after 2.5s is deleted.
 
 
-  // Confetti effect on quiz completion
+  // Confetti effect on results phase (only when not loading)
   useEffect(() => {
-    if (quizCompleted && score >= 1) {
-      confetti({
-        particleCount: 150,
-        spread: 90,
-        origin: { y: 0.6 },
-        colors: ['#84cc16', '#22c55e', '#15803d'],
-      });
+    if (phase === 'results' && !resultsLoading && score >= 1) {
+      // Delay confetti slightly to ensure modal is rendered
+      const timer = setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 90,
+          origin: { y: 0.6 },
+          colors: ['#84cc16', '#22c55e', '#15803d'],
+        });
+      }, 300); // 300ms delay to ensure modal is visible
+      
+      return () => clearTimeout(timer);
     }
-  }, [quizCompleted, score]);
+  }, [phase, score, resultsLoading]);
 
-  // Generate leaderboard when entering results phase
+  // Generate leaderboard when entering results or leaderboard phase
   // Fetch leaderboard periodically in leaderboard phase
   useEffect(() => {
-    if (phase === 'leaderboard' || (phase !== 'quiz' && hasCompetitionEnded())) {
+    if (phase === 'leaderboard' || phase === 'results' || (phase !== 'quiz' && hasCompetitionEnded())) {
       const fetchLeaderboard = async () => {
         const authData = await supabase.auth.getUser();
         const userId = authData.data.user?.id;
@@ -687,30 +765,91 @@ export default function LeaguePage() {
         try {
           console.log('🔍 Fetching leaderboard for competition:', competitionId);
 
-          // Get completed sessions directly from competition_sessions table
+          // PRIORITY 1: Try to fetch from competition_results table (most reliable)
+          const { data: results, error: resultsError } = await supabase
+            .from('competition_results')
+            .select('user_id, score, rank, prize_amount')
+            .eq('competition_id', competitionId)
+            .order('rank', { ascending: true });
+
+          console.log('📊 Competition results query:', { 
+            results, 
+            error: resultsError,
+            resultCount: results?.length || 0 
+          });
+
+          // If competition_results has data, use it (most accurate)
+          if (results && results.length > 0) {
+            console.log('✅ Using competition_results table (', results.length, 'entries)');
+
+            const userIds = Array.from(new Set(results.map((r: any) => r.user_id).filter(Boolean)));
+
+            // Get usernames for the leaderboard entries
+            let profilesMap: Record<string, any> = {};
+            if (userIds.length > 0) {
+              const { data: profilesData } = await supabase
+                .from('profiles')
+                .select('user_id, username')
+                .in('user_id', userIds as any[]);
+
+              (profilesData || []).forEach((p: any) => {
+                profilesMap[p.user_id] = p;
+              });
+            }
+
+            // Map results to leaderboard entries
+            const leaderboardData: LeaderboardEntry[] = results.map((result: any) => {
+              return {
+                id: result.rank,
+                name: (profilesMap[result.user_id] && profilesMap[result.user_id].username) || `User ${result.user_id.substring(0, 8)}`,
+                score: result.score || 0,
+                rank: result.rank,
+                prizeAmount: result.prize_amount || 0,
+                isUser: result.user_id === userId
+              };
+            });
+
+            setLeaderboard(leaderboardData);
+
+            // Set user's rank if they participated
+            if (userId) {
+              const userEntry = leaderboardData.find(entry => entry.isUser);
+              if (userEntry) {
+                setUserRank(userEntry.rank);
+                console.log('👤 User rank set to:', userEntry.rank);
+              }
+            }
+
+            // Update last updated timestamp
+            setLeaderboardLastUpdated(new Date());
+            console.log('✅ Leaderboard updated from competition_results with', leaderboardData.length, 'entries');
+            return; // Exit early - we have the data
+          }
+
+          // FALLBACK: Use competition_sessions if competition_results is empty
+          console.log('⚠️ No data in competition_results, falling back to competition_sessions');
+
           const { data: sessions, error: leaderboardError } = await supabase
             .from('competition_sessions')
             .select('user_id, correct_answers, end_time')
             .eq('competition_id', competitionId)
             .not('end_time', 'is', null);
 
-          console.log('📊 Sessions query result:', { sessions, error: leaderboardError });
+          console.log('📊 Sessions query result:', { 
+            sessions, 
+            error: leaderboardError,
+            sessionCount: sessions?.length || 0 
+          });
 
           if (leaderboardError) {
             console.error('❌ Sessions fetch error:', leaderboardError);
             throw leaderboardError;
           }
 
-          if (!sessions || !Array.isArray(sessions)) {
-            console.warn('⚠️ No sessions found or invalid data structure');
-
-            // If competition has ended but no sessions yet, show empty state
-            if (hasCompetitionEnded()) {
-              setLeaderboard([]);
-              console.log('Competition ended but no participants yet');
-            } else {
-              setLeaderboard([]);
-            }
+          if (!sessions || sessions.length === 0) {
+            console.warn('⚠️ No completed sessions found');
+            console.log('💡 Tip: Check if completeQuiz() is being called when quiz ends');
+            setLeaderboard([]);
             return;
           }
 
@@ -764,7 +903,7 @@ export default function LeaguePage() {
 
           // Update last updated timestamp
           setLeaderboardLastUpdated(new Date());
-          console.log('✅ Leaderboard updated with', leaderboardData.length, 'entries');
+          console.log('✅ Leaderboard updated from sessions with', leaderboardData.length, 'entries');
 
         } catch (error) {
           console.error('Failed to fetch leaderboard:', error);
@@ -775,11 +914,11 @@ export default function LeaguePage() {
       // Fetch immediately
       fetchLeaderboard();
 
-      // Auto-refresh leaderboard every 30 seconds if competition hasn't ended
+      // Auto-refresh leaderboard every 10 seconds in leaderboard phase
       let refreshInterval: NodeJS.Timeout | null = null;
-      if (!hasCompetitionEnded()) {
-        refreshInterval = setInterval(fetchLeaderboard, 30000); // Refresh every 30 seconds
-        console.log('🔄 Started leaderboard auto-refresh (30s intervals)');
+      if (phase === 'leaderboard') {
+        refreshInterval = setInterval(fetchLeaderboard, 10000); // Refresh every 10 seconds
+        console.log('🔄 Started leaderboard auto-refresh (10s intervals)');
       }
 
       return () => {
@@ -818,11 +957,22 @@ export default function LeaguePage() {
             });
         }
 
-        // If currently in quiz or waiting phase, move to leaderboard immediately
-        // DO NOT auto-redirect from 'results' - user must click button
+        // If currently in quiz or waiting phase, move to results first
+        // DO NOT auto-redirect from 'results' - user must click button to see leaderboard
         if (phase === 'quiz' || phase === 'waiting') {
-          console.log(`📊 Moving from ${phase} to leaderboard (competition time expired)`);
-          setPhase('leaderboard');
+          console.log(`📊 Moving from ${phase} to results (competition time expired)`);
+          // Complete quiz if in quiz phase
+          if (phase === 'quiz' && sessionId && !quizCompleted) {
+            completeQuiz().then(() => {
+              setQuizCompleted(true);
+              setPhase('results');
+            }).catch(err => {
+              console.error('Error completing quiz:', err);
+              setPhase('results'); // Still show results even if error
+            });
+          } else {
+            setPhase('results');
+          }
         }
       }
     };
@@ -843,8 +993,8 @@ export default function LeaguePage() {
         const competitionEnded = hasCompetitionEnded();
 
         if (competitionEnded) {
-          // Competition time has expired - force move to leaderboard
-          console.log('Competition end time reached - moving to leaderboard phase');
+          // Competition time has expired - force move to results (not leaderboard)
+          console.log('Competition end time reached - moving to results phase');
 
           // Auto-submit current question as "No Answer" if still answering
           if (!showResult && questions[currentQuestionIndex] && !quizCompleted) {
@@ -860,23 +1010,19 @@ export default function LeaguePage() {
             const answerRecord = {
               question_id: currentQuestion.id,
               is_correct: false,
-              difficulty: currentQuestion.difficulty
+              difficulty: currentQuestion.difficulty,
+              selected_answer: null // No answer selected
             };
             setAnswers(prev => [...prev, answerRecord]);
 
             // Save to database as unanswered
             supabase.auth.getUser().then(({ data }) => {
               if (data.user && sessionId) {
-                let fkQuestionId: number | null = null;
                 let competitionQuestionId: string | null = null;
 
-                // Use id for question_id (numeric ID from questions table)
+                // Use id as competition_question_id (UUID from competition_questions table)
                 if (currentQuestion.id !== null && currentQuestion.id !== undefined) {
-                  fkQuestionId = currentQuestion.id as number;
-                }
-
-                if ((currentQuestion as any).competition_question_id) {
-                  competitionQuestionId = (currentQuestion as any).competition_question_id;
+                  competitionQuestionId = String(currentQuestion.id);
                 }
 
                 const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
@@ -885,8 +1031,8 @@ export default function LeaguePage() {
                   competition_id: competitionId,
                   session_id: sessionId,
                   user_id: data.user.id,
-                  question_id: fkQuestionId,
-                  competition_question_id: competitionQuestionId,
+                  question_id: null, // NULL for competition questions
+                  competition_question_id: competitionQuestionId, // UUID from competition_questions
                   registration_id: registrationId,
                   selected_answer: null, // No answer selected
                   is_correct: false, // Marked as incorrect
@@ -907,7 +1053,18 @@ export default function LeaguePage() {
             });
           }
 
-          setPhase('leaderboard'); // Go directly to leaderboard
+          // Complete quiz and move to results (not leaderboard)
+          if (sessionId && !quizCompleted) {
+            completeQuiz().then(() => {
+              setQuizCompleted(true);
+              setPhase('results');
+            }).catch(err => {
+              console.error('Error completing quiz:', err);
+              setPhase('results'); // Still show results even if error
+            });
+          } else {
+            setPhase('results');
+          }
         } else {
           // Check if competition is nearing end (within 2 minutes)
           const endTimeInfo = getCompetitionEndTime();
@@ -1034,8 +1191,18 @@ export default function LeaguePage() {
 
         // Check if competition has ended before saving answers during sync
         if (hasCompetitionEnded()) {
-          console.log('Competition ended during sync - moving to results without saving answers');
-          setPhase('results');
+          console.log('Competition ended during sync - completing quiz and moving to results');
+          if (sessionId && !quizCompleted) {
+            completeQuiz().then(() => {
+              setQuizCompleted(true);
+              setPhase('results');
+            }).catch(err => {
+              console.error('Error completing quiz during sync:', err);
+              setPhase('results'); // Still show results even if error
+            });
+          } else {
+            setPhase('results');
+          }
           return;
         }
 
@@ -1054,19 +1221,19 @@ export default function LeaguePage() {
           const answerRecord = {
             question_id: currentQuestion.id,
             is_correct: isCorrect,
-            difficulty: currentQuestion.difficulty
+            difficulty: currentQuestion.difficulty,
+            selected_answer: userAnswer // Store user's selection (can be null)
           };
           setAnswers(prev => [...prev, answerRecord]);
 
           // Save to database
           supabase.auth.getUser().then(({ data }) => {
             if (data.user && sessionId) {
-              let fkQuestionId: string | null = null;
               let competitionQuestionId: string | null = null;
 
-              // Use id for question_id (numeric ID from questions table)
+              // Use id as competition_question_id (UUID from competition_questions table)
               if (currentQuestion.id !== null && currentQuestion.id !== undefined) {
-                fkQuestionId = String(currentQuestion.id);
+                competitionQuestionId = String(currentQuestion.id);
               }
 
               const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
@@ -1075,8 +1242,8 @@ export default function LeaguePage() {
                 competition_id: competitionId,
                 session_id: sessionId,
                 user_id: data.user.id,
-                question_id: fkQuestionId,
-                competition_question_id: competitionQuestionId,
+                question_id: null, // NULL for competition questions
+                competition_question_id: competitionQuestionId, // UUID from competition_questions
                 registration_id: registrationId,
                 selected_answer: userAnswer, // Can be null if no answer
                 is_correct: isCorrect, // Will be false if null
@@ -1149,7 +1316,14 @@ export default function LeaguePage() {
 
   // Handle submitting answer when user clicks "Submit Answer" button
   const handleSubmitAnswer = async () => {
-    if (!selectedChoice || showResult) return;
+    console.log('🔘 Submit Answer clicked!', { selectedChoice, showResult });
+    
+    if (!selectedChoice || showResult) {
+      console.log('❌ Submit blocked:', { selectedChoice, showResult });
+      return;
+    }
+
+    console.log('✅ Proceeding with answer submission...');
 
     // Check if competition has ended
     if (hasCompetitionEnded()) {
@@ -1234,104 +1408,104 @@ export default function LeaguePage() {
       });
     }
 
-    // Save answer record
+    // Save answer record with selected answer
     const answerRecord = {
       question_id: currentQuestion.id,
       is_correct: isCorrect,
-      difficulty: currentQuestion.difficulty
+      difficulty: currentQuestion.difficulty,
+      selected_answer: selectedChoice // Store user's selection
     };
     setAnswers((prev) => [...prev, answerRecord]);
 
-    // Save to database immediately
+    // Show result immediately for better UX
+    setShowResult(true);
+
+    // Save to database asynchronously (don't wait for it)
+    const competitionQuestionId = String(currentQuestion.id);
+    const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
+
+    // Get userId from existing auth state (cached, no API call)
+    const sessionData = await supabase.auth.getSession();
+    const userId = sessionData.data.session?.user?.id;
+
+    if (!userId) {
+      console.error('No user ID found');
+      return;
+    }
+
+    const payload: any = {
+      competition_id: competitionId,
+      session_id: currentSessionId,
+      user_id: userId,
+      question_id: null,
+      competition_question_id: competitionQuestionId,
+      registration_id: registrationId,
+      selected_answer: selectedChoice,
+      is_correct: isCorrect,
+      submitted_at: new Date().toISOString(),
+    };
+
+    console.log('💾 Saving answer immediately:', {
+      session_id: currentSessionId,
+      competition_question_id: competitionQuestionId,
+      selected_answer: selectedChoice,
+      is_correct: isCorrect
+    });
+
+    // Save answer to database - CRITICAL operation, must succeed
     try {
-      const authData = await supabase.auth.getUser();
-      const userId = authData.data.user?.id;
-
-      // Determine FK fields
-      let fkQuestionId: string | null = null;
-      let competitionQuestionId: string | null = null;
-
-      // Use id for question_id (numeric ID from questions table)
-      if (currentQuestion.id !== null && currentQuestion.id !== undefined) {
-        fkQuestionId = String(currentQuestion.id);
-      }
-
-      const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
-
-      const payload: any = {
-        competition_id: competitionId,
-        session_id: currentSessionId, // ✅ USE LOCAL VARIABLE, NOT STATE
-        user_id: userId,
-        question_id: fkQuestionId,
-        competition_question_id: competitionQuestionId,
-        registration_id: registrationId,
-        selected_answer: selectedChoice,
-        is_correct: isCorrect,
-        submitted_at: new Date().toISOString(),
-      };
-
-      console.log('💾 Saving answer immediately:', {
-        session_id: currentSessionId,
-        question_id: fkQuestionId,
-        competition_question_id: competitionQuestionId,
-        selected_answer: selectedChoice,
-        is_correct: isCorrect
-      });
-
-      const { error: saveError } = await supabase.from('competition_answers').insert(payload);
+      const { data: savedAnswer, error: saveError } = await supabase
+        .from('competition_answers')
+        .insert(payload)
+        .select()
+        .single();
 
       if (saveError) {
         console.error('❌ Error saving answer:', saveError);
+        console.error('❌ Payload that failed:', payload);
         setError('Failed to save your answer. Please try again.');
+        setShowResult(false); // Hide result if save failed
         return;
       } else {
-        console.log('✅ Answer saved successfully');
+        console.log('✅ Answer saved successfully:', savedAnswer);
       }
-
-      // Track question statistics
-      try {
-        await fetch('/api/track-answer-stats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question_id: fkQuestionId,
-            competition_question_id: null,
-            is_correct: isCorrect,
-            was_skipped: false,
-            response_time_ms: latencyMs > 0 ? latencyMs : null
-          })
-        });
-      } catch (statsErr) {
-        console.error('Failed to track answer stats:', statsErr);
-      }
-
-      // Save speed detection data
-      if (selectedChoice && latencyMs > 0) {
-        try {
-          const { error: speedError } = await supabase
-            .from('competition_speed_detection')
-            .insert({
-              competition_id: competitionId,
-              user_id: userId,
-              latency_ms: latencyMs,
-              detected_at: new Date().toISOString()
-            });
-
-          if (speedError) {
-            console.error('Error saving speed detection:', speedError);
-          }
-        } catch (err) {
-          console.error('Unexpected error in speed detection:', err);
-        }
-      }
-
-      // Show result after successful save
-      setShowResult(true);
-
     } catch (err) {
-      console.error('Unexpected error saving answer:', err);
+      console.error('❌ Unexpected error saving answer:', err);
       setError('Failed to save your answer. Please try again.');
+      setShowResult(false);
+      return;
     }
+
+    // Fire and forget - non-critical background operations
+    Promise.all([
+      // Track question statistics (fire and forget)
+      fetch('/api/track-answer-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_id: null,
+          competition_question_id: competitionQuestionId,
+          is_correct: isCorrect,
+          was_skipped: false,
+          response_time_ms: latencyMs > 0 ? latencyMs : null
+        })
+      }).catch(err => console.error('Failed to track answer stats:', err)),
+      
+      // Save speed detection data (fire and forget)
+      selectedChoice && latencyMs > 0 ? 
+        supabase.from('competition_speed_detection').insert({
+          competition_id: competitionId,
+          user_id: userId,
+          latency_ms: latencyMs,
+          detected_at: new Date().toISOString()
+        }).then(({ error }) => {
+          if (error) console.error('Error saving speed detection:', error);
+        })
+        : Promise.resolve()
+    ]).catch(err => {
+      console.error('Error in background operations:', err);
+      // Don't show error to user - these are non-critical operations
+    });
   };
 
   const handleNextQuestion = async () => {
@@ -1344,8 +1518,12 @@ export default function LeaguePage() {
 
     // Check if competition has ended - prevent submissions after end time
     if (hasCompetitionEnded()) {
-      console.log('Competition ended - preventing submission and moving to results');
+      console.log('Competition ended - preventing submission and completing quiz...');
       setError('Competition has ended. No more submissions are accepted.');
+      if (sessionId && !quizCompleted) {
+        await completeQuiz();
+        setQuizCompleted(true);
+      }
       setPhase('results');
       nextCalled.current = false; // Reset for future use
       return;
@@ -1381,11 +1559,17 @@ export default function LeaguePage() {
       }, 500);
     } else {
       // Last question - complete the quiz
+      console.log('🏁 Last question answered - completing quiz...');
+      
+      // Set loading state immediately to prevent footer from showing
+      setResultsLoading(true);
+      setPhase('results'); // Move to results phase immediately with loading state
+      
       setTimeout(async () => {
+        console.log('🏁 Calling completeQuiz from handleNextQuestion...');
         await completeQuiz();
         setQuizCompleted(true);
         setShowResult(false);
-        setPhase('results');
         nextCalled.current = false; // Reset after completion
       }, 100);
     }
@@ -1432,10 +1616,18 @@ export default function LeaguePage() {
   };
 
   const completeQuiz = async () => {
+    console.log('🏁 completeQuiz called!', { sessionId, answersCount: answers.length });
+    
     if (!sessionId) {
-      console.error("No session ID found");
+      console.error("❌ No session ID found - cannot complete quiz");
+      console.error("💡 This means the session was never created. Check if user answered any questions.");
       return;
     }
+
+    console.log('✅ Session ID exists:', sessionId);
+    
+    // Set loading state
+    setResultsLoading(true);
 
     // Analyze patterns before completing
     const patternAnalysis = analyzeResponsePatterns();
@@ -1492,8 +1684,8 @@ export default function LeaguePage() {
         const xpAwarded = calculateXPAwarded(userRank, correctAnswers);
         const isTrophyWinner = userRank <= prizeConfig.winnerCount;
 
-        // Insert into competition_results table
-        console.log('💾 Inserting competition result:', {
+        // Upsert into competition_results table (prevents duplicate errors)
+        console.log('💾 Upserting competition result:', {
           competition_id: competitionId,
           user_id: userId,
           rank: userRank,
@@ -1503,20 +1695,24 @@ export default function LeaguePage() {
           prize_amount: prizeAmount
         });
 
-        const { data: insertResult, error: insertError } = await supabase.from('competition_results').insert({
-          competition_id: competitionId,
-          user_id: userId,
-          score: correctAnswers,
-          rank: userRank,
-          xp_awarded: xpAwarded,
-          trophy_awarded: isTrophyWinner,
-          prize_amount: prizeAmount
-        });
+        const { data: upsertResult, error: upsertError } = await supabase
+          .from('competition_results')
+          .upsert({
+            competition_id: competitionId,
+            user_id: userId,
+            score: correctAnswers,
+            rank: userRank,
+            xp_awarded: xpAwarded,
+            trophy_awarded: isTrophyWinner,
+            prize_amount: prizeAmount
+          }, {
+            onConflict: 'competition_id,user_id' // Prevent duplicates
+          });
 
-        if (insertError) {
-          console.error('❌ Failed to insert competition result:', insertError);
+        if (upsertError) {
+          console.error('❌ Failed to upsert competition result:', upsertError);
         } else {
-          console.log('✅ Successfully inserted competition result:', insertResult);
+          console.log('✅ Successfully upserted competition result:', upsertResult);
         }
 
         // Insert transaction record if prize won
@@ -1616,10 +1812,9 @@ export default function LeaguePage() {
               final_rank: userRank,
               final_score: correctAnswers,
               total_questions: questions.length,
-              accuracy_percentage: (correctAnswers / questions.length) * 100,
               xp_earned: xpAwarded,
               credits_earned: prizeAmount,
-              completed_at: new Date().toISOString(),
+              // completed_at removed - not in schema
               metadata: {
                 questions_answered: answers.length,
                 total_questions: questions.length,
@@ -1627,7 +1822,8 @@ export default function LeaguePage() {
                 late_joiner: isLateJoiner,
                 missed_questions: missedQuestions,
                 prize_won: prizeAmount > 0,
-                trophy_earned: userRank <= prizeConfig.winnerCount
+                trophy_earned: userRank <= prizeConfig.winnerCount,
+                completed_at: new Date().toISOString() // Store in metadata instead
               }
             });
 
@@ -1689,14 +1885,10 @@ export default function LeaguePage() {
             10: 'Tenth Place'
           };
           const trophyTitle = trophyTitles[userRank] || `Place ${userRank}`;
-          const rankSuffixes: { [key: number]: string } = {
-            1: 'st',
-            2: 'nd',
-            3: 'rd'
-          };
-          const suffix = rankSuffixes[userRank] || 'th';
 
           try {
+            // Try to insert into competition_trophies table
+            // If table doesn't exist or has schema issues, log and continue
             const { error: trophyErr } = await supabase
               .from('competition_trophies')
               .upsert([
@@ -1704,21 +1896,28 @@ export default function LeaguePage() {
                   competition_id: competitionId,
                   user_id: userId,
                   trophy_title: trophyTitle,
-                  trophy_rank: userRank,
+                  rank: userRank, // Use 'rank' field instead of 'trophy_type'
                   earned_at: new Date().toISOString(),
                 }
               ], { onConflict: 'competition_id,user_id' });
 
             if (trophyErr) {
               console.error('Failed to insert/upsert competition_trophy:', trophyErr);
+              console.log('💡 Tip: Check if competition_trophies table exists and has correct schema');
+            } else {
+              console.log('✅ Competition trophy awarded');
             }
           } catch (tErr) {
             console.error('Unexpected error inserting competition_trophy:', tErr);
+            console.log('💡 Continuing without trophy - this is not critical');
           }
         }
       }
     } catch (err) {
       console.error('Failed to finish competition:', err);
+    } finally {
+      // Clear loading state
+      setResultsLoading(false);
     }
   };
 
@@ -1837,6 +2036,18 @@ export default function LeaguePage() {
   const hasCompetitionEnded = (): boolean => {
     if (!competitionDetails) {
       console.log('❌ No competition details available');
+      return false;
+    }
+
+    // First check status - if it's completed or cancelled, it has ended
+    if (competitionDetails.status === 'completed' || competitionDetails.status === 'cancelled') {
+      console.log('✅ Competition status indicates it has ended:', competitionDetails.status);
+      return true;
+    }
+
+    // If status is upcoming or waiting, it hasn't ended
+    if (competitionDetails.status === 'upcoming' || competitionDetails.status === 'waiting') {
+      console.log('⏳ Competition status indicates it hasn\'t started yet:', competitionDetails.status);
       return false;
     }
 
@@ -2244,10 +2455,6 @@ export default function LeaguePage() {
                   {competitionDetails?.name || 'League Competition'}
                 </h1>
                 <div className="flex items-center justify-center sm:justify-end space-x-3 sm:space-x-4">
-                  <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full flex items-center">
-                    <span className="font-bold text-black">{score}</span>
-                    <span className="text-black opacity-80">/{questions.length}</span>
-                  </div>
                   <div className="w-24 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-lime-700 transition-all duration-500"
@@ -2268,9 +2475,7 @@ export default function LeaguePage() {
                       Time Remaining: {Math.ceil(timer)}s
                     </span>
                   </div>
-                  <span className="text-white text-xs font-semibold">
-                    Question {currentQuestionIndex + 1} of {questions.length}
-                  </span>
+                  
                 </div>
                 <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-hidden relative">
                   <div
@@ -2378,23 +2583,17 @@ export default function LeaguePage() {
                         whileHover={!showResult ? { scale: 1.02 } : {}}
                         whileTap={!showResult ? { scale: 0.98 } : {}}
                         onClick={() => handleChoiceSelect(choice)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${showResult && choice === questions[currentQuestionIndex]?.correct_answer
-                          ? 'border-green-500 bg-green-50'
-                          : showResult && selectedChoice === choice
-                            ? 'border-red-500 bg-red-50'
-                            : selectedChoice === choice
-                              ? 'border-lime-400 bg-lime-50'
-                              : 'border-gray-200 hover:border-lime-300 bg-white'
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          selectedChoice === choice
+                            ? 'border-lime-400 bg-lime-50'
+                            : 'border-gray-200 hover:border-lime-300 bg-white'
                           }`}
                         disabled={showResult || quizCompleted}
                       >
                         <div className="flex items-center">
                           <span className="font-medium">{choice}</span>
-                          {showResult && choice === questions[currentQuestionIndex]?.correct_answer && (
-                            <span className="ml-2 text-green-500">✓</span>
-                          )}
-                          {showResult && selectedChoice === choice && selectedChoice !== questions[currentQuestionIndex]?.correct_answer && (
-                            <span className="ml-2 text-red-500">✗</span>
+                          {showResult && selectedChoice === choice && (
+                            <span className="ml-2 text-lime-600">✓ Submitted</span>
                           )}
                         </div>
                       </motion.button>
@@ -2447,13 +2646,20 @@ export default function LeaguePage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.3 }}
             className="text-center py-8 sm:py-12 px-4 sm:px-8"
           >
-
-
-            {/* Personal Stats Section */}
-            <div className="mb-8">
+            {/* Loading State */}
+            {resultsLoading ? (
+              <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-lime-600"></div>
+                <p className="text-xl font-semibold text-gray-700">Calculating your results...</p>
+                <p className="text-sm text-gray-500">Please wait while we process your score</p>
+              </div>
+            ) : (
+              <>
+                {/* Personal Stats Section */}
+                <div className="mb-8">
               <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">
                 Your Performance 🎯
               </h2>
@@ -2589,9 +2795,9 @@ export default function LeaguePage() {
                   className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
                 >
                   <svg className="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
-                  Dashboard & History
+                  Go Home
                 </motion.button>
               </Link>
               <Link href="/livecompetition">
@@ -2601,6 +2807,167 @@ export default function LeaguePage() {
                   className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
                 >
                   Join Another Competition
+                </motion.button>
+              </Link>
+            </div>
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {phase === 'detailed-results' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="p-4 sm:p-8"
+          >
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 text-center flex items-center justify-center gap-2">
+              <svg className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              Detailed Results
+            </h1>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 max-w-4xl mx-auto">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-green-700">{answers.filter(a => a.is_correct).length}</div>
+                <div className="text-sm text-green-600 font-medium">Correct</div>
+              </div>
+              <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-red-700">{answers.filter(a => !a.is_correct).length}</div>
+                <div className="text-sm text-red-600 font-medium">Wrong</div>
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-blue-700">{questions.length}</div>
+                <div className="text-sm text-blue-600 font-medium">Total</div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-4 text-center">
+                <div className="text-3xl font-bold text-purple-700">{Math.round((score / questions.length) * 100)}%</div>
+                <div className="text-sm text-purple-600 font-medium">Accuracy</div>
+              </div>
+            </div>
+
+            {/* Questions List */}
+            <div className="space-y-4 max-w-4xl mx-auto mb-6">
+              {questions.map((question, index) => {
+                const userAnswer = answers[index];
+                const isCorrect = userAnswer?.is_correct || false;
+                
+                return (
+                  <div key={index} className={`border-2 rounded-xl p-4 sm:p-6 ${isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+                    {/* Question Header */}
+                    <div className="flex items-start justify-between mb-3 gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-700">Q{index + 1}.</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${question.difficulty === 'Easy' ? 'bg-green-100 text-green-800' : question.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                          {question.difficulty}
+                        </span>
+                      </div>
+                      <div className={`flex items-center gap-1 font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                        {isCorrect ? (
+                          <>
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Correct
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Wrong
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Question Text */}
+                    <p className="text-gray-800 font-medium mb-4">{question.question_text}</p>
+
+                    {/* Answer Choices */}
+                    <div className="space-y-2">
+                      {question.choices.map((choice, choiceIndex) => {
+                        const isUserAnswer = answers[index] && choice === (answers[index] as any).selected_answer;
+                        const isCorrectAnswer = choice === question.correct_answer;
+                        
+                        return (
+                          <div
+                            key={choiceIndex}
+                            className={`p-3 rounded-lg border-2 ${
+                              isCorrectAnswer
+                                ? 'border-green-500 bg-green-100'
+                                : isUserAnswer
+                                ? 'border-red-500 bg-red-100'
+                                : 'border-gray-200 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={`${isCorrectAnswer || isUserAnswer ? 'font-semibold' : ''}`}>
+                                {choice}
+                              </span>
+                              {isCorrectAnswer && (
+                                <span className="text-green-700 font-bold flex items-center gap-1">
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Correct Answer
+                                </span>
+                              )}
+                              {isUserAnswer && !isCorrectAnswer && (
+                                <span className="text-red-700 font-bold flex items-center gap-1">
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  Your Answer
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Explanation */}
+                    {question.explanation && (
+                      <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded">
+                        <p className="text-sm text-blue-800">
+                          <strong>Explanation:</strong> {question.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPhase('results')}
+                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+              >
+                ← Back to Summary
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPhase('leaderboard')}
+                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+              >
+                View Leaderboard
+              </motion.button>
+              <Link href="/">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+                >
+                  Go Home
                 </motion.button>
               </Link>
             </div>
@@ -2760,16 +3127,17 @@ export default function LeaguePage() {
                   Join Another
                 </motion.button>
               </Link>
-              <Link href="/">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
-                >
-                  <Home size={16} className="mr-2" />
-                  Dashboard
-                </motion.button>
-              </Link>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setPhase('detailed-results')}
+                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg sm:rounded-xl shadow-md transition-all text-sm sm:text-base flex items-center justify-center"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                View Detailed Results
+              </motion.button>
             </div>
           </motion.div>
         )}
