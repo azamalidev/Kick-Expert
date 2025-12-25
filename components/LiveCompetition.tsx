@@ -1470,7 +1470,7 @@ const LiveCompetition = () => {
   }
 
   return (
-    <div className="bg-gray-50 flex flex-col items-center px-4 py-24 pb-12">
+    <div className="bg-gray-50 flex flex-col items-center px-2 sm:px-4 py-24 pb-12">
       {selectedCompetition && (
         <CompetitionModal
           isOpen={modalOpen}
@@ -1511,9 +1511,9 @@ const LiveCompetition = () => {
         </h1>
       </div>
 
-      <div className="flex flex-col  md:flex-row gap-6 mx-auto py-6 px-2  w-full max-w-7xl items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto py-6 px-2 w-full max-w-7xl items-start">
         {competitionData.length === 0 ? (
-          <div className="text-center w-full">
+          <div className="text-center w-full col-span-full">
             <p className="text-gray-600 text-lg">No upcoming competitions available at the moment.</p>
           </div>
         ) : (
@@ -1526,7 +1526,7 @@ const LiveCompetition = () => {
             return (
               <div
                 key={comp.id}
-                className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col"
+                className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col h-full"
                 style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
               >
                 {/* Status Badge */}
@@ -1744,11 +1744,22 @@ const LiveCompetition = () => {
                       // 5 to 2 minutes before start - registration closed, waiting period
                       comp.isRegistered ? (
                         <button
-                          className="w-full mt-2 py-2 bg-orange-500 text-white rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
-                          disabled
+                          onClick={async () => {
+                            // Check if user has already completed this competition
+                            const hasCompleted = await hasCompletedCompetition(comp.id);
+                            if (hasCompleted) {
+                              toast.error('You have already completed this competition!');
+                              return;
+                            }
+
+                            // Redirect to waiting room (league page)
+                            router.push(`/league?competitionId=${comp.id}`);
+                          }}
+                          className="w-full mt-2 py-2 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+                          style={{ backgroundColor: index === 0 ? '#a3e635' : index === 1 ? '#65a30d' : '#3f6212' }}
                         >
                           <Clock className="h-4 w-4" />
-                          Registration Closed
+                          Join Waiting Room
                         </button>
                       ) : (
                         <button className="w-full mt-2 py-2 bg-gray-400 text-white rounded-lg font-semibold cursor-not-allowed" disabled>
@@ -1759,26 +1770,28 @@ const LiveCompetition = () => {
                       // More than 5 minutes before start - registration open
                       comp.isRegistered ? (
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (!isLoggedIn || !user) {
                               toast.error('Please sign up or log in to view your registration.');
                               router.push(`/signup?competition=${comp.name.toLowerCase().replace(' ', '-')}`);
                               return;
                             }
 
-                            const reg = registrations.find(r => r.competition_id === comp.id && r.status === 'confirmed');
-                            setAlreadyRegisteredData({
-                              competitionName: comp.name,
-                              paidAmount: reg ? reg.paid_amount : 0,
-                              startTime: comp.startTime || null,
-                              competitionImagePath: getLeagueImage(comp.name)
-                            });
-                            setAlreadyRegisteredModalOpen(true);
+                            // Check if user has already completed this competition
+                            const hasCompleted = await hasCompletedCompetition(comp.id);
+                            if (hasCompleted) {
+                              toast.error('You have already completed this competition!');
+                              return;
+                            }
+
+                            // Redirect to waiting room (league page)
+                            // toast.success('Redirecting to waiting room...');
+                            router.push(`/league?competitionId=${comp.id}`);
                           }}
                           className="w-full mt-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200"
                         >
                           <CheckCircle className="h-4 w-4" />
-                          Already Registered
+                          Join Waiting Room
                         </button>
                       ) : (
                         <button
@@ -1799,16 +1812,16 @@ const LiveCompetition = () => {
       </div>
 
       {/* Rules Section */}
-      <div className="w-full mt-16 p-8 bg-white rounded-xl border-2 border-lime-100 shadow-lg">
+      <div className="w-full mt-16 p-3 sm:p-8 bg-white rounded-xl border-2 border-lime-100 shadow-lg">
         <h2 className="text-4xl font-extrabold mb-8 text-lime-600 text-center">Competition Rules</h2>
         <div className="space-y-5">
 
           {/* Prize Pool Transparency */}
-          <div className="flex items-start p-5 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
-            <div className="p-2.5 mr-4 bg-yellow-500/30 rounded-lg">
-              <Award className="h-6 w-6 text-yellow-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-yellow-500/30 rounded-lg">
+              <Award className="h-10 w-10 sm:h-6 sm:w-6 text-yellow-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-yellow-800 mb-2">Prize Pool Transparency</h3>
               <p className="text-gray-700 text-base leading-relaxed mb-3">
                 All prize pools are calculated transparently based on actual player registrations. The estimated amounts shown are based on a minimum of 10 participants to give you a clear idea of potential winnings.
@@ -1822,11 +1835,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Competition Format */}
-          <div className="flex items-start p-5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
-            <div className="p-2.5 mr-4 bg-blue-500/30 rounded-lg">
-              <Clock className="h-6 w-6 text-blue-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-blue-500/30 rounded-lg">
+              <Clock className="h-10 w-10 sm:h-6 sm:w-6 text-blue-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-blue-800 mb-2">Competition Format</h3>
               <p className="text-gray-700 text-base leading-relaxed mb-3">
                 All KickExpert competitions follow a standardized time-limited, question-based format designed for fair and exciting gameplay.
@@ -1851,11 +1864,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Competition Types */}
-          <div className="flex items-start p-5 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-colors border-2 border-indigo-300 shadow-md">
-            <div className="p-2.5 mr-4 bg-indigo-500/30 rounded-lg">
-              <Trophy className="h-6 w-6 text-indigo-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-xl hover:from-indigo-100 hover:to-indigo-200 transition-colors border-2 border-indigo-300 shadow-md">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-indigo-500/30 rounded-lg">
+              <Trophy className="h-10 w-10 sm:h-6 sm:w-6 text-indigo-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-indigo-800 mb-2">Competition Types</h3>
               <p className="text-gray-700 text-base leading-relaxed mb-3">
                 Choose from three league tiers, each offering different entry costs, difficulty levels, and prize potentials.
@@ -1887,11 +1900,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Registration & Participation */}
-          <div className="flex items-start p-5 bg-gradient-to-r from-green-50 to-green-100 rounded-xl hover:from-green-100 hover:to-green-200 transition-colors border-2 border-green-300 shadow-md">
-            <div className="p-2.5 mr-4 bg-green-500/30 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-gradient-to-r from-green-50 to-green-100 rounded-xl hover:from-green-100 hover:to-green-200 transition-colors border-2 border-green-300 shadow-md">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-green-500/30 rounded-lg">
+              <CheckCircle className="h-10 w-10 sm:h-6 sm:w-6 text-green-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-green-800 mb-2">Registration & Participation</h3>
               <p className="text-gray-700 text-base leading-relaxed mb-3">
                 Secure your spot in the competition with our streamlined registration process. Early registration ensures you don't miss out on the action.
@@ -1928,11 +1941,11 @@ const LiveCompetition = () => {
             </div>
           </div>
           {/* Dynamic Prize Pool System - FEATURED AT TOP */}
-          <div className="flex items-start p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
-            <div className="p-3 mr-4 bg-yellow-500/30 rounded-lg">
-              <Award className="h-7 w-7 text-yellow-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl hover:from-yellow-100 hover:to-yellow-200 transition-colors border-2 border-yellow-300 shadow-md">
+            <div className="p-4 sm:p-3 mb-3 sm:mb-0 sm:mr-4 bg-yellow-500/30 rounded-lg">
+              <Award className="h-10 w-10 sm:h-7 sm:w-7 text-yellow-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 text-center sm:text-left">
               <h3 className="text-2xl font-extrabold text-yellow-800 mb-3">Dynamic Prize Pool System</h3>
               <div className="text-gray-700 text-base leading-relaxed space-y-2">
                 <p className="font-semibold">Prize pools scale based on player count:</p>
@@ -1954,20 +1967,20 @@ const LiveCompetition = () => {
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
-                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>&lt;50 Players (Top 3) Distribution:</strong> 1st: 50% | 2nd: 30% | 3rd: 20%</p>
-                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>50-100 Players (Top 5) Distribution:</strong> 1st: 30% | 2nd: 20% | 3rd: 17% | 4th: 17% | 5th: 16%</p>
-                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>100+ Players (Top 10) Distribution:</strong> 1st: 20% | 2nd: 15% | 3rd: 12% | 4th: 10% | 5th: 9% | 6th: 8% | 7th: 7% | 8th: 7% | 9th: 6% | 10th: 6%</p>
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>&lt;50 Players (Top 3) Distribution:</strong> 1st: 20% | 2nd: 12% | 3rd: 8% of total revenue</p>
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>50-100 Players (Top 5) Distribution:</strong> 1st: 20% | 2nd: 12% | 3rd: 7% | 4th: 3% | 5th: 3% of total revenue</p>
+                  <p className="text-sm bg-yellow-50 p-2 rounded border border-yellow-200"><strong>100+ Players (Top 10) Distribution:</strong> 1st: 20% | 2nd: 10% | 3rd: 7% | 4th: 4% | 5th: 3% | 6th: 2% | 7th-10th: 1% each of total revenue</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* XP Rewards System - FEATURED AT TOP */}
-          <div className="flex items-start p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
-            <div className="p-3 mr-4 bg-blue-500/30 rounded-lg">
-              <Zap className="h-7 w-7 text-blue-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-6 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-colors border-2 border-blue-300 shadow-md">
+            <div className="p-4 sm:p-3 mb-3 sm:mb-0 sm:mr-4 bg-blue-500/30 rounded-lg">
+              <Zap className="h-10 w-10 sm:h-7 sm:w-7 text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 text-center sm:text-left">
               <h3 className="text-2xl font-extrabold text-blue-800 mb-3">XP Rewards & Progression</h3>
               <div className="text-gray-700 text-base leading-relaxed space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1992,11 +2005,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Honest Play */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-lime-500/20 rounded-lg">
-              <Shield className="h-6 w-6 text-lime-600" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-lime-500/20 rounded-lg">
+              <Shield className="h-10 w-10 sm:h-6 sm:w-6 text-lime-600" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Honest Play Guaranteed</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Play fairly and honestly. Any use of bots, scripts, or external assistance is strictly prohibited and will result in disqualification and potential account suspension.
@@ -2005,11 +2018,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* One Account */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-blue-500/20 rounded-lg">
-              <User className="h-6 w-6 text-blue-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-blue-500/20 rounded-lg">
+              <User className="h-10 w-10 sm:h-6 sm:w-6 text-blue-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">One Account Per Player</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Each participant is allowed only one KickExpert account. Multiple accounts are not permitted and may lead to forfeiture of winnings and account termination.
@@ -2018,11 +2031,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Internet Connection */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-yellow-500/20 rounded-lg">
-              <Wifi className="h-6 w-6 text-yellow-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-yellow-500/20 rounded-lg">
+              <Wifi className="h-10 w-10 sm:h-6 sm:w-6 text-yellow-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Stable Internet Connection</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Ensure you have a stable internet connection before joining. We are not responsible for disconnections or interruptions on your end that may affect your gameplay.
@@ -2031,11 +2044,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Time Limits */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-purple-500/20 rounded-lg">
-              <ClockIcon className="h-6 w-6 text-purple-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-purple-500/20 rounded-lg">
+              <ClockIcon className="h-10 w-10 sm:h-6 sm:w-6 text-purple-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Answer Within Time Limits</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Each question is timed. Submit your answers promptly. Late or unanswered questions will be marked as incorrect.
@@ -2044,11 +2057,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Prize Distribution */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-green-500/20 rounded-lg">
-              <PrizeTrophy className="h-6 w-6 text-green-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-green-500/20 rounded-lg">
+              <PrizeTrophy className="h-10 w-10 sm:h-6 sm:w-6 text-green-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Prize Distribution & Verification</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Prizes are awarded based on final rankings as per the specific competition's prize breakdown. Winners may be subject to identity verification before payouts.
@@ -2057,11 +2070,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Support */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-teal-500/20 rounded-lg">
-              <LifeBuoy className="h-6 w-6 text-teal-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-teal-500/20 rounded-lg">
+              <LifeBuoy className="h-10 w-10 sm:h-6 sm:w-6 text-teal-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Support & Fair Adjudication</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 Encounter an issue? Reach out to our support team. All decisions by KickExpert regarding rule interpretations and disputes are final to ensure fairness.
@@ -2070,11 +2083,11 @@ const LiveCompetition = () => {
           </div>
 
           {/* Platform Integrity */}
-          <div className="flex items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
-            <div className="p-2.5 mr-4 bg-red-500/20 rounded-lg">
-              <Lock className="h-6 w-6 text-red-500" />
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-5 bg-lime-50 rounded-xl hover:bg-lime-100 transition-colors border border-lime-200">
+            <div className="p-4 sm:p-2.5 mb-3 sm:mb-0 sm:mr-4 bg-red-500/20 rounded-lg">
+              <Lock className="h-10 w-10 sm:h-6 sm:w-6 text-red-500" />
             </div>
-            <div>
+            <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-800 mb-2">Platform Integrity</h3>
               <p className="text-gray-600 text-base leading-relaxed">
                 KickExpert reserves the right to modify rules, cancel competitions, or take action against any participant found violating terms or undermining the platform's integrity.

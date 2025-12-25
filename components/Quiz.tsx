@@ -276,19 +276,19 @@ export default function QuizDashboard({ initialQuestions }: QuizDashboardProps) 
 
   return (
     <>
-      <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-6">
-        <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-white text-center sm:text-left">
+      <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-2 sm:p-6">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden mt-4 sm:mt-0">
+          <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-3 sm:p-6">
+            <div className="flex flex-row justify-between items-center gap-2 sm:gap-4">
+              <h1 className="text-sm sm:text-2xl font-bold text-white whitespace-nowrap">
                 Football Knowledge Quiz
               </h1>
-              <div className="flex items-center justify-center sm:justify-end space-x-3 sm:space-x-4">
-                <div className="bg-white bg-opacity-20 px-3 py-1 rounded-full flex items-center">
-                  <span className="font-bold text-black">{score}</span>
-                  <span className="text-black opacity-80">/{questions.length}</span>
+              <div className="flex items-center justify-end space-x-1.5 sm:space-x-4 flex-shrink-0">
+                <div className="bg-white bg-opacity-20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full flex items-center">
+                  <span className="font-bold text-black text-xs sm:text-base">{score}</span>
+                  <span className="text-black opacity-80 text-xs sm:text-base">/{questions.length}</span>
                 </div>
-                <div className="w-24 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
+                <div className="w-16 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-lime-700 transition-all duration-500"
                     style={{ width: `${progress}%` }}

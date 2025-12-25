@@ -46,6 +46,7 @@ export default function Navbar() {
   const [newNotificationAlert, setNewNotificationAlert] = useState<boolean>(false);
   const [marketingOptIn, setMarketingOptIn] = useState<boolean>(false);
   const [lastNotificationCheck, setLastNotificationCheck] = useState<Date>(new Date());
+  const [notificationTimeUpdate, setNotificationTimeUpdate] = useState<number>(0); // Force re-render for time updates
   // We'll fetch notifications from the `public.notifications` table and
   // subscribe to realtime updates. If RLS prevents DB writes, the component
   // will gracefully fall back to local-state-only reads.
@@ -159,11 +160,27 @@ export default function Navbar() {
         ...formattedCompetitions,
       ];
 
+      // Remove duplicates based on id and created_at
+      const uniqueNotifications = merged.reduce((acc: any[], current: any) => {
+        // Check if notification already exists based on id
+        const exists = acc.find(item => 
+          item.id === current.id || 
+          (item.title === current.title && 
+           item.message === current.message && 
+           Math.abs(new Date(item.created_at).getTime() - new Date(current.created_at).getTime()) < 1000)
+        );
+        
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+
       // Sort by created_at (newest first)
-      merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      uniqueNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       // Keep top 15 most recent
-      const recentNotifications = merged.slice(0, 15);
+      const recentNotifications = uniqueNotifications.slice(0, 15);
 
       // If a lastNotificationCheck exists (persisted), treat any notification
       // with created_at <= lastNotificationCheck as read for local display
@@ -367,18 +384,28 @@ export default function Navbar() {
 
     // Subscribe to INSERT and UPDATE events on public.notifications for this user
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      console.log('🔔 Real-time notification received:', payload);
       const n = payload.new;
       // Ignore notifications that are already read
       // Respect marketing opt-in
       if (n.type === 'promotional' && !marketingOptIn) return;
-      // Add new notification to the top, keep only the latest 3
-      setNewNotificationAlert(true);
-      const newNotif = {
-        ...n,
-        created_at: n.created_at || new Date().toISOString(),
-        is_read: !!n.is_read,
-      };
+      
+      // Check if notification already exists to prevent duplicates
       setNotifications(prev => {
+        const exists = prev.some(notif => notif.id === n.id);
+        if (exists) {
+          console.log('⚠️ Duplicate notification detected, skipping:', n.id);
+          return prev; // Don't add duplicate
+        }
+        
+        console.log('✅ Adding new notification:', n.title);
+        // Add new notification to the top, keep only the latest 3
+        setNewNotificationAlert(true);
+        const newNotif = {
+          ...n,
+          created_at: n.created_at || new Date().toISOString(),
+          is_read: !!n.is_read,
+        };
         const next = [newNotif, ...prev].slice(0, 3);
         setUnreadCount(next.filter((m: any) => !m.is_read).length);
         return next;
@@ -387,18 +414,19 @@ export default function Navbar() {
     });
 
     channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      console.log('🔄 Notification updated:', payload);
       const n = payload.new;
-      // If updated notification is now read, remove it from the navbar list
       // Respect marketing opt-in
       if (n.type === 'promotional' && !marketingOptIn) {
         return;
       }
       // Update item in place (keep it visible)
-      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, ...n } : x));
-      setUnreadCount(prev => {
-        const next = (prev && typeof prev === 'number') ? prev : 0;
-        // Recalculate from notifications state after update
-        return (notifications || []).filter((m: any) => !m.is_read).length;
+      setNotifications(prev => {
+        const updated = prev.map(x => x.id === n.id ? { ...x, ...n, is_read: !!n.is_read } : x);
+        // Recalculate unread count from updated notifications
+        const newUnreadCount = updated.filter((m: any) => !m.is_read).length;
+        setUnreadCount(newUnreadCount);
+        return updated;
       });
     });
 
@@ -434,10 +462,19 @@ export default function Navbar() {
 
     const interval = setInterval(() => {
       fetchNotifications(user.id);
-    }, 30000); // Check every 30 seconds
+    }, 10000); // Check every 10 seconds (more frequent)
 
     return () => clearInterval(interval);
   }, [user]);
+
+  // Update notification times every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNotificationTimeUpdate(prev => prev + 1);
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -492,6 +529,8 @@ export default function Navbar() {
     setNotificationOpen(!notificationOpen);
 
     if (user && wasClosed) {
+      // Fetch fresh notifications when opening dropdown
+      fetchNotifications(user.id);
       markNotificationsAsRead(user.id);
     }
   };
@@ -547,13 +586,15 @@ export default function Navbar() {
     return pathname === href;
   };
 
-  // Format notification date
+  // Format notification date with auto-update
   const formatNotificationDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
 
-    if (diffInHours < 1) return 'Just now';
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
 
@@ -982,14 +1023,98 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="lg:hidden text-2xl text-lime-600 focus:outline-none p-1 rounded-full hover:bg-lime-100 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {menuOpen ? <MdClose /> : <MdMenu />}
-        </button>
+        {/* Right Icons - Mobile & Desktop */}
+        <div className="flex items-center gap-3 lg:hidden">
+          {/* Notification Icon - Mobile Only */}
+          {user && (
+            <div className="relative" ref={notificationRef}>
+              <button
+                onClick={handleNotificationClick}
+                className="text-lime-600 cursor-pointer text-lg mt-[2px] transition-colors relative focus:outline-none p-1 rounded-full hover:bg-lime-100"
+                aria-label="Notifications"
+              >
+                <FaBell />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[11px] font-semibold">
+                    {formatBadgeCount(unreadCount)}
+                  </span>
+                )}
+                {newNotificationAlert && unreadCount === 0 && (
+                  <span className="absolute -top-1 -right-1 bg-lime-500 text-white text-xs rounded-full w-2 h-2 flex items-center justify-center animate-pulse" />
+                )}
+              </button>
+              {notificationOpen && (
+                <div className="fixed lg:absolute left-1/2 lg:left-auto right-auto lg:right-0 -translate-x-1/2 lg:translate-x-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-lime-50 text-gray-700 font-medium border-b border-gray-200 flex justify-between items-center">
+                    <span>Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="bg-lime-500 text-white text-xs rounded-full px-2 py-1">
+                        {unreadCount} new
+                      </span>
+                    )}
+                  </div>
+                  <div className="py-1">
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-sm text-gray-500">
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.slice(0, 3).map((notif) => (
+                        <div
+                          key={notif.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleNotificationItemClick(notif)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleNotificationItemClick(notif); }}
+                          className={`px-3 py-2 hover:bg-lime-50 transition-colors border-b border-gray-100 last:border-b-0 cursor-pointer ${!notif.is_read ? 'bg-lime-50' : ''}
+                            `}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-base mt-0.5">
+                              {getNotificationIcon(notif.type || 'default')}
+                            </span>
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-700 font-medium leading-tight">
+                                {notif.title}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-0.5 break-words leading-snug">
+                                {notif.message}
+                              </p>
+                              <p className="text-[11px] text-gray-500 mt-1">
+                                {formatNotificationDate(notif.created_at)}
+                              </p>
+                            </div>
+                            {!notif.is_read && (
+                              <FaCircle className="text-lime-500 text-[10px] mt-1 animate-pulse" />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div className="px-3 py-2 border-t border-gray-100 bg-white">
+                      <Link
+                        href="/user_notifications"
+                        onClick={() => setNotificationOpen(false)}
+                        className="w-full text-center block px-3 py-1.5 bg-lime-50 hover:bg-lime-100 text-lime-700 rounded-md font-medium text-sm"
+                      >
+                        View more
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-2xl text-lime-600 focus:outline-none p-1 rounded-full hover:bg-lime-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? <MdClose /> : <MdMenu />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}

@@ -25,6 +25,7 @@ interface AnswerRecord {
   is_correct: boolean;
   difficulty: string;
   selected_answer?: string | null; // Store user's selected answer
+  answer_time?: number; // Time remaining when answer was submitted (in seconds)
 }
 
 interface Player {
@@ -70,6 +71,7 @@ export default function LeaguePage() {
   const [answers, setAnswers] = useState<AnswerRecord[]>([]);
   const [timer, setTimer] = useState(10);
   const [timerKey, setTimerKey] = useState(0);
+  const [answerSubmittedAt, setAnswerSubmittedAt] = useState<number | null>(null); // Track when answer was submitted
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [competitionDetails, setCompetitionDetails] = useState<CompetitionDetails | null>(null);
   const [userRank, setUserRank] = useState<number | null>(null);
@@ -207,12 +209,9 @@ export default function LeaguePage() {
                 }, 3000);
                 return;
               }
-            } else if (seconds <= 120) {
-              // Less than 2 minutes remaining but not started yet - show countdown
-              setCountdown(seconds);
             } else {
-              // More than 2 minutes remaining - set countdown to exactly 2 minutes (120 seconds)
-              setCountdown(120);
+              // Show actual time remaining until competition starts
+              setCountdown(seconds);
             }
           }
         }
@@ -1265,6 +1264,7 @@ export default function LeaguePage() {
         setSelectedChoice(null);
         setShowResult(false);
         setShowAnswerRequiredWarning(false);
+        setAnswerSubmittedAt(null); // Reset pin when moving to next question
         setTimerKey(prev => prev + 1);
         nextCalled.current = false;
       }
@@ -1322,6 +1322,9 @@ export default function LeaguePage() {
       console.log('❌ Submit blocked:', { selectedChoice, showResult });
       return;
     }
+
+    // Track the time when answer was submitted
+    setAnswerSubmittedAt(timer);
 
     console.log('✅ Proceeding with answer submission...');
 
@@ -1413,7 +1416,8 @@ export default function LeaguePage() {
       question_id: currentQuestion.id,
       is_correct: isCorrect,
       difficulty: currentQuestion.difficulty,
-      selected_answer: selectedChoice // Store user's selection
+      selected_answer: selectedChoice, // Store user's selection
+      answer_time: timer // Store time remaining when answered
     };
     setAnswers((prev) => [...prev, answerRecord]);
 
@@ -1550,6 +1554,7 @@ export default function LeaguePage() {
       setCurrentQuestionIndex((prev) => prev + 1);
       setSelectedChoice(null);
       setShowResult(false);
+      setAnswerSubmittedAt(null); // Reset pin for next question
       // Reset timer - all users get full 30 seconds per question
       setTimer(30);
       setTimerKey((prev) => prev + 1);
@@ -1643,8 +1648,15 @@ export default function LeaguePage() {
       const userId = authData.data.user?.id;
       if (!userId) throw new Error('User not authenticated');
 
-      // Update session summary
-      const correctAnswers = answers.filter(a => a.is_correct).length;
+      // Update session summary - fetch from database to ensure accuracy
+      const { data: sessionAnswers, error: answersError } = await supabase
+        .from('competition_answers')
+        .select('is_correct')
+        .eq('session_id', sessionId);
+
+      const correctAnswers = sessionAnswers?.filter(a => a.is_correct).length || answers.filter(a => a.is_correct).length;
+      console.log('📊 Correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
+      
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
       await supabase.from('competition_sessions').update({
@@ -1953,26 +1965,26 @@ export default function LeaguePage() {
   // Get prize pool percentage and winner count based on player count
   const getPrizePoolConfig = (playerCount: number): { percentage: number; winnerCount: number; distribution: number[] } => {
     if (playerCount < 50) {
-      // <50 Players → Top 3 rewarded (100% of total revenue)
+      // <50 Players → Top 3 rewarded (40% of total revenue)
       // Distribution: 20%, 12%, 8% of TOTAL REVENUE
       return {
-        percentage: 1.0,
+        percentage: 0.4,
         winnerCount: 3,
         distribution: [0.2, 0.12, 0.08] // 20%, 12%, 8% of TOTAL REVENUE
       };
     } else if (playerCount < 100) {
-      // 50–100 Players → Top 5 rewarded (100% of total revenue)
+      // 50–100 Players → Top 5 rewarded (45% of total revenue)
       // Distribution: 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
       return {
-        percentage: 1.0,
+        percentage: 0.45,
         winnerCount: 5,
         distribution: [0.2, 0.12, 0.07, 0.03, 0.03] // 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
       };
     } else {
-      // 100+ Players → Top 10 rewarded (100% of total revenue)
+      // 100+ Players → Top 10 rewarded (50% of total revenue)
       // Distribution: 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
       return {
-        percentage: 1.0,
+        percentage: 0.5,
         winnerCount: 10,
         distribution: [0.2, 0.1, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01] // 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
       };
@@ -2235,8 +2247,8 @@ export default function LeaguePage() {
   }
 
   return (
-    <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+    <div className="min-h-fit mt-14 bg-gray-50 text-gray-800 p-2 sm:p-6">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden mt-4 sm:mt-0">
         {initializing && (
           <div className="p-6 sm:p-8 text-center min-h-[400px] flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -2273,38 +2285,45 @@ export default function LeaguePage() {
               </motion.button>
             </div>
 
-            {/* Countdown Timer */}
-            <div className="relative w-32 h-32 mx-auto mb-8">
-              <svg className="w-full h-full" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="url(#countdown-gradient)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(countdown / 120) * 283} 283`}
-                  transform="rotate(-90 50 50)"
-                />
-                <defs>
-                  <linearGradient id="countdown-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#84cc16" />
-                    <stop offset="100%" stopColor="#22c55e" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className="text-4xl font-bold text-gray-800">{Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
-                <span className="text-xs text-gray-500 mt-1">minutes</span>
+            {/* Countdown Timer - Full Format */}
+            <div className="mb-8">
+              <h3 className="text-center text-gray-600 font-semibold mb-4">Competition Starts In</h3>
+              <div className="flex justify-center space-x-3">
+                {/* Days */}
+                {Math.floor(countdown / 86400) > 0 && (
+                  <div className="flex flex-col items-center">
+                    <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
+                      <span className="text-3xl">{Math.floor(countdown / 86400)}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 mt-2 font-medium">Days</span>
+                  </div>
+                )}
+                
+                {/* Hours */}
+                {countdown >= 3600 && (
+                  <div className="flex flex-col items-center">
+                    <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
+                      <span className="text-3xl">{Math.floor((countdown % 86400) / 3600)}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 mt-2 font-medium">Hours</span>
+                  </div>
+                )}
+                
+                {/* Minutes */}
+                <div className="flex flex-col items-center">
+                  <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
+                    <span className="text-3xl">{Math.floor((countdown % 3600) / 60)}</span>
+                  </div>
+                  <span className="text-xs text-gray-500 mt-2 font-medium">Mins</span>
+                </div>
+                
+                {/* Seconds */}
+                <div className="flex flex-col items-center">
+                  <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
+                    <span className="text-3xl">{countdown % 60}</span>
+                  </div>
+                  <span className="text-xs text-gray-500 mt-2 font-medium">Secs</span>
+                </div>
               </div>
             </div>
 
@@ -2371,7 +2390,11 @@ export default function LeaguePage() {
                       🥇 <span className="font-medium">1st Place</span>
                     </span>
                     <span className="text-sm font-bold text-yellow-600">
-                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * 0.2)} Credits
+                      {(() => {
+                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const distribution = getPrizePoolConfig(players.length).distribution;
+                        return Math.ceil(totalPool * distribution[0]);
+                      })()} Credits
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -2379,7 +2402,11 @@ export default function LeaguePage() {
                       🥈 <span className="font-medium">2nd Place</span>
                     </span>
                     <span className="text-sm font-bold text-gray-600">
-                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * (players.length < 50 ? 0.12 : players.length < 100 ? 0.12 : 0.1))} Credits
+                      {(() => {
+                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const distribution = getPrizePoolConfig(players.length).distribution;
+                        return Math.ceil(totalPool * distribution[1]);
+                      })()} Credits
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -2387,7 +2414,11 @@ export default function LeaguePage() {
                       🥉 <span className="font-medium">3rd Place</span>
                     </span>
                     <span className="text-sm font-bold text-amber-600">
-                      {Math.ceil(Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage) * (players.length < 50 ? 0.08 : 0.07))} Credits
+                      {(() => {
+                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const distribution = getPrizePoolConfig(players.length).distribution;
+                        return Math.ceil(totalPool * distribution[2]);
+                      })()} Credits
                     </span>
                   </div>
                 </div>
@@ -2449,13 +2480,13 @@ export default function LeaguePage() {
 
         {phase === 'quiz' && !quizCompleted && (
           <>
-            <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
-                <h1 className="text-xl sm:text-2xl font-bold text-white text-center sm:text-left">
+            <div className="bg-gradient-to-r from-lime-400 to-lime-500 p-3 sm:p-6">
+              <div className="flex flex-row justify-between items-center space-x-3">
+                <h1 className="text-sm sm:text-2xl font-bold text-white">
                   {competitionDetails?.name || 'League Competition'}
                 </h1>
-                <div className="flex items-center justify-center sm:justify-end space-x-3 sm:space-x-4">
-                  <div className="w-24 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <div className="w-16 sm:w-32 h-2 bg-white bg-opacity-30 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-lime-700 transition-all duration-500"
                       style={{
@@ -2467,17 +2498,17 @@ export default function LeaguePage() {
               </div>
 
               {/* Enhanced Timer Bar */}
-              <div className="mt-4">
+              <div className="mt-3 sm:mt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-5 h-5 text-white" />
-                    <span className="text-white font-medium text-sm">
-                      Time Remaining: {Math.ceil(timer)}s
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    <span className="text-white font-medium text-xs sm:text-sm">
+                      Time: {Math.ceil(timer)}s
                     </span>
                   </div>
                   
                 </div>
-                <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-hidden relative">
+                <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-visible relative">
                   <div
                     className={`h-full transition-all duration-100 ${timer > 20
                       ? 'bg-green-400'
@@ -2489,11 +2520,54 @@ export default function LeaguePage() {
                       width: `${(timer / 30) * 100}%`
                     }}
                   />
+                  
+                  {/* Answer Pin Marker - Google Maps Style */}
+                  {answerSubmittedAt !== null && (
+                    <div
+                      className="absolute -top-10 flex flex-col items-center transition-all duration-300 z-10"
+                      style={{
+                        left: `${(answerSubmittedAt / 30) * 100}%`,
+                        transform: 'translateX(-50%)'
+                      }}
+                    >
+                      {/* Pin Head - Teardrop Shape with Hollow Center */}
+                      <div className="relative">
+                        {/* Outer pin shape */}
+                        <div className="relative w-8 h-8">
+                          {/* Red circle with hollow center */}
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
+                            {/* Hollow center - white circle */}
+                            <div className="absolute inset-[6px] rounded-full bg-white"></div>
+                          </div>
+                          
+                          {/* Time label in center */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[9px] font-bold text-red-600 z-10">
+                              {Math.ceil(answerSubmittedAt)}s
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Pin point - triangle */}
+                        <div className="absolute left-1/2 -translate-x-1/2 top-[26px]">
+                          <div 
+                            className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-600"
+                            style={{
+                              filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.3))'
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      {/* Pin shadow */}
+                      <div className="w-3 h-1 bg-black opacity-20 rounded-full blur-sm mt-1"></div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-3 sm:p-6">
               {/* Competition Ending Warning */}
               {showCompetitionEndingWarning && (
                 <motion.div
@@ -2859,11 +2933,20 @@ export default function LeaguePage() {
                   <div key={index} className={`border-2 rounded-xl p-4 sm:p-6 ${isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
                     {/* Question Header */}
                     <div className="flex items-start justify-between mb-3 gap-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-gray-700">Q{index + 1}.</span>
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${question.difficulty === 'Easy' ? 'bg-green-100 text-green-800' : question.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
                           {question.difficulty}
                         </span>
+                        {/* Answer Time Badge */}
+                        {userAnswer?.answer_time !== undefined && (
+                          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 flex items-center gap-1">
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Answered at {Math.ceil(userAnswer.answer_time)}s
+                          </span>
+                        )}
                       </div>
                       <div className={`flex items-center gap-1 font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
                         {isCorrect ? (
@@ -3042,7 +3125,7 @@ export default function LeaguePage() {
             )}
 
             {/* Leaderboard Table */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-lime-500 to-lime-600">
                   <tr>
