@@ -1366,21 +1366,37 @@ const LiveCompetition = () => {
     const totalRevenue = playerCount * creditCost;
     const fallbackRevenue = minPlayers * creditCost;
 
-    // FIXED: Prize pool stays at minimum (10 players) until 10 participants are reached
+    // Prize pool stays at minimum (10 players) until 10 participants are reached
     // From 11 participants onwards, it updates dynamically
     const displayRevenue = playerCount >= minPlayers ? totalRevenue : fallbackRevenue;
 
-    const prizePool = displayRevenue;
+    // Determine prize pool percentage and distribution based on player count
+    let poolPercentage = 0.4; // Default 40% for <50 players
+    let distribution = [0.20, 0.12, 0.08]; // Top 3 distribution (as % of prize pool)
+    
+    if (playerCount >= 100) {
+      poolPercentage = 0.5; // 50% for 100+ players
+      distribution = [0.20, 0.10, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01]; // Top 10
+    } else if (playerCount >= 50) {
+      poolPercentage = 0.45; // 45% for 50-100 players
+      distribution = [0.20, 0.12, 0.07, 0.03, 0.03]; // Top 5
+    }
+
+    // Calculate actual prize pool (percentage of total revenue)
+    const prizePool = Math.floor(displayRevenue * poolPercentage);
 
     return {
       total: totalRevenue,
       totalDisplay: displayRevenue,
-      pool: prizePool, // Full prize pool (100% of revenue)
-      first: Math.ceil(prizePool * 0.5),  // 50% for 1st place
-      second: Math.ceil(prizePool * 0.3), // 30% for 2nd place
-      third: Math.ceil(prizePool * 0.2),  // 20% for 3rd place
+      pool: prizePool,
+      poolPercentage: poolPercentage * 100, // For display (40%, 45%, 50%)
+      first: Math.ceil(prizePool * distribution[0]),   // % of prize pool
+      second: Math.ceil(prizePool * distribution[1]),  // % of prize pool
+      third: Math.ceil(prizePool * distribution[2]),   // % of prize pool
+      distribution: distribution, // Full distribution array
+      winnerCount: distribution.length, // Number of winners
       isEstimated: playerCount < minPlayers,
-      isFinalized: playerCount >= minPlayers, // Flag for finalized message
+      isFinalized: playerCount >= minPlayers,
       minPool: fallbackRevenue
     };
   };
@@ -1401,13 +1417,14 @@ const LiveCompetition = () => {
         const fallbackRevenue = getCreditCost(comp.name) * 10;
         const totalRevenue = prizePoolRaw > 0 ? prizePoolRaw : fallbackRevenue;
 
-        // Use 100% of revenue for prize pool to match card display
-        const prizePool = totalRevenue;
+        // Use 40% of revenue for prize pool (default for <50 players)
+        const poolPercentage = 0.4;
+        const prizePool = Math.floor(totalRevenue * poolPercentage);
 
         return [
-          `1st: ${Math.ceil(prizePool * 0.5)} Credits`,  // 50% for 1st place
-          `2nd: ${Math.ceil(prizePool * 0.3)} Credits`,  // 30% for 2nd place
-          `3rd: ${Math.ceil(prizePool * 0.2)} Credits`   // 20% for 3rd place
+          `1st: ${Math.ceil(totalRevenue * 0.20)} Credits`,  // 20% of total revenue
+          `2nd: ${Math.ceil(totalRevenue * 0.12)} Credits`,  // 12% of total revenue
+          `3rd: ${Math.ceil(totalRevenue * 0.08)} Credits`   // 8% of total revenue
         ];
       })(),
       startTime: new Date(comp.start_time),
@@ -1621,7 +1638,7 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥇</span>
                             <span className="text-sm font-semibold text-gray-700">1st Place</span>
-                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">50%</span>
+                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
                           </div>
                           <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
                         </div>
@@ -1629,7 +1646,7 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥈</span>
                             <span className="text-sm font-semibold text-gray-700">2nd Place</span>
-                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">30%</span>
+                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">12%</span>
                           </div>
                           <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
                         </div>
@@ -1637,14 +1654,14 @@ const LiveCompetition = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🥉</span>
                             <span className="text-sm font-semibold text-gray-700">3rd Place</span>
-                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">20%</span>
+                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">8%</span>
                           </div>
                           <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
                         </div>
                         {prizePool.isEstimated && (
                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
                             <p className="text-xs text-yellow-700 text-center">
-                              * Estimated prize pool based on minimum 10 players. Actual prize pool grows with more participants!
+                              * Estimated prize pool ({prizePool.poolPercentage}% of revenue). Based on minimum 10 players. Grows with more participants!
                             </p>
                           </div>
                         )}
@@ -1652,7 +1669,7 @@ const LiveCompetition = () => {
                           <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
                             <p className="text-xs text-green-700 text-center font-semibold flex items-center justify-center gap-1">
                               <CheckCircle className="h-3 w-3" />
-                              Prize Pool Active! Growing with every new player.
+                              Prize Pool Active ({prizePool.poolPercentage}% of revenue)! Growing with every new player.
                             </p>
                           </div>
                         )}
