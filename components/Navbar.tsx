@@ -39,6 +39,7 @@ export default function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const [currentHash, setCurrentHash] = useState<string>("");
+  const shownNotificationIds = useRef<Set<string>>(new Set()); // Track shown notification IDs to prevent duplicate toasts
 
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -199,7 +200,38 @@ export default function Navbar() {
         return n;
       });
 
-      setNotifications(effective);
+      setNotifications(prev => {
+        // Merge new notifications with existing ones, avoiding duplicates
+        const existingIds = new Set(prev.map(n => n.id));
+        const existingSignatures = new Set(prev.map(n => `${n.title}-${n.message}-${new Date(n.created_at).getTime()}`));
+        
+        const newOnes = effective.filter(n => {
+          // Skip if ID already exists
+          if (n.id && existingIds.has(n.id)) return false;
+          // Skip if same title+message+time signature exists
+          const signature = `${n.title}-${n.message}-${new Date(n.created_at).getTime()}`;
+          if (existingSignatures.has(signature)) return false;
+          return true;
+        });
+        
+        // Merge: keep existing + add truly new ones
+        const merged = [...prev];
+        
+        // Update existing notifications with fresh data (e.g., is_read status)
+        for (const fresh of effective) {
+          const existingIndex = merged.findIndex(m => m.id === fresh.id);
+          if (existingIndex >= 0) {
+            merged[existingIndex] = { ...merged[existingIndex], ...fresh };
+          }
+        }
+        
+        // Add new notifications
+        merged.push(...newOnes);
+        
+        // Sort by created_at (newest first) and limit
+        merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return merged.slice(0, 15);
+      });
 
       // Calculate unread count using the effective is_read (local) value
       const unread = effective.filter(notif => !notif.is_read).length;
@@ -390,27 +422,54 @@ export default function Navbar() {
       // Respect marketing opt-in
       if (n.type === 'promotional' && !marketingOptIn) return;
       
+      // Create a unique signature for this notification
+      const notifSignature = n.id || `${n.title}-${n.message}-${n.created_at}`;
+      
+      // Check if we've already shown a toast for this notification
+      if (shownNotificationIds.current.has(notifSignature)) {
+        console.log('⚠️ Toast already shown for this notification, skipping:', notifSignature);
+        return;
+      }
+      
       // Check if notification already exists to prevent duplicates
       setNotifications(prev => {
-        const exists = prev.some(notif => notif.id === n.id);
-        if (exists) {
-          console.log('⚠️ Duplicate notification detected, skipping:', n.id);
-          return prev; // Don't add duplicate
+        // Check by ID
+        const existsById = prev.some(notif => notif.id === n.id);
+        if (existsById) {
+          console.log('⚠️ Duplicate notification detected by ID, skipping:', n.id);
+          return prev;
+        }
+        
+        // Check by content signature (title + message + time within 2 seconds)
+        const newTime = new Date(n.created_at || Date.now()).getTime();
+        const existsByContent = prev.some(notif => 
+          notif.title === n.title && 
+          notif.message === n.message && 
+          Math.abs(new Date(notif.created_at).getTime() - newTime) < 2000
+        );
+        if (existsByContent) {
+          console.log('⚠️ Duplicate notification detected by content, skipping:', n.title);
+          return prev;
         }
         
         console.log('✅ Adding new notification:', n.title);
-        // Add new notification to the top, keep only the latest 3
         setNewNotificationAlert(true);
+        
+        // Mark this notification as shown
+        shownNotificationIds.current.add(notifSignature);
+        
+        // Show toast for new notification
+        toast.success(n.title || 'New notification');
+        
         const newNotif = {
           ...n,
           created_at: n.created_at || new Date().toISOString(),
           is_read: !!n.is_read,
         };
-        const next = [newNotif, ...prev].slice(0, 3);
+        const next = [newNotif, ...prev].slice(0, 15);
         setUnreadCount(next.filter((m: any) => !m.is_read).length);
         return next;
       });
-      toast.success(n.title || 'New notification');
     });
 
     channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {

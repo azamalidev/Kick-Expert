@@ -10,6 +10,99 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 
+// Prize Pool Dropdown component - receives expanded state from parent
+interface PrizePoolDropdownProps {
+  prizePool: {
+    pool: number;
+    first: number;
+    second: number;
+    third: number;
+    isEstimated: boolean;
+    isFinalized?: boolean;
+    poolPercentage?: number;
+  };
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+const PrizePoolDropdown: React.FC<PrizePoolDropdownProps> = ({ prizePool, isExpanded, onToggle }) => {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggle();
+        }}
+        className="w-full flex items-center justify-between bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg px-3 py-2 hover:from-yellow-100 hover:to-yellow-200 transition-all"
+      >
+        <div className="flex items-center gap-2">
+          <Award className="h-5 w-5 text-yellow-600" />
+          <span className="text-sm font-bold text-yellow-800">
+            Prize Pool: {prizePool.pool} Credits
+            {prizePool.isEstimated && <span className="text-xs font-normal ml-1">(Est.)</span>}
+          </span>
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="h-4 w-4 text-yellow-600" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-yellow-600" />
+        )}
+      </button>
+
+      {isExpanded && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          className="mt-2 space-y-2"
+        >
+          <div className="flex items-center justify-between bg-white border border-yellow-100 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🥇</span>
+              <span className="text-sm font-semibold text-gray-700">1st Place</span>
+              <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
+            </div>
+            <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
+          </div>
+          <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🥈</span>
+              <span className="text-sm font-semibold text-gray-700">2nd Place</span>
+              <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">12%</span>
+            </div>
+            <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
+          </div>
+          <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🥉</span>
+              <span className="text-sm font-semibold text-gray-700">3rd Place</span>
+              <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">8%</span>
+            </div>
+            <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
+          </div>
+          {prizePool.isEstimated && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
+              <p className="text-xs text-yellow-700 text-center">
+                * Estimated prize pool ({prizePool.poolPercentage}% of revenue). Based on minimum 10 players. Grows with more participants!
+              </p>
+            </div>
+          )}
+          {prizePool.isFinalized && (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+              <p className="text-xs text-green-700 text-center font-semibold flex items-center justify-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                Prize Pool Active ({prizePool.poolPercentage}% of revenue)! Growing with every new player.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
 // Declare PayPal types
 declare global {
   interface Window {
@@ -769,7 +862,7 @@ const LiveCompetition = () => {
     startTime: Date | null;
     competitionImagePath: string;
   }>({ competitionName: '', paidAmount: 0, startTime: null, competitionImagePath: '' });
-  const [expandedPrizes, setExpandedPrizes] = useState<{ [key: string]: boolean }>({});
+  const [expandedPrizeId, setExpandedPrizeId] = useState<string | null>(null);
   const [playerCounts, setPlayerCounts] = useState<{ [key: string]: number }>({});
 
   // Competition configuration
@@ -1543,7 +1636,7 @@ const LiveCompetition = () => {
             return (
               <div
                 key={comp.id}
-                className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col h-full"
+                className="relative border-2 border-lime-300 w-full rounded-xl p-6 shadow-lg bg-white transition-all duration-300 ease-in-out transform hover:scale-102 hover:shadow-xl opacity-0 animate-fadeIn flex flex-col"
                 style={{ animationDelay: `${0.1 + index * 0.1}s`, borderColor: index === 0 ? '#bef264' : index === 1 ? '#84cc16' : '#65a30d' }}
               >
                 {/* Status Badge */}
@@ -1608,74 +1701,11 @@ const LiveCompetition = () => {
                   </div>
 
                   {/* Dynamic Prize Pool - Expandable */}
-                  <div>
-                    <button
-                      onClick={() => setExpandedPrizes(prev => ({ ...prev, [comp.id]: !prev[comp.id] }))}
-                      className="w-full flex items-center justify-between bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg px-3 py-2 hover:from-yellow-100 hover:to-yellow-200 transition-all"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5 text-yellow-600" />
-                        <span className="text-sm font-bold text-yellow-800">
-                          Prize Pool: {prizePool.pool} Credits
-                          {prizePool.isEstimated && <span className="text-xs font-normal ml-1">(Est.)</span>}
-                        </span>
-                      </div>
-                      {expandedPrizes[comp.id] ? (
-                        <ChevronUp className="h-4 w-4 text-yellow-600" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-yellow-600" />
-                      )}
-                    </button>
-
-                    {expandedPrizes[comp.id] && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="mt-2 space-y-2"
-                      >
-                        <div className="flex items-center justify-between bg-white border border-yellow-100 rounded-lg px-3 py-2 shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🥇</span>
-                            <span className="text-sm font-semibold text-gray-700">1st Place</span>
-                            <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded font-bold">20%</span>
-                          </div>
-                          <span className="text-sm font-bold text-yellow-600">{prizePool.first} Credits</span>
-                        </div>
-                        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🥈</span>
-                            <span className="text-sm font-semibold text-gray-700">2nd Place</span>
-                            <span className="text-xs bg-gray-200 text-gray-800 px-2 py-0.5 rounded font-bold">12%</span>
-                          </div>
-                          <span className="text-sm font-bold text-gray-500">{prizePool.second} Credits</span>
-                        </div>
-                        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">🥉</span>
-                            <span className="text-sm font-semibold text-gray-700">3rd Place</span>
-                            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold">8%</span>
-                          </div>
-                          <span className="text-sm font-bold text-amber-600">{prizePool.third} Credits</span>
-                        </div>
-                        {prizePool.isEstimated && (
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2">
-                            <p className="text-xs text-yellow-700 text-center">
-                              * Estimated prize pool ({prizePool.poolPercentage}% of revenue). Based on minimum 10 players. Grows with more participants!
-                            </p>
-                          </div>
-                        )}
-                        {prizePool.isFinalized && (
-                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
-                            <p className="text-xs text-green-700 text-center font-semibold flex items-center justify-center gap-1">
-                              <CheckCircle className="h-3 w-3" />
-                              Prize Pool Active ({prizePool.poolPercentage}% of revenue)! Growing with every new player.
-                            </p>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </div>
+                  <PrizePoolDropdown 
+                    prizePool={prizePool} 
+                    isExpanded={expandedPrizeId === comp.id}
+                    onToggle={() => setExpandedPrizeId(prev => prev === comp.id ? null : comp.id)}
+                  />
                 </div>
 
                 {/* Bottom Section - Fixed at bottom */}

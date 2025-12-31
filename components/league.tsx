@@ -685,16 +685,16 @@ export default function LeaguePage() {
         // Check if competition has ended
         if (hasCompetitionEnded()) {
           console.log('Competition ended - timer expired, completing quiz...');
+          // Set loading state IMMEDIATELY
+          setResultsLoading(true);
+          setPhase('results');
+          
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
-              setPhase('results');
             }).catch(err => {
               console.error('Error completing quiz:', err);
-              setPhase('results'); // Still show results even if error
             });
-          } else {
-            setPhase('results');
           }
           return;
         }
@@ -960,17 +960,17 @@ export default function LeaguePage() {
         // DO NOT auto-redirect from 'results' - user must click button to see leaderboard
         if (phase === 'quiz' || phase === 'waiting') {
           console.log(`📊 Moving from ${phase} to results (competition time expired)`);
+          // Set loading state IMMEDIATELY
+          setResultsLoading(true);
+          setPhase('results');
+          
           // Complete quiz if in quiz phase
           if (phase === 'quiz' && sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
-              setPhase('results');
             }).catch(err => {
               console.error('Error completing quiz:', err);
-              setPhase('results'); // Still show results even if error
             });
-          } else {
-            setPhase('results');
           }
         }
       }
@@ -1052,17 +1052,17 @@ export default function LeaguePage() {
             });
           }
 
+          // Set loading state IMMEDIATELY
+          setResultsLoading(true);
+          setPhase('results');
+          
           // Complete quiz and move to results (not leaderboard)
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
-              setPhase('results');
             }).catch(err => {
               console.error('Error completing quiz:', err);
-              setPhase('results'); // Still show results even if error
             });
-          } else {
-            setPhase('results');
           }
         } else {
           // Check if competition is nearing end (within 2 minutes)
@@ -1191,16 +1191,16 @@ export default function LeaguePage() {
         // Check if competition has ended before saving answers during sync
         if (hasCompetitionEnded()) {
           console.log('Competition ended during sync - completing quiz and moving to results');
+          // Set loading state IMMEDIATELY
+          setResultsLoading(true);
+          setPhase('results');
+          
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
-              setPhase('results');
             }).catch(err => {
               console.error('Error completing quiz during sync:', err);
-              setPhase('results'); // Still show results even if error
             });
-          } else {
-            setPhase('results');
           }
           return;
         }
@@ -1284,12 +1284,15 @@ export default function LeaguePage() {
           syncCheckInterval.current = null;
         }
 
+        // Set loading state IMMEDIATELY
+        setResultsLoading(true);
+        setPhase('results');
+        
         // Complete quiz properly (calculate results, save to DB, etc.)
         completeQuiz().then(() => {
-          setPhase('results');
+          // Loading will be cleared in completeQuiz finally block
         }).catch(err => {
           console.error('Error completing quiz on global timeout:', err);
-          setPhase('results'); // Still move to results even if error
         });
       }
     }, 2000); // Check every 2 seconds
@@ -1524,11 +1527,14 @@ export default function LeaguePage() {
     if (hasCompetitionEnded()) {
       console.log('Competition ended - preventing submission and completing quiz...');
       setError('Competition has ended. No more submissions are accepted.');
+      // Set loading state IMMEDIATELY
+      setResultsLoading(true);
+      setPhase('results');
+      
       if (sessionId && !quizCompleted) {
         await completeQuiz();
         setQuizCompleted(true);
       }
-      setPhase('results');
       nextCalled.current = false; // Reset for future use
       return;
     }
@@ -1626,13 +1632,16 @@ export default function LeaguePage() {
     if (!sessionId) {
       console.error("❌ No session ID found - cannot complete quiz");
       console.error("💡 This means the session was never created. Check if user answered any questions.");
+      setResultsLoading(false); // Clear loading if no session
       return;
     }
 
     console.log('✅ Session ID exists:', sessionId);
     
-    // Set loading state
-    setResultsLoading(true);
+    // Loading state should already be set by caller, but ensure it's true
+    if (!resultsLoading) {
+      setResultsLoading(true);
+    }
 
     // Analyze patterns before completing
     const patternAnalysis = analyzeResponsePatterns();
@@ -2368,8 +2377,9 @@ export default function LeaguePage() {
                     <span className="text-sm font-semibold text-gray-600">Prize Pool</span>
                   </div>
                   <p className="text-2xl font-bold text-yellow-700">
-                    {players.length * getCreditCost()} Credits
+                    {Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage)} Credits
                   </p>
+                 
                 </div>
 
                 <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -2926,7 +2936,18 @@ export default function LeaguePage() {
             {/* Questions List */}
             <div className="space-y-4 max-w-4xl mx-auto mb-6">
               {questions.map((question, index) => {
-                const userAnswer = answers[index];
+                // Find the user's answer for this specific question by matching question_id
+                // Try multiple matching strategies to handle different ID formats
+                let userAnswer = answers.find(a => 
+                  a.question_id === question.id || 
+                  String(a.question_id) === String(question.id)
+                );
+                
+                // Fallback: if no match by ID, try matching by index (for older data)
+                if (!userAnswer && answers[index]) {
+                  userAnswer = answers[index];
+                }
+                
                 const isCorrect = userAnswer?.is_correct || false;
                 
                 return (
@@ -2973,7 +2994,8 @@ export default function LeaguePage() {
                     {/* Answer Choices */}
                     <div className="space-y-2">
                       {question.choices.map((choice, choiceIndex) => {
-                        const isUserAnswer = answers[index] && choice === (answers[index] as any).selected_answer;
+                        // Use the userAnswer already found above for this question
+                        const isUserAnswer = userAnswer && choice === userAnswer.selected_answer;
                         const isCorrectAnswer = choice === question.correct_answer;
                         
                         return (
