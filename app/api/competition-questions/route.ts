@@ -31,10 +31,12 @@ export async function POST(req: NextRequest) {
 
     // Fetch from competition_questions table (NOT questions table!)
     // This table has 2400+ questions specifically for competitions
+    // IMPORTANT: Order by 'id' to ensure consistent order from database before seeded shuffle
     const { data: qsData, error: qsErr } = await supabase
       .from('competition_questions')
       .select('*')
-      .eq('status', true); // Only fetch active questions
+      .eq('status', true) // Only fetch active questions
+      .order('id', { ascending: true }); // Ensure consistent order from DB
 
     if (qsErr) {
       console.error('❌ Error fetching competition_questions table:', qsErr);
@@ -106,21 +108,20 @@ export async function POST(req: NextRequest) {
         hash = hash & hash; // Convert to 32bit integer
       }
 
-      // LCG (Linear Congruential Generator) for better randomization
-      const seededRandom = (seed: number): number => {
+      // LCG (Linear Congruential Generator) for deterministic randomization
+      let currentSeed = Math.abs(hash);
+      
+      const seededRandom = (): number => {
         const a = 1664525;
         const c = 1013904223;
         const m = Math.pow(2, 32);
-        seed = (a * seed + c) % m;
-        return seed / m;
+        currentSeed = (a * currentSeed + c) % m;
+        return currentSeed / m;
       };
-
-      let currentSeed = Math.abs(hash);
 
       // Fisher-Yates shuffle with seeded random
       for (let i = a.length - 1; i > 0; i--) {
-        currentSeed = seededRandom(currentSeed) * Math.pow(2, 32);
-        const j = Math.floor((currentSeed / Math.pow(2, 32)) * (i + 1));
+        const j = Math.floor(seededRandom() * (i + 1));
         [a[i], a[j]] = [a[j], a[i]];
       }
 
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest) {
 
     // Use competition ID as seed - all users in same competition get same order
     const seed = competitionId;
+    console.log(`🎲 Using seed for shuffle: ${seed}`);
 
     const easyQuestions = seededShuffle(allQuestions.filter(q => q.difficulty === 'Easy'), seed + '-easy');
     const mediumQuestions = seededShuffle(allQuestions.filter(q => q.difficulty === 'Medium'), seed + '-medium');
@@ -139,6 +141,11 @@ export async function POST(req: NextRequest) {
       Medium: mediumQuestions.length,
       Hard: hardQuestions.length
     });
+    
+    // Log first 3 question IDs from each difficulty to verify consistency
+    console.log('🔍 First 3 Easy IDs:', easyQuestions.slice(0, 3).map(q => q.id.substring(0, 8)));
+    console.log('🔍 First 3 Medium IDs:', mediumQuestions.slice(0, 3).map(q => q.id.substring(0, 8)));
+    console.log('🔍 First 3 Hard IDs:', hardQuestions.slice(0, 3).map(q => q.id.substring(0, 8)));
 
     // Select the required number from each difficulty
     let finalQs = [
@@ -182,6 +189,9 @@ export async function POST(req: NextRequest) {
       Medium: finalQs.filter(q => q.difficulty === 'Medium').length,
       Hard: finalQs.filter(q => q.difficulty === 'Hard').length
     });
+    
+    // Log final question IDs to verify consistency across API calls
+    console.log('🎯 Final question order (first 5):', finalQs.slice(0, 5).map((q, i) => `Q${i+1}:${q.id.substring(0, 8)}`).join(', '));
 
     // Don't mark questions as used here - they should be marked when actually displayed to user
     // This will be handled in league.tsx when each question is shown

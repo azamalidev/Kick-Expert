@@ -89,6 +89,7 @@ export default function LeaguePage() {
   const [showAnswerRequiredWarning, setShowAnswerRequiredWarning] = useState(false); // NEW: Warning when trying to skip
   const [showLateJoinerWarning, setShowLateJoinerWarning] = useState(false);
   const [showQuizLateJoinerWarning, setShowQuizLateJoinerWarning] = useState(false);
+  const [isRejoin, setIsRejoin] = useState(false); // Track if user is rejoining
   const [competitionTimeWarning, setCompetitionTimeWarning] = useState<string | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false); // Loading state for results calculation
   const nextCalled = useRef(false);
@@ -144,14 +145,19 @@ export default function LeaguePage() {
             .eq('user_id', authResponse.data.user.id)
             .maybeSingle();
 
-          if (existingSession) {
-            // User has already played this competition
+          if (existingSession && existingSession.end_time) {
+            // User has completed this competition (has end_time) - block access
             setError('You have already completed this competition. Redirecting...');
             setInitializing(false);
             setTimeout(() => {
               router.push('/livecompetition');
             }, 2000);
             return;
+          }
+
+          // If session exists but no end_time, user can rejoin (handled in quiz initialization)
+          if (existingSession && !existingSession.end_time) {
+            console.log('🔄 User has incomplete session - will allow rejoin');
           }
         }
 
@@ -309,6 +315,12 @@ export default function LeaguePage() {
     if (phase !== 'quiz' || !competitionId) return;
 
     const initializeQuiz = async () => {
+      // Declare variables at the top of the function scope
+      let isRejoin = false;
+      let existingAnswers: any[] = [];
+      let rejoinSessionId: string | null = null;
+      let registrationId: string | null = null;
+
       try {
         setLoading(true);
 
@@ -465,30 +477,11 @@ export default function LeaguePage() {
         }
 
         // Normalize returned rows to client's Question shape
-        const normalizedQuestions: Question[] = questionsData.map((q: any) => {
-          // Shuffle the choices to randomize correct answer position
-          const originalChoices = q.choices || [];
-          const originalCorrectAnswer = q.correct_answer;
-
-          // Create array of choice objects with original index
-          const choiceObjects = originalChoices.map((choice: string, index: number) => ({
-            text: choice,
-            isCorrect: choice === originalCorrectAnswer,
-            originalIndex: index
-          }));
-
-          // Fisher-Yates shuffle algorithm
-          const shuffledChoices = [...choiceObjects];
-          for (let i = shuffledChoices.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledChoices[i], shuffledChoices[j]] = [shuffledChoices[j], shuffledChoices[i]];
-          }
-
-          // Extract shuffled choice texts and find new correct answer
-          const shuffledChoiceTexts = shuffledChoices.map(choice => choice.text);
-          const newCorrectAnswer = shuffledChoices.find(choice => choice.isCorrect)?.text || originalCorrectAnswer;
-
-          console.log(`🔀 Question "${q.question_text?.substring(0, 50)}...": Correct answer moved from position ${originalChoices.indexOf(originalCorrectAnswer)} to position ${shuffledChoiceTexts.indexOf(newCorrectAnswer)}`);
+        // NOTE: API already shuffles questions and choices with seeded randomization
+        // so all users get the same order. DO NOT shuffle again here!
+        const normalizedQuestions: Question[] = questionsData.map((q: any, index: number) => {
+          const questionText = String(q.question_text || '');
+          console.log(`📋 Q${index + 1}: "${questionText.substring(0, 40)}..." - ID: ${q.competition_question_id}`);
 
           return {
             id: q.competition_question_id ?? null,
@@ -498,11 +491,15 @@ export default function LeaguePage() {
             question_text: q.question_text,
             category: q.category,
             difficulty: q.difficulty,
-            choices: shuffledChoiceTexts,
-            correct_answer: newCorrectAnswer,
+            choices: q.choices, // Already shuffled by API with seed
+            correct_answer: q.correct_answer,
             explanation: q.explanation,
           };
         });
+
+        // Questions stay in synchronized order (seeded by competition ID)
+        console.log('✅ Final questions ready (synchronized order from API):', normalizedQuestions.length);
+        console.log('🎲 Question IDs:', normalizedQuestions.map((q, i) => `Q${i + 1}:${String(q.id).substring(0, 8)}`).join(', '));
 
         // Questions stay in synchronized order, but choices within each question are shuffled
         console.log('✅ Final questions ready (synchronized order, shuffled choices):', normalizedQuestions.length);
@@ -510,37 +507,10 @@ export default function LeaguePage() {
 
         setQuestions(normalizedQuestions);
 
-        // IMMEDIATELY calculate correct starting question for late joiners
-        // This prevents showing Q1 before jumping to correct question
-        if (competitionStartTime && Date.now() > competitionStartTime) {
-          const elapsedMs = Date.now() - competitionStartTime;
-          const elapsedSeconds = Math.floor(elapsedMs / 1000);
-          const currentGlobalQuestion = Math.floor(elapsedSeconds / 30); // 30s per question
-          const missed = Math.min(currentGlobalQuestion, normalizedQuestions.length - 1);
-
-          if (missed > 0) {
-            console.log(`🚨 Late Joiner: Starting at question ${missed + 1}, missed ${missed} questions`);
-            // CRITICAL: Reset timer refs so late joiner gets full 30 seconds
-            timerStartTime.current = null;
-            questionStartTime.current = null;
-            setCurrentQuestionIndex(missed);
-            setMissedQuestions(missed);
-            setIsLateJoiner(true);
-            // Increment timerKey to trigger timer effect with fresh 30 seconds
-            setTimerKey(prev => prev + 1);
-          } else {
-            setCurrentQuestionIndex(0);
-            setMissedQuestions(0);
-            setIsLateJoiner(false);
-          }
-        } else {
-          // On time - start at question 0
-          setCurrentQuestionIndex(0);
-          setMissedQuestions(0);
-          setIsLateJoiner(false);
-        }
-
-
+        // ========================================
+        // STEP 1: Check registration and session FIRST (before question initialization)
+        // ========================================
+        
         // Check registration
         const { data: reg, error: regErr } = await supabase
           .from('competition_registrations')
@@ -557,7 +527,7 @@ export default function LeaguePage() {
           return;
         }
         // Save registration id locally so we can link answers to it
-        const registrationId = reg.id;
+        registrationId = reg.id;
 
         // Check if user has already played this competition
         const { data: existingSession, error: existingSessionErr } = await supabase
@@ -567,8 +537,9 @@ export default function LeaguePage() {
           .eq('user_id', authResponse.data.user.id)
           .maybeSingle();
 
-        if (existingSession) {
-          // User has already played this competition
+        // Check if competition has ended - if ended, don't allow rejoin
+        if (existingSession && existingSession.end_time) {
+          // User has completed this competition (has end_time)
           setError('You have already completed this competition. You can only participate once per competition.');
           setLoading(false);
           // Redirect to home or leaderboard after a delay
@@ -578,13 +549,175 @@ export default function LeaguePage() {
           return;
         }
 
+        // If session exists but no end_time, user left mid-competition - allow rejoin
+        if (existingSession && !existingSession.end_time) {
+          console.log('🔄 User is rejoining competition - session exists without end_time');
+          console.log('📋 Existing session:', existingSession);
+          isRejoin = true;
+          rejoinSessionId = existingSession.id;
+          
+          // CRITICAL: Set state immediately when rejoin is detected
+          setIsRejoin(true);
+
+          // Fetch existing answers to know which questions were already answered
+          const { data: answersData, error: answersError } = await supabase
+            .from('competition_answers')
+            .select('*')
+            .eq('session_id', existingSession.id)
+            .eq('competition_id', competitionId);
+
+          console.log('📋 Fetching existing answers for session:', existingSession.id);
+          console.log('📋 Answers query result:', { answersData, answersError });
+
+          if (!answersError && answersData) {
+            existingAnswers = answersData;
+            console.log(`✅ Found ${existingAnswers.length} existing answers for rejoin`);
+            console.log('📋 Existing answers details:', existingAnswers.map(a => ({
+              question_id: a.competition_question_id,
+              selected: a.selected_answer,
+              correct: a.is_correct
+            })));
+          } else if (answersError) {
+            console.error('❌ Error fetching existing answers:', answersError);
+          } else {
+            console.warn('⚠️ No existing answers found for session');
+          }
+        }
+
         // NOTE: Session creation moved to handleNextQuestion when user actually starts answering
         // This allows users to enter waiting room without being marked as "played"
-
-        setSessionId(null); // No session yet
+        // EXCEPTION: If rejoining, session already exists - use it
+        if (isRejoin) {
+          setSessionId(rejoinSessionId);
+          console.log('✅ Using existing session for rejoin:', rejoinSessionId);
+        } else {
+          setSessionId(null); // No session yet for new users
+        }
+        
         // persist registration id for use when saving answers
         // @ts-ignore
         (window as any).__currentCompetitionRegistrationId = registrationId;
+
+        // ========================================
+        // STEP 2: NOW calculate correct starting question (isRejoin is set correctly now)
+        // ========================================
+        
+        // IMMEDIATELY calculate correct starting question for late joiners OR rejoining users
+        // This prevents showing Q1 before jumping to correct question
+        if (competitionStartTime && Date.now() > competitionStartTime) {
+          const elapsedMs = Date.now() - competitionStartTime;
+          const elapsedSeconds = Math.floor(elapsedMs / 1000);
+          const currentGlobalQuestion = Math.floor(elapsedSeconds / 30); // 30s per question
+          const missed = Math.min(currentGlobalQuestion, normalizedQuestions.length - 1);
+
+          if (missed > 0 || isRejoin) {
+            if (isRejoin) {
+              console.log(`🔄 REJOIN: User returning to competition at question ${missed + 1}`);
+              console.log(`📋 Will process questions 1-${missed} to restore/mark as missed`);
+              
+              // Restore existing session ID
+              setSessionId(rejoinSessionId);
+              (window as any).__currentCompetitionRegistrationId = registrationId;
+
+              // Build answers array from existing answers
+              const restoredAnswers: AnswerRecord[] = [];
+              const answeredQuestionIds = new Set(existingAnswers.map(a => a.competition_question_id));
+
+              console.log(`📋 Existing answers from database:`, existingAnswers.length);
+              console.log(`📋 Question IDs in existing answers:`, Array.from(answeredQuestionIds));
+              console.log(`📋 Full existing answers:`, existingAnswers.map(a => ({
+                id: a.competition_question_id,
+                answer: a.selected_answer,
+                correct: a.is_correct
+              })));
+
+              // Process all questions up to current global question
+              for (let i = 0; i < missed; i++) {
+                const question = normalizedQuestions[i];
+                
+                // Try multiple matching strategies
+                const existingAnswer = existingAnswers.find(
+                  a => a.competition_question_id === question.id || 
+                       String(a.competition_question_id) === String(question.id)
+                );
+
+                console.log(`🔍 Q${i + 1} (ID: ${question.id}): ${existingAnswer ? '✅ Found in DB' : '❌ NOT found in DB'}`);
+                if (existingAnswer) {
+                  console.log(`   └─ Answer: "${existingAnswer.selected_answer}" (${existingAnswer.is_correct ? 'correct' : 'wrong'})`);
+                }
+                if (existingAnswer) {
+                  // Question was answered before leaving
+                  restoredAnswers.push({
+                    question_id: question.id,
+                    is_correct: existingAnswer.is_correct,
+                    difficulty: question.difficulty,
+                    selected_answer: existingAnswer.selected_answer,
+                    answer_time: existingAnswer.answer_time
+                  });
+                  console.log(`✅ Q${i + 1}: Already answered (${existingAnswer.is_correct ? 'correct' : 'wrong'})`);
+                } else {
+                  // Question was missed (not answered before leaving)
+                  restoredAnswers.push({
+                    question_id: question.id,
+                    is_correct: false,
+                    difficulty: question.difficulty,
+                    selected_answer: null,
+                    answer_time: undefined
+                  });
+                  console.log(`❌ Q${i + 1}: Missed (marked as wrong)`);
+
+                  // Insert missed question as wrong answer in database
+                  supabase.from('competition_answers').insert({
+                    competition_id: competitionId,
+                    session_id: rejoinSessionId,
+                    user_id: authResponse.data.user.id,
+                    question_id: null,
+                    competition_question_id: String(question.id),
+                    registration_id: registrationId,
+                    selected_answer: null,
+                    is_correct: false,
+                    submitted_at: new Date().toISOString(),
+                  }).then(({ error }) => {
+                    if (error) console.error(`Error saving missed Q${i + 1}:`, error);
+                  });
+                }
+              }
+
+              // Restore answers and score
+              setAnswers(restoredAnswers);
+              const correctCount = restoredAnswers.filter(a => a.is_correct).length;
+              setScore(correctCount);
+              console.log(`📊 Restored score: ${correctCount}/${restoredAnswers.length}`);
+
+              // Calculate missed questions (questions not answered)
+              const missedCount = restoredAnswers.filter(a => a.selected_answer === null).length;
+              console.log(`📊 Missed questions count: ${missedCount} out of ${restoredAnswers.length}`);
+              console.log(`📊 Answered questions: ${restoredAnswers.filter(a => a.selected_answer !== null).length}`);
+              setMissedQuestions(missedCount);
+              setIsLateJoiner(false); // NOT a late joiner - this is a rejoin
+            } else {
+              console.log(`🚨 Late Joiner: Starting at question ${missed + 1}, missed ${missed} questions`);
+              setMissedQuestions(missed);
+              setIsLateJoiner(true);
+            }
+
+            // CRITICAL: Reset timer refs so user gets proper time for current question
+            timerStartTime.current = null;
+            questionStartTime.current = null;
+            setCurrentQuestionIndex(missed);
+            // Increment timerKey to trigger timer effect with fresh calculation
+            setTimerKey(prev => prev + 1);
+          } else {
+            setCurrentQuestionIndex(0);
+            setMissedQuestions(0);
+            setIsLateJoiner(false);
+          }
+        } else {
+          // On time - start at question 0
+          setCurrentQuestionIndex(0);
+          setMissedQuestions(0);
+          setIsLateJoiner(false);
+        }
         setLoading(false);
       } catch (err) {
         console.error('❌❌❌ CRITICAL ERROR in initializeQuiz:', err);
@@ -1132,14 +1265,14 @@ export default function LeaguePage() {
     }
   }, [isLateJoiner, missedQuestions]);
 
-  // Quiz Phase Late Joiner Warning Timer - Show for 30 seconds when entering quiz as late joiner
+  // Quiz Phase Late Joiner Warning Timer - Show for 20 seconds when entering quiz as late joiner OR rejoin
   useEffect(() => {
-    if (phase === 'quiz' && isLateJoiner && missedQuestions > 0) {
+    if (phase === 'quiz' && (isLateJoiner || isRejoin)) {
       setShowQuizLateJoinerWarning(true);
-      const timer = setTimeout(() => setShowQuizLateJoinerWarning(false), 30000);
+      const timer = setTimeout(() => setShowQuizLateJoinerWarning(false), 20000); // Hide after 20 seconds
       return () => clearTimeout(timer);
     }
-  }, [phase, isLateJoiner, missedQuestions]);
+  }, [phase, isLateJoiner, isRejoin, missedQuestions]);
 
   // NEW: Global Synchronization System
   // Calculate which question should be globally shown based on competition start time
@@ -1208,55 +1341,63 @@ export default function LeaguePage() {
         // CRITICAL: Save current answer BEFORE forcing sync (even if no answer selected)
         if (questions[currentQuestionIndex]) {
           const currentQuestion = questions[currentQuestionIndex];
-          const userAnswer = selectedChoiceRef.current;
-          const isCorrect = userAnswer ? userAnswer === currentQuestion.correct_answer : false; // Ensure boolean
+          
+          // Check if this question was already answered (rejoin scenario)
+          const alreadyAnswered = answers.find(a => a.question_id === currentQuestion.id);
+          
+          if (!alreadyAnswered) {
+            const userAnswer = selectedChoiceRef.current;
+            const isCorrect = userAnswer ? userAnswer === currentQuestion.correct_answer : false; // Ensure boolean
 
-          // Update score if correct
-          if (isCorrect) {
-            setScore(prev => prev + 1);
-          }
-
-          // Save answer record (even if null - marks as unanswered/incorrect)
-          const answerRecord = {
-            question_id: currentQuestion.id,
-            is_correct: isCorrect,
-            difficulty: currentQuestion.difficulty,
-            selected_answer: userAnswer // Store user's selection (can be null)
-          };
-          setAnswers(prev => [...prev, answerRecord]);
-
-          // Save to database
-          supabase.auth.getUser().then(({ data }) => {
-            if (data.user && sessionId) {
-              let competitionQuestionId: string | null = null;
-
-              // Use id as competition_question_id (UUID from competition_questions table)
-              if (currentQuestion.id !== null && currentQuestion.id !== undefined) {
-                competitionQuestionId = String(currentQuestion.id);
-              }
-
-              const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
-
-              supabase.from('competition_answers').insert({
-                competition_id: competitionId,
-                session_id: sessionId,
-                user_id: data.user.id,
-                question_id: null, // NULL for competition questions
-                competition_question_id: competitionQuestionId, // UUID from competition_questions
-                registration_id: registrationId,
-                selected_answer: userAnswer, // Can be null if no answer
-                is_correct: isCorrect, // Will be false if null
-                submitted_at: new Date().toISOString(),
-              }).then(({ error }) => {
-                if (error) console.error('Error saving answer during sync:', error);
-              });
+            // Update score if correct
+            if (isCorrect) {
+              setScore(prev => prev + 1);
             }
-          });
 
-          console.log('💾 Answer saved during global sync:', {
-            answered: userAnswer !== null,
-            is_correct: isCorrect
-          });
+            // Save answer record (even if null - marks as unanswered/incorrect)
+            const answerRecord = {
+              question_id: currentQuestion.id,
+              is_correct: isCorrect,
+              difficulty: currentQuestion.difficulty,
+              selected_answer: userAnswer // Store user's selection (can be null)
+            };
+            setAnswers(prev => [...prev, answerRecord]);
+
+            // Save to database
+            supabase.auth.getUser().then(({ data }) => {
+              if (data.user && sessionId) {
+                let competitionQuestionId: string | null = null;
+
+                // Use id as competition_question_id (UUID from competition_questions table)
+                if (currentQuestion.id !== null && currentQuestion.id !== undefined) {
+                  competitionQuestionId = String(currentQuestion.id);
+                }
+
+                const registrationId = (window as any).__currentCompetitionRegistrationId ?? null;
+
+                supabase.from('competition_answers').insert({
+                  competition_id: competitionId,
+                  session_id: sessionId,
+                  user_id: data.user.id,
+                  question_id: null, // NULL for competition questions
+                  competition_question_id: competitionQuestionId, // UUID from competition_questions
+                  registration_id: registrationId,
+                  selected_answer: userAnswer, // Can be null if no answer
+                  is_correct: isCorrect, // Will be false if null
+                  submitted_at: new Date().toISOString(),
+                }).then(({ error }) => {
+                  if (error) console.error('Error saving answer during sync:', error);
+                });
+              }
+            });
+
+            console.log('💾 Answer saved during global sync:', {
+              answered: userAnswer !== null,
+              is_correct: isCorrect
+            });
+          } else {
+            console.log('⚠️ Question already answered - skipping duplicate save during sync');
+          }
         }
 
         // Now force user to the correct globally synchronized question
@@ -1340,6 +1481,14 @@ export default function LeaguePage() {
 
     const currentQuestion = questions[currentQuestionIndex];
     if (!currentQuestion) return;
+
+    // Check if this question was already answered (rejoin scenario)
+    const alreadyAnswered = answers.find(a => a.question_id === currentQuestion.id);
+    if (alreadyAnswered) {
+      console.log('⚠️ Question already answered during previous session - skipping duplicate submission');
+      setShowResult(true); // Show the existing result
+      return;
+    }
 
     // Create session if it doesn't exist yet - STORE THE ID IN A VARIABLE
     let currentSessionId = sessionId;
@@ -1470,11 +1619,20 @@ export default function LeaguePage() {
       if (saveError) {
         console.error('❌ Error saving answer:', saveError);
         console.error('❌ Payload that failed:', payload);
+        console.error('❌ Session ID:', currentSessionId);
+        console.error('❌ Competition ID:', competitionId);
         setError('Failed to save your answer. Please try again.');
         setShowResult(false); // Hide result if save failed
         return;
       } else {
-        console.log('✅ Answer saved successfully:', savedAnswer);
+        console.log('✅ Answer saved successfully to database');
+        console.log('✅ Saved answer details:', {
+          id: savedAnswer.id,
+          session_id: savedAnswer.session_id,
+          competition_question_id: savedAnswer.competition_question_id,
+          selected_answer: savedAnswer.selected_answer,
+          is_correct: savedAnswer.is_correct
+        });
       }
     } catch (err) {
       console.error('❌ Unexpected error saving answer:', err);
@@ -2532,6 +2690,7 @@ export default function LeaguePage() {
                   />
                   
                   {/* Answer Pin Marker - Google Maps Style */}
+                  {/* COMMENTED OUT: Red badge showing submission time
                   {answerSubmittedAt !== null && (
                     <div
                       className="absolute -top-10 flex flex-col items-center transition-all duration-300 z-10"
@@ -2541,17 +2700,17 @@ export default function LeaguePage() {
                       }}
                     >
                       {/* Pin Head - Teardrop Shape with Hollow Center */}
-                      <div className="relative">
+                      {/* <div className="relative">
                         {/* Outer pin shape */}
-                        <div className="relative w-8 h-8">
+                        {/* <div className="relative w-8 h-8">
                           {/* Red circle with hollow center */}
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
+                          {/* <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
                             {/* Hollow center - white circle */}
-                            <div className="absolute inset-[6px] rounded-full bg-white"></div>
+                            {/* <div className="absolute inset-[6px] rounded-full bg-white"></div>
                           </div>
                           
                           {/* Time label in center */}
-                          <div className="absolute inset-0 flex items-center justify-center">
+                          {/* <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[9px] font-bold text-red-600 z-10">
                               {Math.ceil(answerSubmittedAt)}s
                             </span>
@@ -2559,7 +2718,7 @@ export default function LeaguePage() {
                         </div>
                         
                         {/* Pin point - triangle */}
-                        <div className="absolute left-1/2 -translate-x-1/2 top-[26px]">
+                        {/* <div className="absolute left-1/2 -translate-x-1/2 top-[26px]">
                           <div 
                             className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-600"
                             style={{
@@ -2570,9 +2729,10 @@ export default function LeaguePage() {
                       </div>
                       
                       {/* Pin shadow */}
-                      <div className="w-3 h-1 bg-black opacity-20 rounded-full blur-sm mt-1"></div>
+                      {/* <div className="w-3 h-1 bg-black opacity-20 rounded-full blur-sm mt-1"></div>
                     </div>
                   )}
+                  */}
                 </div>
               </div>
             </div>
@@ -2603,25 +2763,68 @@ export default function LeaguePage() {
               )}
 
               {/* Late Joiner Penalty Warning */}
-              {showQuizLateJoinerWarning && (
+              {showQuizLateJoinerWarning && missedQuestions > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-4 mb-6 shadow-md"
+                  className={`bg-gradient-to-r ${isRejoin ? 'from-blue-50 to-indigo-50 border-blue-200' : 'from-amber-50 to-orange-50 border-amber-200'} border-2 rounded-xl p-4 mb-6 shadow-md`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0">
-                      <Users className="h-6 w-6 text-amber-600" />
+                      {isRejoin ? (
+                        <RotateCcw className="h-6 w-6 text-blue-600" />
+                      ) : (
+                        <Users className="h-6 w-6 text-amber-600" />
+                      )}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-amber-800 mb-2">Late Joiner Notice</h3>
-                      <div className="space-y-2 text-sm text-amber-700">
+                      <h3 className={`text-lg font-bold ${isRejoin ? 'text-blue-800' : 'text-amber-800'} mb-2`}>
+                        {isRejoin ? 'Rejoined Competition' : 'Late Joiner Notice'}
+                      </h3>
+                      <div className={`space-y-2 text-sm ${isRejoin ? 'text-blue-700' : 'text-amber-700'}`}>
+                        {isRejoin ? (
+                          <>
+                            <p className="flex items-center gap-2">
+                              <strong>Welcome back! Continuing from current question.</strong>
+                            </p>
+                            {missedQuestions > 0 && (
+                              <p>• {missedQuestions} unanswered question{missedQuestions !== 1 ? 's' : ''} marked wrong</p>
+                            )}
+                            {missedQuestions === 0 && (
+                              <p>• All your answers restored successfully</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="flex items-center gap-2">
+                              <strong>You missed {missedQuestions} question{missedQuestions !== 1 ? 's' : ''} - counted as incorrect</strong>
+                            </p>
+                            <p>• May affect prize eligibility</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Rejoin Success Message - Show when user rejoined but didn't miss any questions */}
+              {showQuizLateJoinerWarning && isRejoin && missedQuestions === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 mb-6 shadow-md"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <RotateCcw className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-green-800 mb-2">✅ Rejoined Successfully</h3>
+                      <div className="space-y-2 text-sm text-green-700">
                         <p className="flex items-center gap-2">
-                          <strong>You missed {missedQuestions} question{missedQuestions !== 1 ? 's' : ''} - counted as incorrect answers</strong>
+                          <strong>All answers restored. Continue playing!</strong>
                         </p>
-                        <p>• You may not be eligible for prizes due to late joining</p>
-
-
                       </div>
                     </div>
                   </div>
@@ -2677,7 +2880,7 @@ export default function LeaguePage() {
                         <div className="flex items-center">
                           <span className="font-medium">{choice}</span>
                           {showResult && selectedChoice === choice && (
-                            <span className="ml-2 text-lime-600">✓ Submitted</span>
+                            <span className="ml-2 text-lime-600">Submitted</span>
                           )}
                         </div>
                       </motion.button>
@@ -2916,11 +3119,11 @@ export default function LeaguePage() {
             {/* Summary Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 max-w-4xl mx-auto">
               <div className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-green-700">{answers.filter(a => a.is_correct).length}</div>
+                <div className="text-3xl font-bold text-green-700">{score}</div>
                 <div className="text-sm text-green-600 font-medium">Correct</div>
               </div>
               <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-red-700">{answers.filter(a => !a.is_correct).length}</div>
+                <div className="text-3xl font-bold text-red-700">{questions.length - score}</div>
                 <div className="text-sm text-red-600 font-medium">Wrong</div>
               </div>
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 text-center">
@@ -2937,15 +3140,22 @@ export default function LeaguePage() {
             <div className="space-y-4 max-w-4xl mx-auto mb-6">
               {questions.map((question, index) => {
                 // Find the user's answer for this specific question by matching question_id
-                // Try multiple matching strategies to handle different ID formats
+                // This ensures we show the correct answer for each question regardless of order
                 let userAnswer = answers.find(a => 
                   a.question_id === question.id || 
                   String(a.question_id) === String(question.id)
                 );
                 
-                // Fallback: if no match by ID, try matching by index (for older data)
-                if (!userAnswer && answers[index]) {
-                  userAnswer = answers[index];
+                // If no answer found by ID, this question was not answered (missed or skipped)
+                // Create a placeholder answer object
+                if (!userAnswer) {
+                  userAnswer = {
+                    question_id: question.id,
+                    is_correct: false,
+                    difficulty: question.difficulty,
+                    selected_answer: null,
+                    answer_time: undefined
+                  };
                 }
                 
                 const isCorrect = userAnswer?.is_correct || false;

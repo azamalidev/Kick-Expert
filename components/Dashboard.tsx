@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 import { TrophyService } from "../utils/trophyService";
 import {
   getRankFromXP,
@@ -40,12 +40,6 @@ const ranks = [
   { label: 'Expert', minXP: 1000, maxXP: 1999, color: 'text-purple-600', bgColor: 'bg-purple-100', icon: '⭐' },
   { label: 'Champion', minXP: 2000, maxXP: Infinity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: '🏆' },
 ];
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // Utility functions moved outside component to prevent recreation
 const getTransactionIcon = (type: string) => {
@@ -112,6 +106,9 @@ interface TransactionEntry {
   description: string;
   source: string;
   created_at: string;
+  competition_id?: string;
+  session_id?: string;
+  reference_id?: string;
 }
 
 interface SupportTicket {
@@ -148,6 +145,8 @@ export default React.memo(function Dashboard({
   initialSupportTickets,
   userEmail
 }: DashboardProps) {
+  // Supabase client is imported from lib/supabaseClient (has session access)
+
   const [profileData, setProfileData] = useState<ProfileData | null>(initialProfileData);
   const [purchasedCredits, setPurchasedCredits] = useState<number>(initialCredits.purchased);
   const [winningsCredits, setWinningsCredits] = useState<number>(initialCredits.winnings);
@@ -376,6 +375,17 @@ export default React.memo(function Dashboard({
     }
   }, [newMessage, selectedTicket]);
 
+  // Handle viewing competition results - navigate to new page
+  const handleViewCompetitionResults = (transaction: TransactionEntry) => {
+    if (!transaction.session_id) {
+      toast.error("No competition data available for this transaction");
+      return;
+    }
+    
+    // Navigate to competition results page
+    router.push(`/competition-results/${transaction.session_id}`);
+  };
+
   return (
     <div className="min-h-fit mt-15 bg-gray-50 text-gray-800 flex items-center justify-center p-6">
       {loading ? (
@@ -555,7 +565,7 @@ export default React.memo(function Dashboard({
                       Total Credits
                     </p>
                     <p className="text-xl font-bold text-lime-700">
-                      {totalCredits.toFixed(2)}
+                      {totalCredits % 1 === 0 ? totalCredits : totalCredits.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -585,7 +595,7 @@ export default React.memo(function Dashboard({
                       Winnings Credits
                     </p>
                     <p className="text-xl font-bold text-emerald-700">
-                      {winningsCredits.toFixed(2)}
+                      {winningsCredits % 1 === 0 ? winningsCredits : winningsCredits.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -1221,7 +1231,7 @@ export default React.memo(function Dashboard({
                               }`}
                             >
                               {transaction.amount >= 0 ? "+" : ""}$
-                              {Math.abs(transaction.amount).toFixed(2)}
+                              {Math.abs(transaction.amount) % 1 === 0 ? Math.abs(transaction.amount) : Math.abs(transaction.amount).toFixed(2)}
                             </p>
                             <p className="text-sm text-gray-500 capitalize">
                               {transaction.type}
@@ -1275,12 +1285,66 @@ export default React.memo(function Dashboard({
                         const paginated = transactions.slice(start, end);
                         return (
                           <>
-                            {paginated.map((transaction) => (
+                            {paginated.map((transaction) => {
+                              const isCompetitionTransaction = transaction.type === 'reward' || transaction.type === 'entry_fee';
+                              const hasSessionId = !!transaction.session_id;
+                              
+                              return (
                               <div
                                 key={transaction.id}
-                                className="p-4 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                                onClick={() => {
+                                  if (isCompetitionTransaction && hasSessionId) {
+                                    handleViewCompetitionResults(transaction);
+                                  } else if (isCompetitionTransaction && !hasSessionId) {
+                                    toast.error("This transaction doesn't have competition data linked");
+                                  }
+                                }}
+                                className={`p-3 sm:p-4 bg-white border border-gray-100 rounded-lg shadow-sm transition-all ${
+                                  isCompetitionTransaction && hasSessionId 
+                                    ? 'hover:shadow-lg hover:border-lime-300 cursor-pointer' 
+                                    : 'hover:shadow-md'
+                                }`}
                               >
-                                <div className="flex items-center justify-between">
+                                {/* Mobile Layout */}
+                                <div className="block sm:hidden">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                                      <div className="text-xl flex-shrink-0 mt-0.5">
+                                        {getTransactionIcon(transaction.type)}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-gray-800 text-sm leading-tight break-words">
+                                          {transaction.description}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right ml-2 flex-shrink-0">
+                                      <p className={`text-base font-bold whitespace-nowrap ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                        {transaction.amount >= 0 ? "+" : ""}{Math.abs(transaction.amount) % 1 === 0 ? Math.abs(transaction.amount) : Math.abs(transaction.amount).toFixed(2)}
+                                      </p>
+                                      <p className="text-xs text-gray-500">Credits</p>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    {transaction.source} • {formatDate(transaction.created_at)}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${transaction.status === "completed" ? "bg-green-100 text-green-800" : transaction.status === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
+                                      {transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : "Unknown"}
+                                    </span>
+                                    <span className="text-xs text-gray-400 capitalize">
+                                      {transaction.type.replace('_', ' ')}
+                                    </span>
+                                    {isCompetitionTransaction && hasSessionId && (
+                                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                        📊 Click to view
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Desktop Layout */}
+                                <div className="hidden sm:flex items-center justify-between">
                                   <div className="flex items-start space-x-4">
                                     <div className="text-2xl mt-1">
                                       {getTransactionIcon(transaction.type)}
@@ -1292,58 +1356,110 @@ export default React.memo(function Dashboard({
                                       <p className="text-sm text-gray-500 mt-1">
                                         {transaction.source} • {formatDate(transaction.created_at)}
                                       </p>
-                                      <div className="mt-2">
+                                      <div className="mt-2 flex items-center gap-2">
                                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${transaction.status === "completed" ? "bg-green-100 text-green-800" : transaction.status === "pending" ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"}`}>
                                           {transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : "Unknown"}
                                         </span>
+                                        {isCompetitionTransaction && hasSessionId && (
+                                          <span className="inline-block px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                            📊 Click to view results
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
                                   <div className="text-right">
                                     <p className={`text-lg font-bold ${transaction.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                      {transaction.amount >= 0 ? "+" : ""}{Math.abs(transaction.amount).toFixed(2)} Credits
+                                      {transaction.amount >= 0 ? "+" : ""}{Math.abs(transaction.amount) % 1 === 0 ? Math.abs(transaction.amount) : Math.abs(transaction.amount).toFixed(2)} Credits
                                     </p>
                                     <p className="text-sm text-gray-500 capitalize">{transaction.type.replace('_', ' ')}</p>
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                            )})}
 
-                            {/* Improved Pagination controls */}
-                            <div className="flex flex-col md:flex-row items-center justify-between mt-4">
-                              <div className="text-sm text-gray-600 mb-2 md:mb-0">
+
+                            {/* Modern Pagination controls */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-3">
+                              <div className="text-xs sm:text-sm text-gray-600 order-2 sm:order-1">
                                 Showing {(start + 1)}-{Math.min(end, transactions.length)} of {transactions.length}
                               </div>
 
-                              <div className="flex items-center space-x-2">
-
+                              <div className="flex items-center space-x-1 order-1 sm:order-2 overflow-x-auto max-w-full pb-2 sm:pb-0">
                                 <button
                                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                   disabled={currentPage === 1}
-                                  className="px-3 py-2 bg-gray-100 rounded-md disabled:opacity-50"
+                                  className="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium flex-shrink-0"
                                 >
-                                  ‹ Prev
+                                  ‹
                                 </button>
 
-                                {/* page numbers */}
-                                {Array.from({ length: Math.ceil(transactions.length / pageSize) }, (_, i) => i + 1).map((pageNum) => (
-                                  <button
-                                    key={pageNum}
-                                    onClick={() => setCurrentPage(pageNum)}
-                                    className={`px-3 py-2 rounded-md ${pageNum === currentPage ? 'bg-lime-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                                  >
-                                    {pageNum}
-                                  </button>
-                                ))}
+                                {/* Smart page numbers with ellipsis */}
+                                {(() => {
+                                  const totalPages = Math.ceil(transactions.length / pageSize);
+                                  const pages: (number | string)[] = [];
+                                  
+                                  if (totalPages <= 5) {
+                                    // Show all pages if 5 or fewer (mobile friendly)
+                                    for (let i = 1; i <= totalPages; i++) {
+                                      pages.push(i);
+                                    }
+                                  } else {
+                                    // Always show first page
+                                    pages.push(1);
+                                    
+                                    if (currentPage > 3) {
+                                      pages.push('...');
+                                    }
+                                    
+                                    // Show pages around current page
+                                    const start = Math.max(2, currentPage - 1);
+                                    const end = Math.min(totalPages - 1, currentPage + 1);
+                                    
+                                    for (let i = start; i <= end; i++) {
+                                      pages.push(i);
+                                    }
+                                    
+                                    if (currentPage < totalPages - 2) {
+                                      pages.push('...');
+                                    }
+                                    
+                                    // Always show last page
+                                    pages.push(totalPages);
+                                  }
+                                  
+                                  return pages.map((page, index) => {
+                                    if (page === '...') {
+                                      return (
+                                        <span key={`ellipsis-${index}`} className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400 text-xs sm:text-sm">
+                                          ...
+                                        </span>
+                                      );
+                                    }
+                                    
+                                    return (
+                                      <button
+                                        key={page}
+                                        onClick={() => setCurrentPage(page as number)}
+                                        className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-md transition-colors text-xs sm:text-sm font-medium flex-shrink-0 ${
+                                          page === currentPage
+                                            ? 'bg-lime-500 text-white shadow-sm'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        {page}
+                                      </button>
+                                    );
+                                  });
+                                })()}
 
                                 <button
                                   onClick={() => setCurrentPage((p) => Math.min(Math.ceil(transactions.length / pageSize), p + 1))}
                                   disabled={currentPage >= Math.ceil(transactions.length / pageSize)}
-                                  className="px-3 py-2 bg-gray-100 rounded-md disabled:opacity-50"
+                                  className="px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium flex-shrink-0"
                                 >
-                                  Next ›
+                                  ›
                                 </button>
-
                               </div>
                             </div>
                           </>

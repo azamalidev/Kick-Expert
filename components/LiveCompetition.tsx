@@ -1380,7 +1380,9 @@ const LiveCompetition = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      return !!data; // Returns true if session exists
+      // Only return true if session exists AND has end_time (completed)
+      // Sessions without end_time are incomplete (user left mid-competition)
+      return !!(data && data.end_time);
     } catch (err) {
       console.error('Error checking competition completion:', err);
       return false;
