@@ -309,34 +309,47 @@ export default memo(function Profile() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+    
     const fetchUserData = async () => {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        toast.error("Please log in to view your profile");
-        router.push("/login");
-        return;
-      }
-      setEmail(user.email || "");
       try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (!isMounted) return;
+        
+        if (authError || !user) {
+          toast.error("Please log in to view your profile");
+          router.push("/login");
+          return;
+        }
+        setEmail(user.email || "");
+        
         const { data, error } = await supabase
           .from('users')
           .select('name, created_at')
           .eq('id', user.id)
           .single();
+        
+        if (!isMounted) return;
+        
         if (error || !data) {
           console.error("Error fetching user data:", error);
           toast.error("Profile data not found");
+          setLoading(false);
           return;
         }
         const userData = data as SupabaseUser;
         setName(userData.name || "");
         setNewName(userData.name || "");
         setCreatedAt(userData.created_at || "");
+        
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('avatar_url, nationality, username, total_wins, total_games, xp, rank_label, credits, public_profile')
           .eq('user_id', user.id)
           .single();
+        
+        if (!isMounted) return;
         if (profileError) {
           console.error("Error fetching profile data:", profileError);
           setUserProfile(null);
@@ -388,18 +401,33 @@ export default memo(function Profile() {
           setPublicProfile(profile.public_profile ?? true);
           setUserProfile({ ...profile, username: profile.username || userData.name || "" });
         }
+        
+        if (!isMounted) return;
         await fetchUserTrophies(user.id);
+        
+        if (!isMounted) return;
         setReferralLink(`${window.location.origin}/signup?ref=${user.id}`);
         await fetchReferrals(user.id);
+        
+        if (!isMounted) return;
         await fetchReferralRewards(user.id);
       } catch (error) {
+        if (!isMounted) return;
         console.error("Error fetching user data:", error);
         toast.error("Failed to load profile data");
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
+    
     fetchUserData();
+    
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [router]);
 
   const fetchUserTrophies = async (userId: string) => {

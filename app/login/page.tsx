@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 export default function LoginPage() {
   return (
     <div className="px-4">
-      <Suspense fallback={<p>Loading login form...</p>}>
+      <Suspense >
         <Login />
       </Suspense>
     </div>

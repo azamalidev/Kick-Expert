@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   images: {
     domains: ['rjqjjudatklqdrynuati.supabase.co'], // ✅ Add your Supabase storage domain here
   },
+  // Optimize server-side rendering and prevent hanging
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+  // Add timeout for server components
+  serverComponentsExternalPackages: ['@supabase/ssr'],
   async rewrites() {
     return {
       beforeFiles: [
@@ -34,6 +42,16 @@ const nextConfig: NextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // Prevent caching of RSC payloads to avoid stale data
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
         ],
       },
