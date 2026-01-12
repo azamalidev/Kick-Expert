@@ -69,7 +69,7 @@ export default function ForgotPassword() {
           loading: { duration: Infinity },
         }}
       />
-      <div className="hidden lg:flex w-1/2 relative">
+      <div className="hidden lg:flex w-1/2  relative">
         <div className="fixed top-0 left-0 w-1/2 h-full overflow-hidden">
           <Image
             src="/images/slide1.jpg"
@@ -79,7 +79,7 @@ export default function ForgotPassword() {
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20"></div>
-          <div className="absolute bottom-10 left-0 right-0">
+          <div className="absolute  bottom-10 left-0 right-0">
             <div className="max-w-md mx-auto text-center text-white px-4">
               <h2 className="text-3xl font-bold mb-2">Reset Your Password</h2>
               <p className="text-lg">Enter your email to receive a reset link</p>
@@ -87,9 +87,9 @@ export default function ForgotPassword() {
           </div>
         </div>
       </div>
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+          <div className="bg-white p-4 rounded-2xl shadow-xl border border-gray-100">
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <Link href="/" className="flex items-center">

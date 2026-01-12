@@ -107,19 +107,20 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
 
         const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-        // Calculate prizes
-        const totalPlayers = allSessions.length;
-        const prizeConfig = getPrizePoolConfig(totalPlayers);
-        const totalPool = Math.floor(totalPlayers * 2 * prizeConfig.percentage); // Assuming 2 credits entry
+        // Fetch prize amounts from competition_results table (already calculated correctly)
+        const { data: competitionResults } = await supabase
+          .from('competition_results')
+          .select('user_id, prize_amount')
+          .eq('competition_id', sessionData.competition_id);
+
+        const prizeMap = new Map(competitionResults?.map(r => [r.user_id, r.prize_amount]) || []);
 
         const leaderboardData: LeaderboardEntry[] = allSessions.map((s, index) => {
           const profile = profilesMap.get(s.user_id);
           const rank = index + 1;
-          let prizeAmount = 0;
-
-          if (rank <= prizeConfig.distribution.length) {
-            prizeAmount = Math.ceil(totalPool * prizeConfig.distribution[rank - 1]);
-          }
+          
+          // Get prize amount from competition_results table (source of truth)
+          const prizeAmount = prizeMap.get(s.user_id) || 0;
 
           return {
             id: s.id,
@@ -181,23 +182,29 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
   };
 
   const getPrizePoolConfig = (playerCount: number) => {
-    if (playerCount >= 10) {
+    if (playerCount < 50) {
+      // <50 Players → Top 3 rewarded (40% of total revenue)
+      // Distribution: 20%, 12%, 8% of TOTAL REVENUE
       return {
-        percentage: 0.9,
-        distribution: [0.50, 0.30, 0.20],
-        winnerCount: 3
+        percentage: 0.4,
+        winnerCount: 3,
+        distribution: [0.2, 0.12, 0.08] // 20%, 12%, 8% of TOTAL REVENUE
       };
-    } else if (playerCount >= 5) {
+    } else if (playerCount < 100) {
+      // 50–100 Players → Top 5 rewarded (45% of total revenue)
+      // Distribution: 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
       return {
-        percentage: 0.85,
-        distribution: [0.60, 0.40],
-        winnerCount: 2
+        percentage: 0.45,
+        winnerCount: 5,
+        distribution: [0.2, 0.12, 0.07, 0.03, 0.03] // 20%, 12%, 7%, 3%, 3% of TOTAL REVENUE
       };
     } else {
+      // 100+ Players → Top 10 rewarded (50% of total revenue)
+      // Distribution: 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
       return {
-        percentage: 0.80,
-        distribution: [1.0],
-        winnerCount: 1
+        percentage: 0.5,
+        winnerCount: 10,
+        distribution: [0.2, 0.1, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01] // 20%, 10%, 7%, 4%, 3%, 2%, 1%, 1%, 1%, 1% of TOTAL REVENUE
       };
     }
   };

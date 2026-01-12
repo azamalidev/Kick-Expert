@@ -707,7 +707,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                       <span className="text-2xl">🥇</span>
                       <div>
                         <p className="text-sm font-semibold text-gray-700">1st Place</p>
-                        <p className="text-xs text-gray-500">50% of pool</p>
+                        <p className="text-xs text-gray-500">20% of pool</p>
                       </div>
                     </div>
                     <span className="text-base font-bold text-yellow-700">{dynamicPrizePool ? `${dynamicPrizePool.first} Credits` : competition.prizes[0].split(': ')[1]}</span>
@@ -717,7 +717,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                       <span className="text-2xl">🥈</span>
                       <div>
                         <p className="text-sm font-semibold text-gray-700">2nd Place</p>
-                        <p className="text-xs text-gray-500">30% of pool</p>
+                        <p className="text-xs text-gray-500">12% of pool</p>
                       </div>
                     </div>
                     <span className="text-base font-bold text-gray-600">{dynamicPrizePool ? `${dynamicPrizePool.second} Credits` : competition.prizes[1].split(': ')[1]}</span>
@@ -727,7 +727,7 @@ const CompetitionModal: React.FC<CompetitionModalProps> = ({
                       <span className="text-2xl">🥉</span>
                       <div>
                         <p className="text-sm font-semibold text-gray-700">3rd Place</p>
-                        <p className="text-xs text-gray-500">20% of pool</p>
+                        <p className="text-xs text-gray-500">8% of pool</p>
                       </div>
                     </div>
                     <span className="text-base font-bold text-amber-600">{dynamicPrizePool ? `${dynamicPrizePool.third} Credits` : competition.prizes[2].split(': ')[1]}</span>
@@ -1466,18 +1466,19 @@ const LiveCompetition = () => {
     const displayRevenue = playerCount >= minPlayers ? totalRevenue : fallbackRevenue;
 
     // Determine prize pool percentage and distribution based on player count
+    // Distribution percentages are applied directly to TOTAL REVENUE
     let poolPercentage = 0.4; // Default 40% for <50 players
-    let distribution = [0.20, 0.12, 0.08]; // Top 3 distribution (as % of prize pool)
+    let distribution = [0.20, 0.12, 0.08]; // Top 3 distribution (as % of TOTAL REVENUE)
     
     if (playerCount >= 100) {
       poolPercentage = 0.5; // 50% for 100+ players
-      distribution = [0.20, 0.10, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01]; // Top 10
+      distribution = [0.20, 0.10, 0.07, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01]; // Top 10 (as % of TOTAL REVENUE)
     } else if (playerCount >= 50) {
       poolPercentage = 0.45; // 45% for 50-100 players
-      distribution = [0.20, 0.12, 0.07, 0.03, 0.03]; // Top 5
+      distribution = [0.20, 0.12, 0.07, 0.03, 0.03]; // Top 5 (as % of TOTAL REVENUE)
     }
 
-    // Calculate actual prize pool (percentage of total revenue)
+    // Calculate actual prize pool (sum of all distributions from total revenue)
     const prizePool = Math.floor(displayRevenue * poolPercentage);
 
     return {
@@ -1485,9 +1486,9 @@ const LiveCompetition = () => {
       totalDisplay: displayRevenue,
       pool: prizePool,
       poolPercentage: poolPercentage * 100, // For display (40%, 45%, 50%)
-      first: Math.ceil(prizePool * distribution[0]),   // % of prize pool
-      second: Math.ceil(prizePool * distribution[1]),  // % of prize pool
-      third: Math.ceil(prizePool * distribution[2]),   // % of prize pool
+      first: Math.ceil(displayRevenue * distribution[0]),   // % of TOTAL REVENUE
+      second: Math.ceil(displayRevenue * distribution[1]),  // % of TOTAL REVENUE
+      third: Math.ceil(displayRevenue * distribution[2]),   // % of TOTAL REVENUE
       distribution: distribution, // Full distribution array
       winnerCount: distribution.length, // Number of winners
       isEstimated: playerCount < minPlayers,

@@ -40,6 +40,7 @@ interface LeaderboardEntry {
   isUser: boolean;
   rank: number;
   prizeAmount?: number; // Prize amount from database
+  questions_played?: number; // Total questions played
 }
 
 interface CompetitionDetails {
@@ -836,18 +837,6 @@ export default function LeaguePage() {
 
         console.log('⏰ Timer expired (30s) - Moving to next question');
 
-        // If user hasn't answered yet, show warning/auto-submit logic
-        if (!selectedChoiceRef.current && !showResult) {
-          // Logic for unanswered question (handled in handleNextQuestion or here)
-          // For now, we just proceed. handleNextQuestion handles the transition.
-          // If you want to force "No Answer" submission, do it here.
-          // But existing logic seems to handle "no choice" in handleNextQuestion? 
-          // Actually, handleNextQuestion just moves index. 
-          // We should probably auto-submit if not answered? 
-          // The previous code had "Case 2: user selected something -> show result".
-          // But now we wait for timer regardless.
-        }
-
         // ALWAYS move to next question when timer hits 0
         console.log(`⏰ Timer expired - Question ${currentQuestionIndex + 1}/${questions.length}`);
         console.log(`   Is last question: ${currentQuestionIndex === questions.length - 1}`);
@@ -1018,7 +1007,8 @@ export default function LeaguePage() {
               score: session.correct_answers || 0,
               rank: rank,
               prizeAmount: prizeAmount,
-              isUser: session.user_id === userId
+              isUser: session.user_id === userId,
+              questions_played: session.questions_played || questions.length
             };
           });
 
@@ -1729,18 +1719,31 @@ export default function LeaguePage() {
     } else {
       // Last question - complete the quiz
       console.log('🏁 Last question answered - completing quiz...');
+      console.log(`📊 Current answers count: ${answers.length}, Expected: ${questions.length}`);
       
       // Set loading state immediately to prevent footer from showing
       setResultsLoading(true);
       setPhase('results'); // Move to results phase immediately with loading state
       
+      // Wait longer to ensure last answer is saved to database
       setTimeout(async () => {
         console.log('🏁 Calling completeQuiz from handleNextQuestion...');
+        console.log(`📊 Final answers count before completeQuiz: ${answers.length}`);
+        
+        // Double-check that we have all answers before completing
+        if (answers.length < questions.length) {
+          console.warn(`⚠️ Missing answers! Expected ${questions.length}, got ${answers.length}`);
+          console.warn('⚠️ Waiting additional time for last answer to save...');
+          
+          // Wait a bit more for the last answer to be saved
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         await completeQuiz();
         setQuizCompleted(true);
         setShowResult(false);
         nextCalled.current = false; // Reset after completion
-      }, 100);
+      }, 500); // Increased from 100ms to 500ms
     }
   };
 
@@ -1816,13 +1819,44 @@ export default function LeaguePage() {
       if (!userId) throw new Error('User not authenticated');
 
       // Update session summary - fetch from database to ensure accuracy
-      const { data: sessionAnswers, error: answersError } = await supabase
+      console.log('📊 Fetching answers from database for session:', sessionId);
+      let sessionAnswers = null;
+      let answersError = null;
+      
+      const fetchResult = await supabase
         .from('competition_answers')
-        .select('is_correct')
+        .select('is_correct, competition_question_id, selected_answer')
         .eq('session_id', sessionId);
+      
+      sessionAnswers = fetchResult.data;
+      answersError = fetchResult.error;
+
+      if (answersError) {
+        console.error('❌ Error fetching session answers:', answersError);
+      }
+
+      console.log('📊 Database answers:', sessionAnswers?.length, 'State answers:', answers.length, 'Expected:', questions.length);
+      
+      if (sessionAnswers && sessionAnswers.length < questions.length) {
+        console.warn(`⚠️ DATABASE MISSING ANSWERS! DB has ${sessionAnswers.length}, expected ${questions.length}`);
+        console.warn('⚠️ This usually means the last answer was not saved yet. Waiting 1 second and retrying...');
+        
+        // Wait and retry fetching
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const retryResult = await supabase
+          .from('competition_answers')
+          .select('is_correct, competition_question_id, selected_answer')
+          .eq('session_id', sessionId);
+        
+        if (retryResult.data) {
+          sessionAnswers = retryResult.data;
+          console.log('📊 After retry - Database answers:', sessionAnswers.length);
+        }
+      }
 
       const correctAnswers = sessionAnswers?.filter(a => a.is_correct).length || answers.filter(a => a.is_correct).length;
-      console.log('📊 Correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
+      console.log('📊 Final correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
       
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
@@ -2182,14 +2216,13 @@ export default function LeaguePage() {
     }
 
     // Calculate based on total revenue and distribution
-    // Distribution percentages are applied to the POOL (not total revenue)
+    // Distribution percentages are applied DIRECTLY to TOTAL REVENUE
     const totalRevenue = calculateTotalRevenue();
-    const prizePool = Math.floor(totalRevenue * config.percentage);
     const rankIndex = rank - 1; // Convert to 0-based index
 
     if (rankIndex < config.distribution.length) {
-      // Apply distribution percentage to the pool
-      return Math.ceil(prizePool * config.distribution[rankIndex]);
+      // Apply distribution percentage directly to total revenue
+      return Math.ceil(totalRevenue * config.distribution[rankIndex]);
     }
 
     return 0;
@@ -2384,12 +2417,7 @@ export default function LeaguePage() {
         <div className="bg-white p-8 rounded-xl shadow-md max-w-md text-center">
           <h2 className="text-xl font-bold text-red-500 mb-4">Error Loading Quiz</h2>
           <p className="mb-6 text-gray-600">{error}</p>
-          <button
-            onClick={handleRestartQuiz}
-            className="px-6 py-2 bg-lime-500 text-white rounded-lg hover:bg-lime-600 transition font-medium"
-          >
-            Try Again
-          </button>
+         
         </div>
       </div>
     );
@@ -2559,9 +2587,9 @@ export default function LeaguePage() {
                     </span>
                     <span className="text-sm font-bold text-yellow-600">
                       {(() => {
-                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const totalRevenue = players.length * getCreditCost();
                         const distribution = getPrizePoolConfig(players.length).distribution;
-                        return Math.ceil(totalPool * distribution[0]);
+                        return Math.ceil(totalRevenue * distribution[0]);
                       })()} Credits
                     </span>
                   </div>
@@ -2571,9 +2599,9 @@ export default function LeaguePage() {
                     </span>
                     <span className="text-sm font-bold text-gray-600">
                       {(() => {
-                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const totalRevenue = players.length * getCreditCost();
                         const distribution = getPrizePoolConfig(players.length).distribution;
-                        return Math.ceil(totalPool * distribution[1]);
+                        return Math.ceil(totalRevenue * distribution[1]);
                       })()} Credits
                     </span>
                   </div>
@@ -2583,9 +2611,9 @@ export default function LeaguePage() {
                     </span>
                     <span className="text-sm font-bold text-amber-600">
                       {(() => {
-                        const totalPool = Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage);
+                        const totalRevenue = players.length * getCreditCost();
                         const distribution = getPrizePoolConfig(players.length).distribution;
-                        return Math.ceil(totalPool * distribution[2]);
+                        return Math.ceil(totalRevenue * distribution[2]);
                       })()} Credits
                     </span>
                   </div>
@@ -3403,7 +3431,7 @@ export default function LeaguePage() {
                             {entry.isUser && <span className="ml-2 text-lime-600 font-semibold">(You)</span>}
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            <span className="font-semibold">{entry.score}/{questions.length}</span>
+                            <span className="font-semibold">{entry.score}/{entry.questions_played || questions.length}</span>
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                             {prize > 0 ? (
