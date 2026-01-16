@@ -1855,39 +1855,16 @@ export default function LeaguePage() {
         }
       }
 
-      // CRITICAL: Always count from database, never from state
-      // Re-fetch one final time to ensure we have the absolute latest count
-      const { data: finalAnswers, error: finalError } = await supabase
-        .from('competition_answers')
-        .select('is_correct')
-        .eq('session_id', sessionId);
-
-      if (finalError) {
-        console.error('❌ Error in final answer fetch:', finalError);
-      }
-
-      const correctAnswers = finalAnswers?.filter(a => a.is_correct).length || 0;
-      const totalAnswers = finalAnswers?.length || 0;
-      
-      console.log('📊 FINAL correct answers count:', correctAnswers, 'Total answers in DB:', totalAnswers, 'Expected:', questions.length);
-      
-      if (totalAnswers < questions.length) {
-        console.error(`⚠️ CRITICAL: Database still missing answers! DB has ${totalAnswers}, expected ${questions.length}`);
-      }
+      const correctAnswers = sessionAnswers?.filter(a => a.is_correct).length || answers.filter(a => a.is_correct).length;
+      console.log('📊 Final correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
       
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
-      const { error: updateError } = await supabase.from('competition_sessions').update({
+      await supabase.from('competition_sessions').update({
         correct_answers: correctAnswers,
         score_percentage: scorePercentage,
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
-
-      if (updateError) {
-        console.error('❌ Error updating competition_sessions:', updateError);
-      } else {
-        console.log('✅ Session updated with correct_answers:', correctAnswers, 'score_percentage:', scorePercentage.toFixed(2));
-      }
 
       // Calculate rank based on score and time (this should be handled by a database function in production)
       const { data: allScores, error: scoresError } = await supabase
