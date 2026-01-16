@@ -1855,16 +1855,39 @@ export default function LeaguePage() {
         }
       }
 
-      const correctAnswers = sessionAnswers?.filter(a => a.is_correct).length || answers.filter(a => a.is_correct).length;
-      console.log('📊 Final correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
+      // CRITICAL: Always count from database, never from state
+      // Re-fetch one final time to ensure we have the absolute latest count
+      const { data: finalAnswers, error: finalError } = await supabase
+        .from('competition_answers')
+        .select('is_correct')
+        .eq('session_id', sessionId);
+
+      if (finalError) {
+        console.error('❌ Error in final answer fetch:', finalError);
+      }
+
+      const correctAnswers = finalAnswers?.filter(a => a.is_correct).length || 0;
+      const totalAnswers = finalAnswers?.length || 0;
+      
+      console.log('📊 FINAL correct answers count:', correctAnswers, 'Total answers in DB:', totalAnswers, 'Expected:', questions.length);
+      
+      if (totalAnswers < questions.length) {
+        console.error(`⚠️ CRITICAL: Database still missing answers! DB has ${totalAnswers}, expected ${questions.length}`);
+      }
       
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
-      await supabase.from('competition_sessions').update({
+      const { error: updateError } = await supabase.from('competition_sessions').update({
         correct_answers: correctAnswers,
         score_percentage: scorePercentage,
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
+
+      if (updateError) {
+        console.error('❌ Error updating competition_sessions:', updateError);
+      } else {
+        console.log('✅ Session updated with correct_answers:', correctAnswers, 'score_percentage:', scorePercentage.toFixed(2));
+      }
 
       // Calculate rank based on score and time (this should be handled by a database function in production)
       const { data: allScores, error: scoresError } = await supabase
@@ -2230,6 +2253,12 @@ export default function LeaguePage() {
 
   // Helper function to get credit cost with fallback
   const getCreditCost = (): number => {
+    console.log('🔍 getCreditCost called:', {
+      credit_cost: competitionDetails?.credit_cost,
+      entry_fee: competitionDetails?.entry_fee,
+      name: competitionDetails?.name
+    });
+    
     if (competitionDetails?.credit_cost) {
       return competitionDetails.credit_cost;
     }
@@ -2563,7 +2592,20 @@ export default function LeaguePage() {
                     <span className="text-sm font-semibold text-gray-600">Prize Pool</span>
                   </div>
                   <p className="text-2xl font-bold text-yellow-700">
-                    {Math.floor(players.length * getCreditCost() * getPrizePoolConfig(players.length).percentage)} Credits
+                    {(() => {
+                      const playerCount = players.length;
+                      const creditCost = getCreditCost();
+                      const poolPercentage = getPrizePoolConfig(playerCount).percentage;
+                      const prizePool = Math.floor(playerCount * creditCost * poolPercentage);
+                      console.log('💰 Prize Pool Calculation:', {
+                        playerCount,
+                        creditCost,
+                        poolPercentage,
+                        totalRevenue: playerCount * creditCost,
+                        prizePool
+                      });
+                      return prizePool;
+                    })()} Credits
                   </p>
                  
                 </div>
@@ -2589,7 +2631,15 @@ export default function LeaguePage() {
                       {(() => {
                         const totalRevenue = players.length * getCreditCost();
                         const distribution = getPrizePoolConfig(players.length).distribution;
-                        return Math.ceil(totalRevenue * distribution[0]);
+                        const firstPlacePrize = Math.ceil(totalRevenue * distribution[0]);
+                        console.log('🥇 1st Place Calculation:', {
+                          playerCount: players.length,
+                          creditCost: getCreditCost(),
+                          totalRevenue,
+                          distribution: distribution[0],
+                          firstPlacePrize
+                        });
+                        return firstPlacePrize;
                       })()} Credits
                     </span>
                   </div>
