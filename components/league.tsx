@@ -116,7 +116,7 @@ export default function LeaguePage() {
         // First, check if user is authenticated
         const authResponse = await supabase.auth.getUser();
         console.log('👤 Auth check:', authResponse.data.user ? 'Logged in' : 'Not logged in');
-        
+
         if (authResponse.data.user) {
           // 🔒 STEP 2: Browser Fingerprint Check
           console.log('🔍 Checking device fingerprint...');
@@ -278,7 +278,7 @@ export default function LeaguePage() {
       const countdownInterval = setInterval(() => {
         // Don't check if competition has ended during waiting phase
         // Only check after competition has started
-        
+
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownInterval);
@@ -382,7 +382,7 @@ export default function LeaguePage() {
 
         // Call the local route which merges competition_questions with questions
         console.log('🚀 Fetching questions for competition:', competitionId);
-        
+
         const routeRes = await fetch('/api/competition-questions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -402,7 +402,7 @@ export default function LeaguePage() {
 
         const routeJson = await routeRes.json();
         console.log('📦 Full API Response:', routeJson);
-        
+
         // Check if API returned an error
         if (routeJson.error) {
           console.error('❌ API returned error:', routeJson.error);
@@ -415,7 +415,7 @@ export default function LeaguePage() {
         const questionsData = routeJson?.questions ?? [];
 
         console.log('🌐 Received from API:', questionsData.length, 'questions');
-        
+
         if (questionsData.length > 0) {
           console.log('📊 First question sample:', questionsData[0]);
           console.log('📊 Difficulty breakdown:',
@@ -511,7 +511,7 @@ export default function LeaguePage() {
         // ========================================
         // STEP 1: Check registration and session FIRST (before question initialization)
         // ========================================
-        
+
         // Check registration
         const { data: reg, error: regErr } = await supabase
           .from('competition_registrations')
@@ -556,7 +556,7 @@ export default function LeaguePage() {
           console.log('📋 Existing session:', existingSession);
           isRejoin = true;
           rejoinSessionId = existingSession.id;
-          
+
           // CRITICAL: Set state immediately when rejoin is detected
           setIsRejoin(true);
 
@@ -594,7 +594,7 @@ export default function LeaguePage() {
         } else {
           setSessionId(null); // No session yet for new users
         }
-        
+
         // persist registration id for use when saving answers
         // @ts-ignore
         (window as any).__currentCompetitionRegistrationId = registrationId;
@@ -602,7 +602,7 @@ export default function LeaguePage() {
         // ========================================
         // STEP 2: NOW calculate correct starting question (isRejoin is set correctly now)
         // ========================================
-        
+
         // IMMEDIATELY calculate correct starting question for late joiners OR rejoining users
         // This prevents showing Q1 before jumping to correct question
         if (competitionStartTime && Date.now() > competitionStartTime) {
@@ -615,7 +615,7 @@ export default function LeaguePage() {
             if (isRejoin) {
               console.log(`🔄 REJOIN: User returning to competition at question ${missed + 1}`);
               console.log(`📋 Will process questions 1-${missed} to restore/mark as missed`);
-              
+
               // Restore existing session ID
               setSessionId(rejoinSessionId);
               (window as any).__currentCompetitionRegistrationId = registrationId;
@@ -635,11 +635,11 @@ export default function LeaguePage() {
               // Process all questions up to current global question
               for (let i = 0; i < missed; i++) {
                 const question = normalizedQuestions[i];
-                
+
                 // Try multiple matching strategies
                 const existingAnswer = existingAnswers.find(
-                  a => a.competition_question_id === question.id || 
-                       String(a.competition_question_id) === String(question.id)
+                  a => a.competition_question_id === question.id ||
+                    String(a.competition_question_id) === String(question.id)
                 );
 
                 console.log(`🔍 Q${i + 1} (ID: ${question.id}): ${existingAnswer ? '✅ Found in DB' : '❌ NOT found in DB'}`);
@@ -822,7 +822,7 @@ export default function LeaguePage() {
           // Set loading state IMMEDIATELY
           setResultsLoading(true);
           setPhase('results');
-          
+
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
@@ -870,7 +870,7 @@ export default function LeaguePage() {
           colors: ['#84cc16', '#22c55e', '#15803d'],
         });
       }, 300); // 300ms delay to ensure modal is visible
-      
+
       return () => clearTimeout(timer);
     }
   }, [phase, score, resultsLoading]);
@@ -886,79 +886,22 @@ export default function LeaguePage() {
         try {
           console.log('🔍 Fetching leaderboard for competition:', competitionId);
 
-          // PRIORITY 1: Try to fetch from competition_results table (most reliable)
-          const { data: results, error: resultsError } = await supabase
-            .from('competition_results')
-            .select('user_id, score, rank, prize_amount')
-            .eq('competition_id', competitionId)
-            .order('rank', { ascending: true });
-
-          console.log('📊 Competition results query:', { 
-            results, 
-            error: resultsError,
-            resultCount: results?.length || 0 
-          });
-
-          // If competition_results has data, use it (most accurate)
-          if (results && results.length > 0) {
-            console.log('✅ Using competition_results table (', results.length, 'entries)');
-
-            const userIds = Array.from(new Set(results.map((r: any) => r.user_id).filter(Boolean)));
-
-            // Get usernames for the leaderboard entries
-            let profilesMap: Record<string, any> = {};
-            if (userIds.length > 0) {
-              const { data: profilesData } = await supabase
-                .from('profiles')
-                .select('user_id, username')
-                .in('user_id', userIds as any[]);
-
-              (profilesData || []).forEach((p: any) => {
-                profilesMap[p.user_id] = p;
-              });
-            }
-
-            // Map results to leaderboard entries
-            const leaderboardData: LeaderboardEntry[] = results.map((result: any) => {
-              console.log(`📊 Competition result entry:`, {
-                user_id: result.user_id,
-                score: result.score,
-                rank: result.rank,
-                prize_amount: result.prize_amount
-              });
-              return {
-                id: result.user_id, // Use user_id as unique identifier
-                name: (profilesMap[result.user_id] && profilesMap[result.user_id].username) || `User ${result.user_id.substring(0, 8)}`,
-                score: result.score || 0,
-                rank: result.rank,
-                prizeAmount: result.prize_amount || 0,
-                isUser: result.user_id === userId
-              };
+          // ⚠️ IMPORTANT: First try to finalize the competition if it has ended
+          // This ensures correct ranks are calculated AFTER all users have finished
+          try {
+            const finalizeRes = await fetch('/api/finalize-competition', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ competitionId })
             });
-
-            // Sort by rank to ensure proper display order (ascending - 1, 2, 3, 4...)
-            leaderboardData.sort((a, b) => a.rank - b.rank);
-            console.log('📊 Leaderboard sorted by rank:', leaderboardData.map(e => `${e.name}: Rank ${e.rank}, Score ${e.score}`));
-
-            setLeaderboard(leaderboardData);
-
-            // Set user's rank if they participated
-            if (userId) {
-              const userEntry = leaderboardData.find(entry => entry.isUser);
-              if (userEntry) {
-                setUserRank(userEntry.rank);
-                console.log('👤 User rank set to:', userEntry.rank);
-              }
-            }
-
-            // Update last updated timestamp
-            setLeaderboardLastUpdated(new Date());
-            console.log('✅ Leaderboard updated from competition_results with', leaderboardData.length, 'entries');
-            return; // Exit early - we have the data
+            const finalizeData = await finalizeRes.json();
+            console.log('📊 Finalize check result:', finalizeData);
+          } catch (err) {
+            console.warn('Finalize check failed (non-critical):', err);
           }
 
-          // FALLBACK: Use competition_sessions if competition_results is empty
-          console.log('⚠️ No data in competition_results, falling back to competition_sessions');
+          // Calculate ranks dynamically from competition_sessions
+          console.log('📊 Using competition_sessions for dynamic rank calculation');
 
           const { data: sessions, error: leaderboardError } = await supabase
             .from('competition_sessions')
@@ -966,10 +909,10 @@ export default function LeaguePage() {
             .eq('competition_id', competitionId)
             .not('end_time', 'is', null);
 
-          console.log('📊 Sessions query result:', { 
-            sessions, 
+          console.log('📊 Sessions query result:', {
+            sessions,
             error: leaderboardError,
-            sessionCount: sessions?.length || 0 
+            sessionCount: sessions?.length || 0
           });
 
           if (leaderboardError) {
@@ -991,10 +934,10 @@ export default function LeaguePage() {
             // Get scores, default to 0 if null/undefined
             const scoreA = a.correct_answers ?? 0;
             const scoreB = b.correct_answers ?? 0;
-            
+
             // Primary sort: Higher score wins
             if (scoreB !== scoreA) return scoreB - scoreA;
-            
+
             // Tie-breaker: Faster completion time wins (earlier end_time)
             return new Date(a.end_time).getTime() - new Date(b.end_time).getTime();
           });
@@ -1018,7 +961,7 @@ export default function LeaguePage() {
           const actualPlayerCount = sortedSessions.length;
           const prizeConfig = getPrizePoolConfig(actualPlayerCount);
           const totalRevenue = actualPlayerCount * getCreditCost();
-          
+
           console.log('💰 Prize pool calculation for fallback leaderboard:', {
             actualPlayerCount,
             creditCost: getCreditCost(),
@@ -1030,20 +973,20 @@ export default function LeaguePage() {
           // Map sessions to leaderboard entries with correct ranking
           const leaderboardData: LeaderboardEntry[] = sortedSessions.map((session: any, index: number) => {
             const rank = index + 1; // 1-based rank
-            
+
             // Calculate prize amount based on actual player count
             let prizeAmount = 0;
             if (rank <= prizeConfig.winnerCount) {
               const rankIndex = rank - 1;
               prizeAmount = Math.ceil(totalRevenue * prizeConfig.distribution[rankIndex]);
             }
-            
+
             console.log(`📊 Leaderboard entry ${rank}:`, {
               user_id: session.user_id,
               score: session.correct_answers,
               rank,
               prizeAmount,
-              calculation: rank <= prizeConfig.winnerCount 
+              calculation: rank <= prizeConfig.winnerCount
                 ? `${totalRevenue} × ${prizeConfig.distribution[rank - 1]} = ${prizeAmount}`
                 : 'Not a winner'
             });
@@ -1135,7 +1078,7 @@ export default function LeaguePage() {
           // Set loading state IMMEDIATELY
           setResultsLoading(true);
           setPhase('results');
-          
+
           // Complete quiz if in quiz phase
           if (phase === 'quiz' && sessionId && !quizCompleted) {
             completeQuiz().then(() => {
@@ -1227,7 +1170,7 @@ export default function LeaguePage() {
           // Set loading state IMMEDIATELY
           setResultsLoading(true);
           setPhase('results');
-          
+
           // Complete quiz and move to results (not leaderboard)
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
@@ -1366,7 +1309,7 @@ export default function LeaguePage() {
           // Set loading state IMMEDIATELY
           setResultsLoading(true);
           setPhase('results');
-          
+
           if (sessionId && !quizCompleted) {
             completeQuiz().then(() => {
               setQuizCompleted(true);
@@ -1380,10 +1323,10 @@ export default function LeaguePage() {
         // CRITICAL: Save current answer BEFORE forcing sync (even if no answer selected)
         if (questions[currentQuestionIndex]) {
           const currentQuestion = questions[currentQuestionIndex];
-          
+
           // Check if this question was already answered (rejoin scenario)
           const alreadyAnswered = answers.find(a => a.question_id === currentQuestion.id);
-          
+
           if (!alreadyAnswered) {
             const userAnswer = selectedChoiceRef.current;
             const isCorrect = userAnswer ? userAnswer === currentQuestion.correct_answer : false; // Ensure boolean
@@ -1467,7 +1410,7 @@ export default function LeaguePage() {
         // Set loading state IMMEDIATELY
         setResultsLoading(true);
         setPhase('results');
-        
+
         // Complete quiz properly (calculate results, save to DB, etc.)
         completeQuiz().then(() => {
           // Loading will be cleared in completeQuiz finally block
@@ -1500,7 +1443,7 @@ export default function LeaguePage() {
   // Handle submitting answer when user clicks "Submit Answer" button
   const handleSubmitAnswer = async () => {
     console.log('🔘 Submit Answer clicked!', { selectedChoice, showResult });
-    
+
     if (!selectedChoice || showResult) {
       console.log('❌ Submit blocked:', { selectedChoice, showResult });
       return;
@@ -1694,9 +1637,9 @@ export default function LeaguePage() {
           response_time_ms: latencyMs > 0 ? latencyMs : null
         })
       }).catch(err => console.error('Failed to track answer stats:', err)),
-      
+
       // Save speed detection data (fire and forget)
-      selectedChoice && latencyMs > 0 ? 
+      selectedChoice && latencyMs > 0 ?
         supabase.from('competition_speed_detection').insert({
           competition_id: competitionId,
           user_id: userId,
@@ -1727,7 +1670,7 @@ export default function LeaguePage() {
       // Set loading state IMMEDIATELY
       setResultsLoading(true);
       setPhase('results');
-      
+
       if (sessionId && !quizCompleted) {
         await completeQuiz();
         setQuizCompleted(true);
@@ -1769,25 +1712,25 @@ export default function LeaguePage() {
       // Last question - complete the quiz
       console.log('🏁 Last question answered - completing quiz...');
       console.log(`📊 Current answers count: ${answers.length}, Expected: ${questions.length}`);
-      
+
       // Set loading state immediately to prevent footer from showing
       setResultsLoading(true);
       setPhase('results'); // Move to results phase immediately with loading state
-      
+
       // Wait longer to ensure last answer is saved to database
       setTimeout(async () => {
         console.log('🏁 Calling completeQuiz from handleNextQuestion...');
         console.log(`📊 Final answers count before completeQuiz: ${answers.length}`);
-        
+
         // Double-check that we have all answers before completing
         if (answers.length < questions.length) {
           console.warn(`⚠️ Missing answers! Expected ${questions.length}, got ${answers.length}`);
           console.warn('⚠️ Waiting additional time for last answer to save...');
-          
+
           // Wait a bit more for the last answer to be saved
           await new Promise(resolve => setTimeout(resolve, 500));
         }
-        
+
         await completeQuiz();
         setQuizCompleted(true);
         setShowResult(false);
@@ -1838,7 +1781,7 @@ export default function LeaguePage() {
 
   const completeQuiz = async () => {
     console.log('🏁 completeQuiz called!', { sessionId, answersCount: answers.length });
-    
+
     if (!sessionId) {
       console.error("❌ No session ID found - cannot complete quiz");
       console.error("💡 This means the session was never created. Check if user answered any questions.");
@@ -1847,7 +1790,7 @@ export default function LeaguePage() {
     }
 
     console.log('✅ Session ID exists:', sessionId);
-    
+
     // Loading state should already be set by caller, but ensure it's true
     if (!resultsLoading) {
       setResultsLoading(true);
@@ -1871,12 +1814,12 @@ export default function LeaguePage() {
       console.log('📊 Fetching answers from database for session:', sessionId);
       let sessionAnswers = null;
       let answersError = null;
-      
+
       const fetchResult = await supabase
         .from('competition_answers')
         .select('is_correct, competition_question_id, selected_answer')
         .eq('session_id', sessionId);
-      
+
       sessionAnswers = fetchResult.data;
       answersError = fetchResult.error;
 
@@ -1885,19 +1828,19 @@ export default function LeaguePage() {
       }
 
       console.log('📊 Database answers:', sessionAnswers?.length, 'State answers:', answers.length, 'Expected:', questions.length);
-      
+
       if (sessionAnswers && sessionAnswers.length < questions.length) {
         console.warn(`⚠️ DATABASE MISSING ANSWERS! DB has ${sessionAnswers.length}, expected ${questions.length}`);
         console.warn('⚠️ This usually means the last answer was not saved yet. Waiting 1 second and retrying...');
-        
+
         // Wait and retry fetching
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const retryResult = await supabase
           .from('competition_answers')
           .select('is_correct, competition_question_id, selected_answer')
           .eq('session_id', sessionId);
-        
+
         if (retryResult.data) {
           sessionAnswers = retryResult.data;
           console.log('📊 After retry - Database answers:', sessionAnswers.length);
@@ -1906,7 +1849,7 @@ export default function LeaguePage() {
 
       const correctAnswers = sessionAnswers?.filter(a => a.is_correct).length || answers.filter(a => a.is_correct).length;
       console.log('📊 Final correct answers count:', correctAnswers, 'from DB:', sessionAnswers?.length, 'from state:', answers.length);
-      
+
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
       await supabase.from('competition_sessions').update({
@@ -1915,295 +1858,48 @@ export default function LeaguePage() {
         end_time: new Date().toISOString(),
       }).eq('id', sessionId);
 
-      // Calculate rank based on score and time (this should be handled by a database function in production)
-      const { data: allScores, error: scoresError } = await supabase
-        .from('competition_sessions')
-        .select('user_id, correct_answers, end_time')
-        .eq('competition_id', competitionId)
-        .not('end_time', 'is', null);
+      console.log('✅ Session updated with end_time and score');
 
-      console.log('📊 All scores for ranking:', allScores, 'Error:', scoresError);
-
-      if (allScores) {
-        // Sort by correct answers (desc) and end time (asc - faster completion is better)
-        const sortedScores = allScores
-          .map(session => ({
-            user_id: session.user_id,
-            score: session.correct_answers || 0,
-            end_time: new Date(session.end_time).getTime()
-          }))
-          .sort((a, b) => {
-            // Primary sort: Higher score wins
-            if (b.score !== a.score) return b.score - a.score;
-            // Tie-breaker: Faster completion time wins
-            return a.end_time - b.end_time;
-          });
-
-        console.log('🏆 Sorted scores for ranking:', sortedScores);
-
-        // Use actual completed player count for prize calculations
-        const actualPlayerCount = sortedScores.length;
-        console.log('👥 Actual completed players:', actualPlayerCount);
-
-        // Find user's rank (1-based index)
-        const userRankIndex = sortedScores.findIndex(score => score.user_id === userId);
-        const userRank = userRankIndex >= 0 ? userRankIndex + 1 : sortedScores.length;
-        console.log('👤 User rank calculated:', userRank, 'for user:', userId, 'at index:', userRankIndex);
-        
-        // Calculate prizes based on ACTUAL completed player count
-        const prizeConfig = getPrizePoolConfig(actualPlayerCount);
-        const totalRevenue = actualPlayerCount * getCreditCost();
-        
-        // Calculate prize amount for this rank
-        let prizeAmount = 0;
-        if (userRank <= prizeConfig.winnerCount) {
-          const rankIndex = userRank - 1;
-          prizeAmount = Math.ceil(totalRevenue * prizeConfig.distribution[rankIndex]);
-        }
-        
-        console.log('💰 Prize calculation:', {
-          rank: userRank,
-          actualPlayerCount,
-          creditCost: getCreditCost(),
-          totalRevenue,
-          prizePoolPercentage: prizeConfig.percentage,
-          winnerCount: prizeConfig.winnerCount,
-          prizeAmount
-        });
-        
-        const xpAwarded = calculateXPAwarded(userRank, correctAnswers, actualPlayerCount);
-        const isTrophyWinner = userRank <= prizeConfig.winnerCount;
-
-        // Upsert into competition_results table (prevents duplicate errors)
-        console.log('💾 Upserting competition result:', {
-          competition_id: competitionId,
-          user_id: userId,
-          rank: userRank,
-          score: correctAnswers,
-          xp_awarded: xpAwarded,
-          trophy_awarded: isTrophyWinner,
-          prize_amount: prizeAmount,
-          total_players: actualPlayerCount,
-          total_revenue: totalRevenue
-        });
-
-        const { data: upsertResult, error: upsertError } = await supabase
-          .from('competition_results')
-          .upsert({
-            competition_id: competitionId,
-            user_id: userId,
-            score: correctAnswers,
-            rank: userRank,
-            xp_awarded: xpAwarded,
-            trophy_awarded: isTrophyWinner,
-            prize_amount: prizeAmount
-          }, {
-            onConflict: 'competition_id,user_id' // Prevent duplicates
-          });
-
-        if (upsertError) {
-          console.error('❌ Failed to upsert competition result:', upsertError);
-        } else {
-          console.log('✅ Successfully upserted competition result:', upsertResult);
-        }
-
-        // Insert transaction record if prize won
-        if (prizeAmount > 0) {
-          try {
-            const rankSuffix = userRank === 1 ? '1st' : userRank === 2 ? '2nd' : userRank === 3 ? '3rd' : `${userRank}th`;
-            const competitionName = competitionDetails?.name || 'League Competition';
-
-            const { error: txError } = await supabase.from('transactions').insert({
-              user_id: userId,
-              type: 'reward',
-              amount: prizeAmount,
-              status: 'completed',
-              metadata: {
-                rank: userRank,
-                score: correctAnswers,
-                prize_amount: prizeAmount,
-                competition_id: competitionId,
-                total_questions: questions.length,
-                competition_name: competitionName
-              },
-              description: `Competition Reward (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}/${questions.length}`,
-              session_id: sessionId,
-              source: 'league_competition'
-            });
-
-            if (txError) {
-              console.error('❌ Failed to insert transaction record:', txError);
-            } else {
-              console.log('✅ Transaction record created for prize reward');
-
-              // CRITICAL: Update user_credits to add winnings
-              try {
-                const { data: currentCredits, error: fetchError } = await supabase
-                  .from('user_credits')
-                  .select('winnings_credits')
-                  .eq('user_id', userId)
-                  .maybeSingle();
-
-                if (fetchError) {
-                  console.error('❌ Error fetching current credits:', fetchError);
-                } else if (currentCredits) {
-                  const newWinningsCredits = (parseFloat(currentCredits.winnings_credits) || 0) + prizeAmount;
-
-                  const { error: updateError } = await supabase
-                    .from('user_credits')
-                    .update({
-                      winnings_credits: newWinningsCredits,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('user_id', userId);
-
-                  if (updateError) {
-                    console.error('❌ Error updating winnings_credits:', updateError);
-                  } else {
-                    console.log(`✅ Winnings credits updated: +${prizeAmount} credits (new total: ${newWinningsCredits})`);
-                  }
-                } else {
-                  console.error('❌ No user_credits record found for user');
-                }
-              } catch (creditsErr) {
-                console.error('Unexpected error updating user credits:', creditsErr);
-              }
-            }
-          } catch (txErr) {
-            console.error('Unexpected error creating transaction:', txErr);
-          }
-        }
-
-        // Log suspicious activity if detected
-        if (patternAnalysis.isSuspicious) {
-          try {
-            const avgLatency = patternAnalysis.avgLatency || 0;
-            const reasonDetails = `Speed anomaly detected: ${patternAnalysis.reasons.join(', ')}. Avg latency: ${avgLatency.toFixed(2)}ms, Fast responses: ${patternAnalysis.fastResponses}/${responseLatencies.current.length}`;
-
-            await logCheatAction(
-              competitionId,
-              userId,
-              'flag',
-              reasonDetails
-            );
-
-            console.log('✅ Suspicious speed activity logged to competition_cheat_actions');
-          } catch (err) {
-            console.warn('Could not log cheat action:', err);
-          }
-        }
-
-        // Save competition results to user profile for permanent access
+      // Log suspicious activity if detected
+      if (patternAnalysis.isSuspicious) {
         try {
-          const { error: historyError } = await supabase
-            .from('competition_history')
-            .insert({
-              user_id: userId,
-              competition_id: competitionId,
-              competition_name: competitionDetails?.name || 'League Competition',
-              final_rank: userRank,
-              final_score: correctAnswers,
-              total_questions: questions.length,
-              xp_earned: xpAwarded,
-              credits_earned: prizeAmount,
-              // completed_at removed - not in schema
-              metadata: {
-                questions_answered: answers.length,
-                total_questions: questions.length,
-                accuracy_percentage: (correctAnswers / questions.length) * 100,
-                late_joiner: isLateJoiner,
-                missed_questions: missedQuestions,
-                prize_won: prizeAmount > 0,
-                trophy_earned: userRank <= prizeConfig.winnerCount,
-                completed_at: new Date().toISOString() // Store in metadata instead
-              }
-            });
+          const avgLatency = patternAnalysis.avgLatency || 0;
+          const reasonDetails = `Speed anomaly detected: ${patternAnalysis.reasons.join(', ')}. Avg latency: ${avgLatency.toFixed(2)}ms, Fast responses: ${patternAnalysis.fastResponses}/${responseLatencies.current.length}`;
 
-          if (historyError) {
-            console.error('Error saving competition history:', historyError);
-          } else {
-            console.log('✅ Competition history saved for permanent access');
-          }
-        } catch (historyErr) {
-          console.error('Unexpected error saving competition history:', historyErr);
+          await logCheatAction(
+            competitionId,
+            userId,
+            'flag',
+            reasonDetails
+          );
+
+          console.log('✅ Suspicious speed activity logged to competition_cheat_actions');
+        } catch (err) {
+          console.warn('Could not log cheat action:', err);
         }
+      }
 
-        // Update user profile - increment games, wins (if winner), and XP
-        try {
-          // Fetch current profile data
-          const { data: currentProfile, error: profileFetchError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+      // ⚠️ IMPORTANT: Do NOT calculate ranks or distribute prizes here!
+      // When each user finishes, other users may not have finished yet.
+      // This would cause everyone to get rank 1 (since they're the only one with end_time at that moment).
+      // 
+      // Instead, call the finalize-competition API which:
+      // 1. Checks if competition has ended
+      // 2. If ended, calculates correct ranks based on ALL completed sessions
+      // 3. Distributes prizes, updates credits, awards trophies, etc.
 
-          if (profileFetchError) {
-            console.error('Error fetching profile:', profileFetchError);
-          } else if (currentProfile) {
-            const isWinner = userRank <= prizeConfig.winnerCount;
-
-            const { error: profileUpdateError } = await supabase
-              .from('profiles')
-              .update({
-                total_games: (currentProfile.total_games || 0) + 1,
-                total_wins: (currentProfile.total_wins || 0) + (isWinner ? 1 : 0),
-                xp: (currentProfile.xp || 0) + xpAwarded,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_id', userId);
-
-            if (profileUpdateError) {
-              console.error('Error updating profile:', profileUpdateError);
-            } else {
-              console.log(`Profile updated: +1 game, ${isWinner ? '+1 win, ' : ''}+${xpAwarded} XP`);
-            }
-          }
-        } catch (profileErr) {
-          console.error('Unexpected error updating profile:', profileErr);
-        }
-
-        // Award trophies for winners
-        if (userRank <= prizeConfig.winnerCount) {
-          const trophyTitles: { [key: number]: string } = {
-            1: 'Champion',
-            2: 'Runner-up',
-            3: 'Third Place',
-            4: 'Fourth Place',
-            5: 'Fifth Place',
-            6: 'Sixth Place',
-            7: 'Seventh Place',
-            8: 'Eighth Place',
-            9: 'Ninth Place',
-            10: 'Tenth Place'
-          };
-          const trophyTitle = trophyTitles[userRank] || `Place ${userRank}`;
-
-          try {
-            // Try to insert into competition_trophies table
-            // If table doesn't exist or has schema issues, log and continue
-            const { error: trophyErr } = await supabase
-              .from('competition_trophies')
-              .upsert([
-                {
-                  competition_id: competitionId,
-                  user_id: userId,
-                  trophy_title: trophyTitle,
-                  rank: userRank, // Use 'rank' field instead of 'trophy_type'
-                  earned_at: new Date().toISOString(),
-                }
-              ], { onConflict: 'competition_id,user_id' });
-
-            if (trophyErr) {
-              console.error('Failed to insert/upsert competition_trophy:', trophyErr);
-              console.log('💡 Tip: Check if competition_trophies table exists and has correct schema');
-            } else {
-              console.log('✅ Competition trophy awarded');
-            }
-          } catch (tErr) {
-            console.error('Unexpected error inserting competition_trophy:', tErr);
-            console.log('💡 Continuing without trophy - this is not critical');
-          }
-        }
+      try {
+        console.log('🔄 Calling finalize-competition API...');
+        const finalizeRes = await fetch('/api/finalize-competition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ competitionId })
+        });
+        const finalizeData = await finalizeRes.json();
+        console.log('📊 Finalize API response:', finalizeData);
+      } catch (finalizeErr) {
+        console.error('Error calling finalize API:', finalizeErr);
+        // Non-critical - finalization will happen when viewing leaderboard
       }
     } catch (err) {
       console.error('Failed to finish competition:', err);
@@ -2318,7 +2014,7 @@ export default function LeaguePage() {
       entry_fee: competitionDetails?.entry_fee,
       name: competitionDetails?.name
     });
-    
+
     if (competitionDetails?.credit_cost) {
       return competitionDetails.credit_cost;
     }
@@ -2506,7 +2202,7 @@ export default function LeaguePage() {
         <div className="bg-white p-8 rounded-xl shadow-md max-w-md text-center">
           <h2 className="text-xl font-bold text-red-500 mb-4">Error Loading Quiz</h2>
           <p className="mb-6 text-gray-600">{error}</p>
-         
+
         </div>
       </div>
     );
@@ -2582,7 +2278,7 @@ export default function LeaguePage() {
                     <span className="text-xs text-gray-500 mt-2 font-medium">Days</span>
                   </div>
                 )}
-                
+
                 {/* Hours */}
                 {countdown >= 3600 && (
                   <div className="flex flex-col items-center">
@@ -2592,7 +2288,7 @@ export default function LeaguePage() {
                     <span className="text-xs text-gray-500 mt-2 font-medium">Hours</span>
                   </div>
                 )}
-                
+
                 {/* Minutes */}
                 <div className="flex flex-col items-center">
                   <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
@@ -2600,7 +2296,7 @@ export default function LeaguePage() {
                   </div>
                   <span className="text-xs text-gray-500 mt-2 font-medium">Mins</span>
                 </div>
-                
+
                 {/* Seconds */}
                 <div className="flex flex-col items-center">
                   <div className="bg-gradient-to-br from-lime-100 to-lime-200 text-lime-700 font-bold rounded-xl py-3 px-4 min-w-[4rem] shadow-md border-2 border-lime-300">
@@ -2667,7 +2363,7 @@ export default function LeaguePage() {
                       return prizePool;
                     })()} Credits
                   </p>
-                 
+
                 </div>
 
                 <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -2812,7 +2508,7 @@ export default function LeaguePage() {
                       Time: {Math.ceil(timer)}s
                     </span>
                   </div>
-                  
+
                 </div>
                 <div className="w-full h-3 bg-white bg-opacity-30 rounded-full overflow-visible relative">
                   <div
@@ -2826,7 +2522,7 @@ export default function LeaguePage() {
                       width: `${(timer / 30) * 100}%`
                     }}
                   />
-                  
+
                   {/* Answer Pin Marker - Google Maps Style */}
                   {/* COMMENTED OUT: Red badge showing submission time
                   {answerSubmittedAt !== null && (
@@ -2838,17 +2534,17 @@ export default function LeaguePage() {
                       }}
                     >
                       {/* Pin Head - Teardrop Shape with Hollow Center */}
-                      {/* <div className="relative">
+                  {/* <div className="relative">
                         {/* Outer pin shape */}
-                        {/* <div className="relative w-8 h-8">
+                  {/* <div className="relative w-8 h-8">
                           {/* Red circle with hollow center */}
-                          {/* <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
+                  {/* <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
                             {/* Hollow center - white circle */}
-                            {/* <div className="absolute inset-[6px] rounded-full bg-white"></div>
+                  {/* <div className="absolute inset-[6px] rounded-full bg-white"></div>
                           </div>
                           
                           {/* Time label in center */}
-                          {/* <div className="absolute inset-0 flex items-center justify-center">
+                  {/* <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[9px] font-bold text-red-600 z-10">
                               {Math.ceil(answerSubmittedAt)}s
                             </span>
@@ -2856,7 +2552,7 @@ export default function LeaguePage() {
                         </div>
                         
                         {/* Pin point - triangle */}
-                        {/* <div className="absolute left-1/2 -translate-x-1/2 top-[26px]">
+                  {/* <div className="absolute left-1/2 -translate-x-1/2 top-[26px]">
                           <div 
                             className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-600"
                             style={{
@@ -2867,7 +2563,7 @@ export default function LeaguePage() {
                       </div>
                       
                       {/* Pin shadow */}
-                      {/* <div className="w-3 h-1 bg-black opacity-20 rounded-full blur-sm mt-1"></div>
+                  {/* <div className="w-3 h-1 bg-black opacity-20 rounded-full blur-sm mt-1"></div>
                     </div>
                   )}
                   */}
@@ -3008,10 +2704,9 @@ export default function LeaguePage() {
                         whileHover={!showResult ? { scale: 1.02 } : {}}
                         whileTap={!showResult ? { scale: 0.98 } : {}}
                         onClick={() => handleChoiceSelect(choice)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
-                          selectedChoice === choice
-                            ? 'border-lime-400 bg-lime-50'
-                            : 'border-gray-200 hover:border-lime-300 bg-white'
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${selectedChoice === choice
+                          ? 'border-lime-400 bg-lime-50'
+                          : 'border-gray-200 hover:border-lime-300 bg-white'
                           }`}
                         disabled={showResult || quizCompleted}
                       >
@@ -3085,156 +2780,156 @@ export default function LeaguePage() {
               <>
                 {/* Personal Stats Section */}
                 <div className="mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">
-                Your Performance 🎯
-              </h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-gray-800">
+                    Your Performance 🎯
+                  </h2>
 
-              {/* Score Circle */}
-              <div className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-6 sm:mb-8">
-                <svg className="w-full h-full" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="8"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="45"
-                    fill="none"
-                    stroke="url(#gradient)"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(score / questions.length) * 283} 283`}
-                    transform="rotate(-90 50 50)"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#84cc16" />
-                      <stop offset="100%" stopColor="#22c55e" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl sm:text-4xl font-bold text-gray-800">
-                    {score}/{questions.length}
-                  </span>
-                  <span className="text-gray-500 text-xs sm:text-sm mt-1">Correct Answers</span>
-                </div>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-2xl mx-auto">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Star className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm font-semibold text-gray-600">Accuracy</span>
+                  {/* Score Circle */}
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 mx-auto mb-6 sm:mb-8">
+                    <svg className="w-full h-full" viewBox="0 0 100 100">
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke="#e5e7eb"
+                        strokeWidth="8"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="none"
+                        stroke="url(#gradient)"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${(score / questions.length) * 283} 283`}
+                        transform="rotate(-90 50 50)"
+                      />
+                      <defs>
+                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#84cc16" />
+                          <stop offset="100%" stopColor="#22c55e" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl sm:text-4xl font-bold text-gray-800">
+                        {score}/{questions.length}
+                      </span>
+                      <span className="text-gray-500 text-xs sm:text-sm mt-1">Correct Answers</span>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-blue-700">
-                    {Math.round((score / questions.length) * 100)}%
-                  </p>
-                </div>
 
-                <div className="bg-gradient-to-br from-lime-50 to-lime-100 border-2 border-lime-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Trophy className="h-5 w-5 text-lime-600" />
-                    <span className="text-sm font-semibold text-gray-600">Questions</span>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 max-w-2xl mx-auto">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Star className="h-5 w-5 text-blue-600" />
+                        <span className="text-sm font-semibold text-gray-600">Accuracy</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-700">
+                        {Math.round((score / questions.length) * 100)}%
+                      </p>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-lime-50 to-lime-100 border-2 border-lime-200 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Trophy className="h-5 w-5 text-lime-600" />
+                        <span className="text-sm font-semibold text-gray-600">Questions</span>
+                      </div>
+                      <p className="text-2xl font-bold text-lime-700">{questions.length}</p>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <Award className="h-5 w-5 text-purple-600" />
+                        <span className="text-sm font-semibold text-gray-600">XP Earned</span>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-700">+{score * 5}</p>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-lime-700">{questions.length}</p>
-                </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Award className="h-5 w-5 text-purple-600" />
-                    <span className="text-sm font-semibold text-gray-600">XP Earned</span>
-                  </div>
-                  <p className="text-2xl font-bold text-purple-700">+{score * 5}</p>
-                </div>
-              </div>
-
-              {/* Performance Message */}
-              <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-800">
-                {getRecommendation().message} {getRecommendation().emoji}
-              </h3>
-              <p className="text-gray-600 mb-5 sm:mb-6 max-w-md mx-auto text-sm sm:text-base">
-                {getRecommendation().description}
-              </p>
-
-
-
-              {/* Competition Status & Tie-Breaker Info */}
-              <div className="space-y-4 mb-6">
-
-
-                {/* Tie-Breaker Logic */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 max-w-lg mx-auto shadow-md">
-                  <h3 className="text-lg font-bold text-blue-800 mb-3 flex items-center justify-center gap-2">
-                    <Award className="h-5 w-5" />
-                    Ranking System
+                  {/* Performance Message */}
+                  <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-800">
+                    {getRecommendation().message} {getRecommendation().emoji}
                   </h3>
-                  <div className="space-y-2 text-sm text-blue-700">
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-blue-800">1.</span>
-                      <span><strong>Primary:</strong> Total correct answers (higher is better)</span>
+                  <p className="text-gray-600 mb-5 sm:mb-6 max-w-md mx-auto text-sm sm:text-base">
+                    {getRecommendation().description}
+                  </p>
+
+
+
+                  {/* Competition Status & Tie-Breaker Info */}
+                  <div className="space-y-4 mb-6">
+
+
+                    {/* Tie-Breaker Logic */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 max-w-lg mx-auto shadow-md">
+                      <h3 className="text-lg font-bold text-blue-800 mb-3 flex items-center justify-center gap-2">
+                        <Award className="h-5 w-5" />
+                        Ranking System
+                      </h3>
+                      <div className="space-y-2 text-sm text-blue-700">
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-blue-800">1.</span>
+                          <span><strong>Primary:</strong> Total correct answers (higher is better)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-blue-800">2.</span>
+                          <span><strong>Tie-breaker:</strong> Completion time (faster completion wins)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-blue-800">3.</span>
+                          <span><strong>Secondary:</strong> Response consistency (steady timing)</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-blue-800">2.</span>
-                      <span><strong>Tie-breaker:</strong> Completion time (faster completion wins)</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-blue-800">3.</span>
-                      <span><strong>Secondary:</strong> Response consistency (steady timing)</span>
-                    </div>
+
+
                   </div>
                 </div>
 
-
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  // Clear the results viewing timer when manually navigating
-                  if (resultsViewingTimer) {
-                    clearInterval(resultsViewingTimer);
-                    setResultsViewingTimer(null);
-                  }
-                  setResultsViewingTimeLeft(null);
-                  setPhase('leaderboard');
-                }}
-                className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
-              >
-                View Final Leaderboard
-              </motion.button>
-              <Link href="/">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
-                >
-                  <svg className="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  Go Home
-                </motion.button>
-              </Link>
-              <Link href="/livecompetition">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
-                >
-                  Join Another Competition
-                </motion.button>
-              </Link>
-            </div>
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // Clear the results viewing timer when manually navigating
+                      if (resultsViewingTimer) {
+                        clearInterval(resultsViewingTimer);
+                        setResultsViewingTimer(null);
+                      }
+                      setResultsViewingTimeLeft(null);
+                      setPhase('leaderboard');
+                    }}
+                    className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+                  >
+                    View Final Leaderboard
+                  </motion.button>
+                  <Link href="/">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+                    >
+                      <svg className="h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      Go Home
+                    </motion.button>
+                  </Link>
+                  <Link href="/livecompetition">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full sm:w-auto px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-lime-500 to-lime-600 hover:from-lime-600 hover:to-lime-700 text-white font-bold rounded-lg sm:rounded-xl shadow-lg transition-all text-sm sm:text-base"
+                    >
+                      Join Another Competition
+                    </motion.button>
+                  </Link>
+                </div>
               </>
             )}
           </motion.div>
@@ -3279,11 +2974,11 @@ export default function LeaguePage() {
               {questions.map((question, index) => {
                 // Find the user's answer for this specific question by matching question_id
                 // This ensures we show the correct answer for each question regardless of order
-                let userAnswer = answers.find(a => 
-                  a.question_id === question.id || 
+                let userAnswer = answers.find(a =>
+                  a.question_id === question.id ||
                   String(a.question_id) === String(question.id)
                 );
-                
+
                 // If no answer found by ID, this question was not answered (missed or skipped)
                 // Create a placeholder answer object
                 if (!userAnswer) {
@@ -3295,9 +2990,9 @@ export default function LeaguePage() {
                     answer_time: undefined
                   };
                 }
-                
+
                 const isCorrect = userAnswer?.is_correct || false;
-                
+
                 return (
                   <div key={index} className={`border-2 rounded-xl p-4 sm:p-6 ${isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
                     {/* Question Header */}
@@ -3345,17 +3040,16 @@ export default function LeaguePage() {
                         // Use the userAnswer already found above for this question
                         const isUserAnswer = userAnswer && choice === userAnswer.selected_answer;
                         const isCorrectAnswer = choice === question.correct_answer;
-                        
+
                         return (
                           <div
                             key={choiceIndex}
-                            className={`p-3 rounded-lg border-2 ${
-                              isCorrectAnswer
-                                ? 'border-green-500 bg-green-100'
-                                : isUserAnswer
+                            className={`p-3 rounded-lg border-2 ${isCorrectAnswer
+                              ? 'border-green-500 bg-green-100'
+                              : isUserAnswer
                                 ? 'border-red-500 bg-red-100'
                                 : 'border-gray-200 bg-white'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className={`${isCorrectAnswer || isUserAnswer ? 'font-semibold' : ''}`}>
@@ -3518,43 +3212,43 @@ export default function LeaguePage() {
                     {leaderboard
                       .sort((a, b) => a.rank - b.rank) // ✅ Ensure sorted by rank for display
                       .map((entry, index) => {
-                      // Use the prize_amount directly from the database
-                      const prize = entry.prizeAmount || 0;
+                        // Use the prize_amount directly from the database
+                        const prize = entry.prizeAmount || 0;
 
-                      return (
-                        <motion.tr
-                          key={entry.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, delay: index * 0.05 }}
-                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
-                            }`}
-                        >
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold">{entry.rank}</span>
-                              {entry.rank === 1 && <span className="text-xl">🥇</span>}
-                              {entry.rank === 2 && <span className="text-xl">🥈</span>}
-                              {entry.rank === 3 && <span className="text-xl">🥉</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {entry.name}
-                            {entry.isUser && <span className="ml-2 text-lime-600 font-semibold">(You)</span>}
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            <span className="font-semibold">{entry.score}/{entry.questions_played || questions.length}</span>
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                            {prize > 0 ? (
-                              <span className="font-bold text-lime-600">{prize} Credits</span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                        </motion.tr>
-                      );
-                    })}
+                        return (
+                          <motion.tr
+                            key={entry.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.05 }}
+                            className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
+                              }`}
+                          >
+                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{entry.rank}</span>
+                                {entry.rank === 1 && <span className="text-xl">🥇</span>}
+                                {entry.rank === 2 && <span className="text-xl">🥈</span>}
+                                {entry.rank === 3 && <span className="text-xl">🥉</span>}
+                              </div>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              {entry.name}
+                              {entry.isUser && <span className="ml-2 text-lime-600 font-semibold">(You)</span>}
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                              <span className="font-semibold">{entry.score}/{entry.questions_played || questions.length}</span>
+                            </td>
+                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                              {prize > 0 ? (
+                                <span className="font-bold text-lime-600">{prize} Credits</span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
                   </AnimatePresence>
                 </tbody>
               </table>
