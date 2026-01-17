@@ -93,24 +93,20 @@ export async function POST(req: Request) {
             });
         }
 
-        // 3. Check if already finalized (by checking if competition_results has correct data)
-        const { data: existingResults, error: existingError } = await supabase
+        // 3. Check if already finalized - if ANY results exist, skip
+        const { data: existingResults } = await supabase
             .from('competition_results')
-            .select('id, rank')
+            .select('id')
             .eq('competition_id', competitionId);
 
-        // Check if we already have finalized results
         if (existingResults && existingResults.length > 0) {
-            // Already finalized - return early to prevent duplicate notifications
-            console.log('✅ Competition already finalized with', existingResults.length, 'results');
+            console.log('✅ Competition already finalized with', existingResults.length, 'players');
             return NextResponse.json({
                 success: true,
                 message: "Already finalized",
                 resultCount: existingResults.length
             });
         }
-
-        console.log('🔄 Finalizing competition results...');
 
         // 4. Fetch all completed sessions
         const { data: sessions, error: sessionsError } = await supabase
@@ -129,7 +125,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: true, message: "No completed sessions" });
         }
 
-        console.log(`📊 Found ${sessions.length} completed sessions`);
+        console.log('🔄 Finalizing competition with', sessions.length, 'players...');
 
         // 5. Sort sessions by score (desc) and end_time (asc for tie-breaker)
         const sortedSessions = sessions.sort((a, b) => {

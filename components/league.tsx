@@ -886,42 +886,26 @@ export default function LeaguePage() {
         try {
           console.log('🔍 Fetching leaderboard for competition:', competitionId);
 
-          // PRIORITY 1: Check competition_results FIRST (before calling finalize API)
-          // This prevents duplicate API calls and notifications for already-finalized competitions
+          // Always call finalize API - it will check internally if re-finalization is needed
+          // The API compares completed sessions vs existing results to handle late finishers
+          try {
+            const finalizeRes = await fetch('/api/finalize-competition', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ competitionId })
+            });
+            const finalizeData = await finalizeRes.json();
+            console.log('📊 Finalize API result:', finalizeData);
+          } catch (err) {
+            console.warn('Finalize API failed (non-critical):', err);
+          }
+
+          // Fetch results after finalization attempt
           let { data: results, error: resultsError } = await supabase
             .from('competition_results')
             .select('user_id, score, rank, prize_amount')
             .eq('competition_id', competitionId)
             .order('rank', { ascending: true });
-
-          // Only call finalize API if NO results exist yet
-          if (!results || results.length === 0) {
-            console.log('🔄 No results found, attempting to finalize competition...');
-            try {
-              const finalizeRes = await fetch('/api/finalize-competition', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ competitionId })
-              });
-              const finalizeData = await finalizeRes.json();
-              console.log('📊 Finalize API result:', finalizeData);
-
-              // Re-fetch results after finalization
-              const { data: newResults } = await supabase
-                .from('competition_results')
-                .select('user_id, score, rank, prize_amount')
-                .eq('competition_id', competitionId)
-                .order('rank', { ascending: true });
-
-              if (newResults && newResults.length > 0) {
-                results = newResults;
-              }
-            } catch (err) {
-              console.warn('Finalize API failed (non-critical):', err);
-            }
-          } else {
-            console.log('✅ Results already exist, skipping finalize API call');
-          }
 
           if (results && results.length > 0) {
             console.log('✅ Using competition_results table (', results.length, 'entries)');
@@ -1953,27 +1937,12 @@ export default function LeaguePage() {
       }
 
       // ⚠️ IMPORTANT: Do NOT calculate ranks or distribute prizes here!
-      // When each user finishes, other users may not have finished yet.
-      // This would cause everyone to get rank 1 (since they're the only one with end_time at that moment).
-      // 
-      // Instead, call the finalize-competition API which:
-      // 1. Checks if competition has ended
-      // 2. If ended, calculates correct ranks based on ALL completed sessions
-      // 3. Distributes prizes, updates credits, awards trophies, etc.
-
-      try {
-        console.log('🔄 Calling finalize-competition API...');
-        const finalizeRes = await fetch('/api/finalize-competition', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ competitionId })
-        });
-        const finalizeData = await finalizeRes.json();
-        console.log('📊 Finalize API response:', finalizeData);
-      } catch (finalizeErr) {
-        console.error('Error calling finalize API:', finalizeErr);
-        // Non-critical - finalization will happen when viewing leaderboard
-      }
+      // ⚠️ IMPORTANT: Do NOT call finalize API here!
+      // The finalize API should only be called from fetchLeaderboard AFTER the competition end time.
+      // This ensures ALL players who finished before the end time are included in the finalization.
+      // If we call finalize here (when this player finishes), other players might still be playing
+      // and would be excluded from the results.
+      console.log('✅ Session completed. Finalization will happen via fetchLeaderboard after competition ends.');
     } catch (err) {
       console.error('Failed to finish competition:', err);
     } finally {
