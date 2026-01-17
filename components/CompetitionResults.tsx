@@ -86,20 +86,18 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
       setSession(sessionData);
       setCompetitionDetails(sessionData.competitions);
 
-      // Fetch all sessions for leaderboard
-      const { data: allSessions, error: leaderboardError } = await supabase
-        .from('competition_sessions')
-        .select('id, user_id, score_percentage, correct_answers, questions_played')
+      // Fetch all results from competition_results table (publicly readable, has finalized data)
+      const { data: competitionResults, error: resultsError } = await supabase
+        .from('competition_results')
+        .select('id, user_id, score, rank, prize_amount, xp_awarded')
         .eq('competition_id', sessionData.competition_id)
-        .not('end_time', 'is', null)
-        .order('correct_answers', { ascending: false })
-        .order('score_percentage', { ascending: false });
+        .order('rank', { ascending: true });
 
-      if (leaderboardError) {
-        console.error("Error fetching leaderboard:", leaderboardError);
-      } else if (allSessions && allSessions.length > 0) {
-        // Fetch profiles
-        const userIds = allSessions.map(s => s.user_id);
+      if (resultsError) {
+        console.error("Error fetching competition results:", resultsError);
+      } else if (competitionResults && competitionResults.length > 0) {
+        // Fetch profiles for usernames
+        const userIds = competitionResults.map(r => r.user_id);
         const { data: profiles } = await supabase
           .from('profiles')
           .select('user_id, username, avatar_url')
@@ -107,40 +105,32 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
 
         const profilesMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-        // Fetch prize amounts from competition_results table (already calculated correctly)
-        const { data: competitionResults } = await supabase
-          .from('competition_results')
-          .select('user_id, prize_amount')
-          .eq('competition_id', sessionData.competition_id);
-
-        const prizeMap = new Map(competitionResults?.map(r => [r.user_id, r.prize_amount]) || []);
-
-        const leaderboardData: LeaderboardEntry[] = allSessions.map((s, index) => {
-          const profile = profilesMap.get(s.user_id);
-          const rank = index + 1;
-          
-          // Get prize amount from competition_results table (source of truth)
-          const prizeAmount = prizeMap.get(s.user_id) || 0;
+        const leaderboardData: LeaderboardEntry[] = competitionResults.map((result) => {
+          const profile = profilesMap.get(result.user_id);
 
           return {
-            id: s.id,
-            user_id: s.user_id,
-            score: s.correct_answers,
-            score_percentage: s.score_percentage,
-            correct_answers: s.correct_answers,
-            questions_played: s.questions_played,
+            id: result.id,
+            user_id: result.user_id,
+            score: result.score || 0,
+            score_percentage: sessionData.questions_played > 0
+              ? (result.score / (sessionData.competitions?.question_count || 15)) * 100
+              : 0,
+            correct_answers: result.score || 0,
+            questions_played: sessionData.competitions?.question_count || 15,
             username: profile?.username || 'Anonymous',
             avatar_url: profile?.avatar_url || null,
-            prizeAmount,
-            isUser: s.user_id === user.id
+            prizeAmount: result.prize_amount || 0,
+            isUser: result.user_id === user.id
           };
         });
 
         setLeaderboard(leaderboardData);
+        console.log('📊 Leaderboard loaded from competition_results:', leaderboardData.length, 'players');
 
         // Find user rank
-        const userIndex = leaderboardData.findIndex(entry => entry.user_id === user.id);
-        if (userIndex !== -1) {
+        const userEntry = leaderboardData.find(entry => entry.user_id === user.id);
+        if (userEntry) {
+          const userIndex = leaderboardData.indexOf(userEntry);
           setUserRank(userIndex + 1);
         }
       }
@@ -262,11 +252,10 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
               <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-gray-200 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('leaderboard')}
-                  className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm sm:text-base ${
-                    activeTab === 'leaderboard'
+                  className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm sm:text-base ${activeTab === 'leaderboard'
                       ? 'border-lime-500 text-lime-600'
                       : 'border-transparent text-gray-600 hover:text-gray-800'
-                  }`}
+                    }`}
                 >
                   <span className="flex items-center gap-1 sm:gap-2">
                     <span>🏆</span>
@@ -276,11 +265,10 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
                 </button>
                 <button
                   onClick={() => setActiveTab('results')}
-                  className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm sm:text-base ${
-                    activeTab === 'results'
+                  className={`px-3 sm:px-6 py-2 sm:py-3 font-medium transition-colors border-b-2 whitespace-nowrap text-sm sm:text-base ${activeTab === 'results'
                       ? 'border-lime-500 text-lime-600'
                       : 'border-transparent text-gray-600 hover:text-gray-800'
-                  }`}
+                    }`}
                 >
                   <span className="flex items-center gap-1 sm:gap-2">
                     <span>📊</span>
@@ -289,229 +277,225 @@ export default function CompetitionResults({ sessionId }: CompetitionResultsProp
                 </button>
               </div>
 
-          {/* Leaderboard Tab */}
-          {activeTab === 'leaderboard' && (
-            <div>
-              {/* Prize Pool Summary */}
-              {leaderboard.length > 0 && (
-                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-md">
-                  <h2 className="text-lg sm:text-xl font-bold text-yellow-800 mb-3 sm:mb-4 flex items-center justify-center gap-2">
-                    <Award className="h-5 w-5 sm:h-6 sm:w-6" />
-                    Prize Distribution
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-yellow-200">
-                      <div className="text-2xl sm:text-3xl mb-2">🥇</div>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">1st Place</p>
-                      <p className="text-lg sm:text-xl font-bold text-yellow-600">
-                        {leaderboard[0]?.prizeAmount || 0} Credits
-                      </p>
+              {/* Leaderboard Tab */}
+              {activeTab === 'leaderboard' && (
+                <div>
+                  {/* Prize Pool Summary */}
+                  {leaderboard.length > 0 && (
+                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-md">
+                      <h2 className="text-lg sm:text-xl font-bold text-yellow-800 mb-3 sm:mb-4 flex items-center justify-center gap-2">
+                        <Award className="h-5 w-5 sm:h-6 sm:w-6" />
+                        Prize Distribution
+                      </h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-yellow-200">
+                          <div className="text-2xl sm:text-3xl mb-2">🥇</div>
+                          <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">1st Place</p>
+                          <p className="text-lg sm:text-xl font-bold text-yellow-600">
+                            {leaderboard[0]?.prizeAmount || 0} Credits
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-gray-200">
+                          <div className="text-2xl sm:text-3xl mb-2">🥈</div>
+                          <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">2nd Place</p>
+                          <p className="text-lg sm:text-xl font-bold text-gray-600">
+                            {leaderboard[1]?.prizeAmount || 0} Credits
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-amber-200">
+                          <div className="text-2xl sm:text-3xl mb-2">🥉</div>
+                          <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">3rd Place</p>
+                          <p className="text-lg sm:text-xl font-bold text-amber-600">
+                            {leaderboard[2]?.prizeAmount || 0} Credits
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-gray-200">
-                      <div className="text-2xl sm:text-3xl mb-2">🥈</div>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">2nd Place</p>
-                      <p className="text-lg sm:text-xl font-bold text-gray-600">
-                        {leaderboard[1]?.prizeAmount || 0} Credits
-                      </p>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 sm:p-4 text-center shadow-sm border border-amber-200">
-                      <div className="text-2xl sm:text-3xl mb-2">🥉</div>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-600 mb-1">3rd Place</p>
-                      <p className="text-lg sm:text-xl font-bold text-amber-600">
-                        {leaderboard[2]?.prizeAmount || 0} Credits
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {/* User Rank Highlight */}
-              {userRank && (
-                <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-3 sm:p-4 rounded-lg text-white text-center mb-4 sm:mb-6 shadow-md">
-                  <h3 className="text-base sm:text-lg font-semibold mb-2">Your Final Ranking</h3>
-                  <div className="flex items-center justify-center gap-3 sm:gap-4">
-                    <div className="text-3xl sm:text-4xl font-bold"># {userRank}</div>
-                    <div className="text-left">
-                      <p className="text-xs sm:text-sm opacity-90">out of {leaderboard.length} players</p>
-                      {userRank <= 3 && (
-                        <p className="text-xs sm:text-sm font-semibold mt-1 flex items-center gap-1">
-                          <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
-                          Prize Winner!
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Leaderboard Table */}
-              <div className="bg-white rounded-lg shadow-md overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gradient-to-r from-lime-500 to-lime-600">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
-                        Rank
-                      </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
-                        Player
-                      </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
-                        Score
-                      </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
-                        Prize
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    <AnimatePresence>
-                      {leaderboard.map((entry, index) => (
-                        <motion.tr
-                          key={entry.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, delay: index * 0.05 }}
-                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${
-                            index < 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
-                          }`}
-                        >
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <span className="font-bold">{index + 1}</span>
-                              {index === 0 && <span className="text-base sm:text-xl">🥇</span>}
-                              {index === 1 && <span className="text-base sm:text-xl">🥈</span>}
-                              {index === 2 && <span className="text-base sm:text-xl">🥉</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-700">
-                            <div className="max-w-[120px] sm:max-w-none truncate">
-                              {entry.username}
-                              {entry.isUser && <span className="ml-1 sm:ml-2 text-lime-600 font-semibold">(You)</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
-                            <span className="font-semibold">{entry.score}/{entry.questions_played}</span>
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
-                            {entry.prizeAmount > 0 ? (
-                              <span className="font-bold text-lime-600">{entry.prizeAmount} Credits</span>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                        </motion.tr>
-                      ))}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-
-             
-            </div>
-          )}
-
-          {/* Detailed Results Tab */}
-          {activeTab === 'results' && (
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Your Answers</h3>
-              
-              {/* Summary */}
-              {session && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-                  <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
-                    <div>
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">{session.correct_answers}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Correct</p>
-                    </div>
-                    <div>
-                      <p className="text-xl sm:text-2xl font-bold text-red-600">{session.questions_played - session.correct_answers}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Wrong</p>
-                    </div>
-                    <div>
-                      <p className="text-xl sm:text-2xl font-bold text-blue-600">{session.questions_played}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Total</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {questions.length > 0 ? (
-                questions.map((question, index) => {
-                  const answer = answers.find(a => a.competition_question_id === question.id);
-                  const isCorrect = answer?.is_correct || false;
-
-                  return (
-                    <div
-                      key={question.id}
-                      className={`border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 ${
-                        isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2 sm:mb-3 flex-wrap gap-2">
-                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                          <span className="font-bold text-gray-700 text-sm sm:text-base">Q{index + 1}.</span>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              question.difficulty === 'Easy'
-                                ? 'bg-green-100 text-green-800'
-                                : question.difficulty === 'Medium'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {question.difficulty}
-                          </span>
-                          {isCorrect ? (
-                            <span className="text-green-600 font-bold text-sm sm:text-base">✓ Correct</span>
-                          ) : (
-                            <span className="text-red-600 font-bold text-sm sm:text-base">✗ Wrong</span>
+                  {/* User Rank Highlight */}
+                  {userRank && (
+                    <div className="bg-gradient-to-r from-lime-500 to-lime-600 p-3 sm:p-4 rounded-lg text-white text-center mb-4 sm:mb-6 shadow-md">
+                      <h3 className="text-base sm:text-lg font-semibold mb-2">Your Final Ranking</h3>
+                      <div className="flex items-center justify-center gap-3 sm:gap-4">
+                        <div className="text-3xl sm:text-4xl font-bold"># {userRank}</div>
+                        <div className="text-left">
+                          <p className="text-xs sm:text-sm opacity-90">out of {leaderboard.length} players</p>
+                          {userRank <= 3 && (
+                            <p className="text-xs sm:text-sm font-semibold mt-1 flex items-center gap-1">
+                              <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
+                              Prize Winner!
+                            </p>
                           )}
                         </div>
                       </div>
-
-                      <p className="font-medium text-gray-800 mb-2 sm:mb-3 text-sm sm:text-base">{question.question_text}</p>
-
-                      <div className="space-y-2 mb-2 sm:mb-3">
-                        {question.choices?.map((choice: string, i: number) => (
-                          <div
-                            key={i}
-                            className={`p-2 rounded-lg ${
-                              choice === question.correct_answer
-                                ? 'bg-green-100 border-2 border-green-400'
-                                : choice === answer?.selected_answer
-                                ? 'bg-red-100 border-2 border-red-400'
-                                : 'bg-gray-50'
-                            }`}
-                          >
-                            <span className="text-xs sm:text-sm break-words">
-                              {choice === question.correct_answer && '✓ '}
-                              {choice === answer?.selected_answer && !isCorrect && '✗ '}
-                              {choice}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {question.explanation && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3">
-                          <p className="text-xs sm:text-sm text-blue-800">
-                            <strong>Explanation:</strong> {question.explanation}
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  );
-                })
-              ) : (
-                <p className="text-center text-gray-500 py-8 text-sm sm:text-base">No detailed results available</p>
+                  )}
+
+                  {/* Leaderboard Table */}
+                  <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gradient-to-r from-lime-500 to-lime-600">
+                        <tr>
+                          <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
+                            Rank
+                          </th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
+                            Player
+                          </th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
+                            Score
+                          </th>
+                          <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-white uppercase tracking-wider">
+                            Prize
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        <AnimatePresence>
+                          {leaderboard.map((entry, index) => (
+                            <motion.tr
+                              key={entry.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3, delay: index * 0.05 }}
+                              className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${index < 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
+                                }`}
+                            >
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <span className="font-bold">{index + 1}</span>
+                                  {index === 0 && <span className="text-base sm:text-xl">🥇</span>}
+                                  {index === 1 && <span className="text-base sm:text-xl">🥈</span>}
+                                  {index === 2 && <span className="text-base sm:text-xl">🥉</span>}
+                                </div>
+                              </td>
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-700">
+                                <div className="max-w-[120px] sm:max-w-none truncate">
+                                  {entry.username}
+                                  {entry.isUser && <span className="ml-1 sm:ml-2 text-lime-600 font-semibold">(You)</span>}
+                                </div>
+                              </td>
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
+                                <span className="font-semibold">{entry.score}/{entry.questions_played}</span>
+                              </td>
+                              <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm">
+                                {entry.prizeAmount > 0 ? (
+                                  <span className="font-bold text-lime-600">{entry.prizeAmount} Credits</span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </AnimatePresence>
+                      </tbody>
+                    </table>
+                  </div>
+
+
+                </div>
+              )}
+
+              {/* Detailed Results Tab */}
+              {activeTab === 'results' && (
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">Your Answers</h3>
+
+                  {/* Summary */}
+                  {session && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                      <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
+                        <div>
+                          <p className="text-xl sm:text-2xl font-bold text-green-600">{session.correct_answers}</p>
+                          <p className="text-xs sm:text-sm text-gray-600">Correct</p>
+                        </div>
+                        <div>
+                          <p className="text-xl sm:text-2xl font-bold text-red-600">{session.questions_played - session.correct_answers}</p>
+                          <p className="text-xs sm:text-sm text-gray-600">Wrong</p>
+                        </div>
+                        <div>
+                          <p className="text-xl sm:text-2xl font-bold text-blue-600">{session.questions_played}</p>
+                          <p className="text-xs sm:text-sm text-gray-600">Total</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {questions.length > 0 ? (
+                    questions.map((question, index) => {
+                      const answer = answers.find(a => a.competition_question_id === question.id);
+                      const isCorrect = answer?.is_correct || false;
+
+                      return (
+                        <div
+                          key={question.id}
+                          className={`border-2 rounded-lg sm:rounded-xl p-3 sm:p-4 ${isCorrect ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'
+                            }`}
+                        >
+                          <div className="flex items-start justify-between mb-2 sm:mb-3 flex-wrap gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                              <span className="font-bold text-gray-700 text-sm sm:text-base">Q{index + 1}.</span>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-semibold ${question.difficulty === 'Easy'
+                                    ? 'bg-green-100 text-green-800'
+                                    : question.difficulty === 'Medium'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}
+                              >
+                                {question.difficulty}
+                              </span>
+                              {isCorrect ? (
+                                <span className="text-green-600 font-bold text-sm sm:text-base">✓ Correct</span>
+                              ) : (
+                                <span className="text-red-600 font-bold text-sm sm:text-base">✗ Wrong</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="font-medium text-gray-800 mb-2 sm:mb-3 text-sm sm:text-base">{question.question_text}</p>
+
+                          <div className="space-y-2 mb-2 sm:mb-3">
+                            {question.choices?.map((choice: string, i: number) => (
+                              <div
+                                key={i}
+                                className={`p-2 rounded-lg ${choice === question.correct_answer
+                                    ? 'bg-green-100 border-2 border-green-400'
+                                    : choice === answer?.selected_answer
+                                      ? 'bg-red-100 border-2 border-red-400'
+                                      : 'bg-gray-50'
+                                  }`}
+                              >
+                                <span className="text-xs sm:text-sm break-words">
+                                  {choice === question.correct_answer && '✓ '}
+                                  {choice === answer?.selected_answer && !isCorrect && '✗ '}
+                                  {choice}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {question.explanation && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3">
+                              <p className="text-xs sm:text-sm text-blue-800">
+                                <strong>Explanation:</strong> {question.explanation}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-center text-gray-500 py-8 text-sm sm:text-base">No detailed results available</p>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-  <Footer />
-</>
+      <Footer />
+    </>
   );
 }
