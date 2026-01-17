@@ -38,12 +38,12 @@ export async function GET(req: NextRequest) {
     console.log('🔄 Starting competition finalization cron job...');
 
     // Find competitions that have ended but not been finalized
-    // We check for 'active' status and end_time has passed
+    // Check for 'active' OR 'running' status and end_time has passed
     const now = new Date().toISOString();
     const { data: endedCompetitions, error: fetchError } = await supabase
       .from('competitions')
       .select('*')
-      .eq('status', 'active')
+      .in('status', ['active', 'running']) // ✅ Check both active and running
       .lte('end_time', now);
 
     if (fetchError) {

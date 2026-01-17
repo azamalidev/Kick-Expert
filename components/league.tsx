@@ -34,7 +34,7 @@ interface Player {
 }
 
 interface LeaderboardEntry {
-  id: number;
+  id: string; // ✅ User ID (UUID string)
   name: string;
   score: number;
   isUser: boolean;
@@ -920,8 +920,14 @@ export default function LeaguePage() {
 
             // Map results to leaderboard entries
             const leaderboardData: LeaderboardEntry[] = results.map((result: any) => {
+              console.log(`📊 Competition result entry:`, {
+                user_id: result.user_id,
+                score: result.score,
+                rank: result.rank,
+                prize_amount: result.prize_amount
+              });
               return {
-                id: result.rank,
+                id: result.user_id, // Use user_id as unique identifier
                 name: (profilesMap[result.user_id] && profilesMap[result.user_id].username) || `User ${result.user_id.substring(0, 8)}`,
                 score: result.score || 0,
                 rank: result.rank,
@@ -929,6 +935,10 @@ export default function LeaguePage() {
                 isUser: result.user_id === userId
               };
             });
+
+            // Sort by rank to ensure proper display order (ascending - 1, 2, 3, 4...)
+            leaderboardData.sort((a, b) => a.rank - b.rank);
+            console.log('📊 Leaderboard sorted by rank:', leaderboardData.map(e => `${e.name}: Rank ${e.rank}, Score ${e.score}`));
 
             setLeaderboard(leaderboardData);
 
@@ -978,7 +988,14 @@ export default function LeaguePage() {
 
           // Sort sessions by score desc, then end_time asc (faster completion is better for ties)
           const sortedSessions = sessions.sort((a, b) => {
-            if (b.correct_answers !== a.correct_answers) return b.correct_answers - a.correct_answers;
+            // Get scores, default to 0 if null/undefined
+            const scoreA = a.correct_answers ?? 0;
+            const scoreB = b.correct_answers ?? 0;
+            
+            // Primary sort: Higher score wins
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            
+            // Tie-breaker: Faster completion time wins (earlier end_time)
             return new Date(a.end_time).getTime() - new Date(b.end_time).getTime();
           });
 
@@ -997,12 +1014,41 @@ export default function LeaguePage() {
             });
           }
 
-          // Map sessions to leaderboard entries
+          // Calculate prize distribution based on actual completed sessions
+          const actualPlayerCount = sortedSessions.length;
+          const prizeConfig = getPrizePoolConfig(actualPlayerCount);
+          const totalRevenue = actualPlayerCount * getCreditCost();
+          
+          console.log('💰 Prize pool calculation for fallback leaderboard:', {
+            actualPlayerCount,
+            creditCost: getCreditCost(),
+            totalRevenue,
+            prizePoolPercentage: prizeConfig.percentage,
+            winnerCount: prizeConfig.winnerCount
+          });
+
+          // Map sessions to leaderboard entries with correct ranking
           const leaderboardData: LeaderboardEntry[] = sortedSessions.map((session: any, index: number) => {
-            const rank = index + 1;
-            const prizeAmount = calculatePrizeAmount(rank);
+            const rank = index + 1; // 1-based rank
+            
+            // Calculate prize amount based on actual player count
+            let prizeAmount = 0;
+            if (rank <= prizeConfig.winnerCount) {
+              const rankIndex = rank - 1;
+              prizeAmount = Math.ceil(totalRevenue * prizeConfig.distribution[rankIndex]);
+            }
+            
+            console.log(`📊 Leaderboard entry ${rank}:`, {
+              user_id: session.user_id,
+              score: session.correct_answers,
+              rank,
+              prizeAmount,
+              calculation: rank <= prizeConfig.winnerCount 
+                ? `${totalRevenue} × ${prizeConfig.distribution[rank - 1]} = ${prizeAmount}`
+                : 'Not a winner'
+            });
             return {
-              id: index + 1,
+              id: session.user_id, // Use user_id as unique identifier
               name: (profilesMap[session.user_id] && profilesMap[session.user_id].username) || `User ${session.user_id.substring(0, 8)}`,
               score: session.correct_answers || 0,
               rank: rank,
@@ -1011,6 +1057,9 @@ export default function LeaguePage() {
               questions_played: session.questions_played || questions.length
             };
           });
+
+          // Already sorted by rank since we assigned rank from sorted array
+          console.log('📊 Leaderboard from sessions:', leaderboardData.map(e => `${e.name}: Rank ${e.rank}, Score ${e.score}`));
 
           setLeaderboard(leaderboardData);
 
@@ -1880,21 +1929,49 @@ export default function LeaguePage() {
         const sortedScores = allScores
           .map(session => ({
             user_id: session.user_id,
-            score: session.correct_answers,
+            score: session.correct_answers || 0,
             end_time: new Date(session.end_time).getTime()
           }))
           .sort((a, b) => {
+            // Primary sort: Higher score wins
             if (b.score !== a.score) return b.score - a.score;
+            // Tie-breaker: Faster completion time wins
             return a.end_time - b.end_time;
           });
 
         console.log('🏆 Sorted scores for ranking:', sortedScores);
 
-        const userRank = sortedScores.findIndex(score => score.user_id === userId) + 1;
-        console.log('👤 User rank calculated:', userRank, 'for user:', userId);
-        const prizeAmount = calculatePrizeAmount(userRank);
-        const prizeConfig = getPrizePoolConfig(players.length);
-        const xpAwarded = calculateXPAwarded(userRank, correctAnswers);
+        // Use actual completed player count for prize calculations
+        const actualPlayerCount = sortedScores.length;
+        console.log('👥 Actual completed players:', actualPlayerCount);
+
+        // Find user's rank (1-based index)
+        const userRankIndex = sortedScores.findIndex(score => score.user_id === userId);
+        const userRank = userRankIndex >= 0 ? userRankIndex + 1 : sortedScores.length;
+        console.log('👤 User rank calculated:', userRank, 'for user:', userId, 'at index:', userRankIndex);
+        
+        // Calculate prizes based on ACTUAL completed player count
+        const prizeConfig = getPrizePoolConfig(actualPlayerCount);
+        const totalRevenue = actualPlayerCount * getCreditCost();
+        
+        // Calculate prize amount for this rank
+        let prizeAmount = 0;
+        if (userRank <= prizeConfig.winnerCount) {
+          const rankIndex = userRank - 1;
+          prizeAmount = Math.ceil(totalRevenue * prizeConfig.distribution[rankIndex]);
+        }
+        
+        console.log('💰 Prize calculation:', {
+          rank: userRank,
+          actualPlayerCount,
+          creditCost: getCreditCost(),
+          totalRevenue,
+          prizePoolPercentage: prizeConfig.percentage,
+          winnerCount: prizeConfig.winnerCount,
+          prizeAmount
+        });
+        
+        const xpAwarded = calculateXPAwarded(userRank, correctAnswers, actualPlayerCount);
         const isTrophyWinner = userRank <= prizeConfig.winnerCount;
 
         // Upsert into competition_results table (prevents duplicate errors)
@@ -1905,7 +1982,9 @@ export default function LeaguePage() {
           score: correctAnswers,
           xp_awarded: xpAwarded,
           trophy_awarded: isTrophyWinner,
-          prize_amount: prizeAmount
+          prize_amount: prizeAmount,
+          total_players: actualPlayerCount,
+          total_revenue: totalRevenue
         });
 
         const { data: upsertResult, error: upsertError } = await supabase
@@ -2135,14 +2214,15 @@ export default function LeaguePage() {
   };
 
   // Calculate XP awarded based on rank and competition difficulty
-  const calculateXPAwarded = (rank: number, correctCount: number): number => {
+  const calculateXPAwarded = (rank: number, correctCount: number, actualPlayerCount?: number): number => {
     const competitionName = competitionDetails?.name || '';
-    const playerCount = players.length;
+    // Use actualPlayerCount if provided, otherwise fall back to players.length
+    const playerCount = actualPlayerCount ?? players.length;
     const prizeConfig = getPrizePoolConfig(playerCount);
 
     // Winners get XP based on placement
     if (rank <= prizeConfig.winnerCount) {
-      // Winners get 5 XP per correct answer (existing logic)
+      // Winners get 5 XP per correct answer
       return correctCount * 5;
     }
 
@@ -2192,7 +2272,10 @@ export default function LeaguePage() {
     }
   };
 
+  // @deprecated - This function uses players.length which may not reflect actual completed players
+  // Use inline calculation with actualPlayerCount instead
   const calculatePrizeAmount = (rank: number): number => {
+    console.warn('⚠️ calculatePrizeAmount is deprecated - using players.length instead of actualPlayerCount');
     const playerCount = players.length;
     const config = getPrizePoolConfig(playerCount);
 
@@ -2242,12 +2325,12 @@ export default function LeaguePage() {
     if (competitionDetails?.entry_fee) {
       return competitionDetails.entry_fee;
     }
-    // Fallback based on competition name
+    // Fallback based on competition name - MATCH LiveCompetition.tsx values
     const name = competitionDetails?.name || '';
-    if (name.includes('Starter')) return 10;
-    if (name.includes('Pro')) return 20;
-    if (name.includes('Elite')) return 30;
-    return 10; // Default fallback
+    if (name.includes('Starter')) return 5; // ✅ Fixed: was 10, should be 5
+    if (name.includes('Pro')) return 10; // ✅ Fixed: was 20, should be 10
+    if (name.includes('Elite')) return 20; // ✅ Fixed: was 30, should be 20
+    return 5; // Default fallback
   };
 
   // Helper function to check if competition has ended
@@ -3432,7 +3515,9 @@ export default function LeaguePage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   <AnimatePresence>
-                    {leaderboard.map((entry, index) => {
+                    {leaderboard
+                      .sort((a, b) => a.rank - b.rank) // ✅ Ensure sorted by rank for display
+                      .map((entry, index) => {
                       // Use the prize_amount directly from the database
                       const prize = entry.prizeAmount || 0;
 
@@ -3442,15 +3527,15 @@ export default function LeaguePage() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: index * 0.05 }}
-                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${index < 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
+                          className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
                             }`}
                         >
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold">{index + 1}</span>
-                              {index === 0 && <span className="text-xl">🥇</span>}
-                              {index === 1 && <span className="text-xl">🥈</span>}
-                              {index === 2 && <span className="text-xl">🥉</span>}
+                              <span className="font-bold">{entry.rank}</span>
+                              {entry.rank === 1 && <span className="text-xl">🥇</span>}
+                              {entry.rank === 2 && <span className="text-xl">🥈</span>}
+                              {entry.rank === 3 && <span className="text-xl">🥉</span>}
                             </div>
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
