@@ -99,18 +99,15 @@ export async function POST(req: Request) {
             .select('id, rank')
             .eq('competition_id', competitionId);
 
-        // Check if we have results with different ranks (indicating proper finalization)
-        if (existingResults && existingResults.length > 1) {
-            const ranks = new Set(existingResults.map(r => r.rank));
-            if (ranks.size > 1) {
-                // Already finalized with different ranks
-                console.log('✅ Competition already finalized with proper ranks');
-                return NextResponse.json({
-                    success: true,
-                    message: "Already finalized",
-                    resultCount: existingResults.length
-                });
-            }
+        // Check if we already have finalized results
+        if (existingResults && existingResults.length > 0) {
+            // Already finalized - return early to prevent duplicate notifications
+            console.log('✅ Competition already finalized with', existingResults.length, 'results');
+            return NextResponse.json({
+                success: true,
+                message: "Already finalized",
+                resultCount: existingResults.length
+            });
         }
 
         console.log('🔄 Finalizing competition results...');
@@ -230,24 +227,36 @@ export async function POST(req: Request) {
                     if (txError) {
                         console.error(`❌ Failed to insert transaction for user ${session.user_id}:`, txError);
                     } else {
-                        // Update user_credits
-                        const { data: currentCredits } = await supabase
+                        console.log(`✅ Transaction inserted for user ${session.user_id}: +${prizeAmount} credits`);
+
+                        // Update user_credits - use upsert to handle missing records
+                        const { data: currentCredits, error: creditsFetchError } = await supabase
                             .from('user_credits')
                             .select('winnings_credits')
                             .eq('user_id', session.user_id)
                             .maybeSingle();
 
-                        if (currentCredits) {
-                            const newWinningsCredits = (parseFloat(currentCredits.winnings_credits) || 0) + prizeAmount;
-                            await supabase
-                                .from('user_credits')
-                                .update({
-                                    winnings_credits: newWinningsCredits,
-                                    updated_at: new Date().toISOString()
-                                })
-                                .eq('user_id', session.user_id);
+                        if (creditsFetchError) {
+                            console.error(`❌ Error fetching credits for user ${session.user_id}:`, creditsFetchError);
+                        }
 
-                            console.log(`💰 Credits updated for user ${session.user_id}: +${prizeAmount}`);
+                        const currentWinnings = currentCredits ? (parseFloat(currentCredits.winnings_credits as any) || 0) : 0;
+                        const newWinningsCredits = currentWinnings + prizeAmount;
+
+                        console.log(`💰 Updating credits for user ${session.user_id}: ${currentWinnings} -> ${newWinningsCredits}`);
+
+                        const { error: creditsUpdateError } = await supabase
+                            .from('user_credits')
+                            .upsert({
+                                user_id: session.user_id,
+                                winnings_credits: newWinningsCredits,
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'user_id' });
+
+                        if (creditsUpdateError) {
+                            console.error(`❌ Error updating credits for user ${session.user_id}:`, creditsUpdateError);
+                        } else {
+                            console.log(`✅ Credits successfully updated for user ${session.user_id}: +${prizeAmount}`);
                         }
                     }
                 } else {

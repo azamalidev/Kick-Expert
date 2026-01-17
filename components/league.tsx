@@ -886,22 +886,88 @@ export default function LeaguePage() {
         try {
           console.log('🔍 Fetching leaderboard for competition:', competitionId);
 
-          // ⚠️ IMPORTANT: First try to finalize the competition if it has ended
-          // This ensures correct ranks are calculated AFTER all users have finished
-          try {
-            const finalizeRes = await fetch('/api/finalize-competition', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ competitionId })
-            });
-            const finalizeData = await finalizeRes.json();
-            console.log('📊 Finalize check result:', finalizeData);
-          } catch (err) {
-            console.warn('Finalize check failed (non-critical):', err);
+          // PRIORITY 1: Check competition_results FIRST (before calling finalize API)
+          // This prevents duplicate API calls and notifications for already-finalized competitions
+          let { data: results, error: resultsError } = await supabase
+            .from('competition_results')
+            .select('user_id, score, rank, prize_amount')
+            .eq('competition_id', competitionId)
+            .order('rank', { ascending: true });
+
+          // Only call finalize API if NO results exist yet
+          if (!results || results.length === 0) {
+            console.log('🔄 No results found, attempting to finalize competition...');
+            try {
+              const finalizeRes = await fetch('/api/finalize-competition', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ competitionId })
+              });
+              const finalizeData = await finalizeRes.json();
+              console.log('📊 Finalize API result:', finalizeData);
+
+              // Re-fetch results after finalization
+              const { data: newResults } = await supabase
+                .from('competition_results')
+                .select('user_id, score, rank, prize_amount')
+                .eq('competition_id', competitionId)
+                .order('rank', { ascending: true });
+
+              if (newResults && newResults.length > 0) {
+                results = newResults;
+              }
+            } catch (err) {
+              console.warn('Finalize API failed (non-critical):', err);
+            }
+          } else {
+            console.log('✅ Results already exist, skipping finalize API call');
           }
 
-          // Calculate ranks dynamically from competition_sessions
-          console.log('📊 Using competition_sessions for dynamic rank calculation');
+          if (results && results.length > 0) {
+            console.log('✅ Using competition_results table (', results.length, 'entries)');
+
+            // Get usernames for the leaderboard entries
+            const resultUserIds = Array.from(new Set(results.map((r: any) => r.user_id).filter(Boolean)));
+            let resultsProfilesMap: Record<string, any> = {};
+
+            if (resultUserIds.length > 0) {
+              const { data: profilesData } = await supabase
+                .from('profiles')
+                .select('user_id, username')
+                .in('user_id', resultUserIds as any[]);
+
+              (profilesData || []).forEach((p: any) => {
+                resultsProfilesMap[p.user_id] = p;
+              });
+            }
+
+            const leaderboardFromResults: LeaderboardEntry[] = results.map((result: any) => ({
+              id: result.user_id,
+              name: (resultsProfilesMap[result.user_id] && resultsProfilesMap[result.user_id].username) || `User ${result.user_id.substring(0, 8)}`,
+              score: result.score || 0,
+              rank: result.rank,
+              prizeAmount: result.prize_amount || 0,
+              isUser: result.user_id === userId
+            }));
+
+            console.log('📊 Leaderboard from results:', leaderboardFromResults.map(e => `${e.name}: Rank ${e.rank}, Score ${e.score}`));
+
+            setLeaderboard(leaderboardFromResults);
+            if (userId) {
+              const userEntry = leaderboardFromResults.find(entry => entry.isUser);
+              if (userEntry) {
+                setUserRank(userEntry.rank);
+                console.log('👤 User rank set to:', userEntry.rank);
+              }
+            }
+            setLeaderboardLastUpdated(new Date());
+            console.log('✅ Leaderboard updated from competition_results with', leaderboardFromResults.length, 'entries');
+            return; // Done - no need to fall back
+          }
+
+          // FALLBACK: Use competition_sessions for live/during-competition ranking
+          // Note: This has RLS restrictions so users only see their own sessions
+          console.log('📊 competition_results empty, using competition_sessions for live data');
 
           const { data: sessions, error: leaderboardError } = await supabase
             .from('competition_sessions')
@@ -922,7 +988,6 @@ export default function LeaguePage() {
 
           if (!sessions || sessions.length === 0) {
             console.warn('⚠️ No completed sessions found');
-            console.log('💡 Tip: Check if completeQuiz() is being called when quiz ends');
             setLeaderboard([]);
             return;
           }
@@ -1780,7 +1845,13 @@ export default function LeaguePage() {
   };
 
   const completeQuiz = async () => {
-    console.log('🏁 completeQuiz called!', { sessionId, answersCount: answers.length });
+    console.log('🏁 completeQuiz called!', { sessionId, answersCount: answers.length, quizCompleted });
+
+    // GUARD: Prevent multiple calls
+    if (quizCompleted) {
+      console.log('⏭️ Quiz already completed, skipping duplicate call');
+      return;
+    }
 
     if (!sessionId) {
       console.error("❌ No session ID found - cannot complete quiz");
@@ -1789,6 +1860,8 @@ export default function LeaguePage() {
       return;
     }
 
+    // Mark as completed IMMEDIATELY to prevent duplicate calls
+    setQuizCompleted(true);
     console.log('✅ Session ID exists:', sessionId);
 
     // Loading state should already be set by caller, but ensure it's true
