@@ -96,7 +96,9 @@ export default function LeaguePage() {
   const [resultsLoading, setResultsLoading] = useState(false); // Loading state for results calculation
   const [finalizationCountdown, setFinalizationCountdown] = useState<number>(0); // Countdown before finalization
   const [isFinalizationReady, setIsFinalizationReady] = useState(false); // True after countdown completes
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false); // NEW: Loading state for leaderboard
   const nextCalled = useRef(false);
+  const hasLoadedLeaderboardRef = useRef(false); // NEW: Track if leaderboard has loaded once to avoid skeleton on refresh
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
   const responseLatencies = useRef<number[]>([]); // Track all response times
@@ -965,6 +967,11 @@ export default function LeaguePage() {
   useEffect(() => {
     if (phase === 'leaderboard' || phase === 'results' || (phase !== 'quiz' && hasCompetitionEnded())) {
       const fetchLeaderboard = async () => {
+        // Show loading state only on first load
+        if (!hasLoadedLeaderboardRef.current) {
+          setLeaderboardLoading(true);
+        }
+
         const authData = await supabase.auth.getUser();
         const userId = authData.data.user?.id;
 
@@ -1162,9 +1169,17 @@ export default function LeaguePage() {
           setLeaderboardLastUpdated(new Date());
           console.log('✅ Leaderboard updated from sessions with', leaderboardData.length, 'entries');
 
+          // Mark as loaded successfully
+          hasLoadedLeaderboardRef.current = true;
+
         } catch (error) {
           console.error('Failed to fetch leaderboard:', error);
-          setLeaderboard([]);
+          // Only clear leaderboard if we haven't loaded it before (keeps old data on refresh error)
+          if (!hasLoadedLeaderboardRef.current) {
+            setLeaderboard([]);
+          }
+        } finally {
+          setLeaderboardLoading(false);
         }
       };
 
@@ -3401,46 +3416,73 @@ export default function LeaguePage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   <AnimatePresence>
-                    {leaderboard
-                      .sort((a, b) => a.rank - b.rank) // ✅ Ensure sorted by rank for display
-                      .map((entry, index) => {
-                        // Use the prize_amount directly from the database
-                        const prize = entry.prizeAmount || 0;
+                    {leaderboardLoading ? (
+                      // Skeleton Loading State
+                      [...Array(5)].map((_, i) => (
+                        <motion.tr
+                          key={`skeleton-${i}`}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="bg-white"
+                        >
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 bg-gray-200 rounded w-12 animate-pulse"></div>
+                          </td>
+                        </motion.tr>
+                      ))
+                    ) : (
+                      leaderboard
+                        .sort((a, b) => a.rank - b.rank) // ✅ Ensure sorted by rank for display
+                        .map((entry, index) => {
+                          // Use the prize_amount directly from the database
+                          const prize = entry.prizeAmount || 0;
 
-                        return (
-                          <motion.tr
-                            key={entry.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: index * 0.05 }}
-                            className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
-                              }`}
-                          >
-                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold">{entry.rank}</span>
-                                {entry.rank === 1 && <span className="text-xl">🥇</span>}
-                                {entry.rank === 2 && <span className="text-xl">🥈</span>}
-                                {entry.rank === 3 && <span className="text-xl">🥉</span>}
-                              </div>
-                            </td>
-                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                              {entry.name}
-                              {entry.isUser && <span className="ml-2 text-lime-600 font-semibold">(You)</span>}
-                            </td>
-                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                              <span className="font-semibold">{entry.score}/{entry.questions_played || questions.length}</span>
-                            </td>
-                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                              {prize > 0 ? (
-                                <span className="font-bold text-lime-600">{prize} Credits</span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
+                          return (
+                            <motion.tr
+                              key={entry.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3, delay: index * 0.05 }}
+                              className={`hover:bg-gray-50 ${entry.isUser ? 'bg-lime-50 font-semibold' : ''} ${entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
+                                }`}
+                            >
+                              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold">{entry.rank}</span>
+                                  {entry.rank === 1 && <span className="text-xl">🥇</span>}
+                                  {entry.rank === 2 && <span className="text-xl">🥈</span>}
+                                  {entry.rank === 3 && <span className="text-xl">🥉</span>}
+                                </div>
+
+                              </td>
+                              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                {entry.name}
+                                {entry.isUser && <span className="ml-2 text-lime-600 font-semibold">(You)</span>}
+                              </td>
+                              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                <span className="font-semibold">{entry.score}/{entry.questions_played || questions.length}</span>
+                              </td>
+                              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                                {prize > 0 ? (
+                                  <span className="font-bold text-lime-600">{prize} Credits</span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            </motion.tr>
+                          );
+                        })
+                    )}
                   </AnimatePresence>
                 </tbody>
               </table>
