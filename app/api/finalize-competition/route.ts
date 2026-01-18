@@ -71,7 +71,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: "Competition not found" }, { status: 404 });
         }
 
-        // 2. Check if competition has ended (allow some buffer time)
+        // 2. Check if competition has ended (allow some buffer time for late finishers)
         const now = new Date();
         let competitionEndTime: Date | null = null;
 
@@ -83,15 +83,26 @@ export async function POST(req: Request) {
             competitionEndTime = new Date(startTime + durationMs);
         }
 
-        // If competition hasn't ended yet, return early
-        if (competitionEndTime && now < competitionEndTime) {
-            console.log('⏳ Competition has not ended yet, skipping finalization');
+        // CRITICAL: Add a 15-second grace period after competition ends
+        // Client already waits 10 seconds before calling this API
+        // This extra 15 seconds (25 total) allows for any remaining network delays
+        const GRACE_PERIOD_MS = 15000; // 15 seconds (client waits 10s + this 15s = 25s total buffer)
+        const graceEndTime = competitionEndTime ? new Date(competitionEndTime.getTime() + GRACE_PERIOD_MS) : null;
+
+        // If competition hasn't ended + grace period, return early
+        if (graceEndTime && now < graceEndTime) {
+            const remainingMs = graceEndTime.getTime() - now.getTime();
+            console.log(`⏳ Competition has not ended yet (including ${GRACE_PERIOD_MS / 1000}s grace period). ${remainingMs}ms remaining.`);
             return NextResponse.json({
                 success: true,
-                message: "Competition not ended yet",
-                endsAt: competitionEndTime.toISOString()
+                message: "Competition not ended yet (grace period active)",
+                endsAt: competitionEndTime?.toISOString(),
+                graceEndsAt: graceEndTime.toISOString(),
+                remainingMs: remainingMs
             });
         }
+
+        console.log(`✅ Competition ended and grace period passed. Proceeding with finalization.`);
 
         // 3. Check if already finalized - if ANY results exist, skip
         const { data: existingResults } = await supabase

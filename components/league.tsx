@@ -87,17 +87,21 @@ export default function LeaguePage() {
   const [isLateJoiner, setIsLateJoiner] = useState(false);
   const [missedQuestions, setMissedQuestions] = useState(0);
   const [competitionStartTime, setCompetitionStartTime] = useState<number | null>(null);
+  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0); // Offset: serverTime - clientTime
   const [showAnswerRequiredWarning, setShowAnswerRequiredWarning] = useState(false); // NEW: Warning when trying to skip
   const [showLateJoinerWarning, setShowLateJoinerWarning] = useState(false);
   const [showQuizLateJoinerWarning, setShowQuizLateJoinerWarning] = useState(false);
   const [isRejoin, setIsRejoin] = useState(false); // Track if user is rejoining
   const [competitionTimeWarning, setCompetitionTimeWarning] = useState<string | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false); // Loading state for results calculation
+  const [finalizationCountdown, setFinalizationCountdown] = useState<number>(0); // Countdown before finalization
+  const [isFinalizationReady, setIsFinalizationReady] = useState(false); // True after countdown completes
   const nextCalled = useRef(false);
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
   const responseLatencies = useRef<number[]>([]); // Track all response times
   const syncCheckInterval = useRef<NodeJS.Timeout | null>(null); // NEW: For global sync checking
+  const serverTimeOffsetRef = useRef<number>(0); // Server time - Client time (positive = server ahead)
   const router = useRouter();
   const searchParams = useSearchParams();
   const competitionId = searchParams ? searchParams.get('competitionId') || '' : '';
@@ -171,6 +175,38 @@ export default function LeaguePage() {
         if (!error && data) {
           console.log('Competition details fetched:', data); // Debug log
           setCompetitionDetails(data);
+
+          // CRITICAL: Calculate server time offset for timer synchronization
+          // Fetch server time from our dedicated endpoint
+          try {
+            const beforeFetch = Date.now();
+            const response = await fetch('/api/server-time');
+            const afterFetch = Date.now();
+
+            if (response.ok) {
+              const serverTimeData = await response.json();
+              const serverTime = serverTimeData.serverTime;
+
+              // Estimate network latency (half round trip)
+              const latency = Math.floor((afterFetch - beforeFetch) / 2);
+
+              // Calculate offset: serverTime - clientTime
+              // Adjust for network latency
+              const clientTimeAtServerResponse = beforeFetch + latency;
+              const offset = serverTime - clientTimeAtServerResponse;
+
+              serverTimeOffsetRef.current = offset;
+              setServerTimeOffset(offset);
+
+              console.log(`⏱️ Time sync complete: Server time offset = ${offset}ms (${offset > 0 ? 'server ahead' : 'client ahead'})`);
+              console.log(`   Server time: ${serverTimeData.serverTimeISO}`);
+              console.log(`   Client time: ${new Date(clientTimeAtServerResponse).toISOString()}`);
+              console.log(`   Network latency: ~${latency}ms`);
+            }
+          } catch (syncErr) {
+            console.warn('Could not sync time with server:', syncErr);
+            serverTimeOffsetRef.current = 0; // Fallback to no offset
+          }
 
           // Check if competition is in a valid state for participation
           if (data.status === 'completed' || data.status === 'cancelled') {
@@ -605,8 +641,10 @@ export default function LeaguePage() {
 
         // IMMEDIATELY calculate correct starting question for late joiners OR rejoining users
         // This prevents showing Q1 before jumping to correct question
-        if (competitionStartTime && Date.now() > competitionStartTime) {
-          const elapsedMs = Date.now() - competitionStartTime;
+        // Use server-synchronized time for accurate calculation
+        const serverNow = Date.now() + serverTimeOffsetRef.current;
+        if (competitionStartTime && serverNow > competitionStartTime) {
+          const elapsedMs = serverNow - competitionStartTime;
           const elapsedSeconds = Math.floor(elapsedMs / 1000);
           const currentGlobalQuestion = Math.floor(elapsedSeconds / 30); // 30s per question
           const missed = Math.min(currentGlobalQuestion, normalizedQuestions.length - 1);
@@ -768,9 +806,11 @@ export default function LeaguePage() {
     // Set the start time for this question if not set
     if (!timerStartTime.current) {
       // Calculate how much time has elapsed globally for this question
+      // CRITICAL: Use server-synchronized time for accurate sync across devices
       if (competitionStartTime) {
-        const now = Date.now();
-        const globalElapsedMs = now - competitionStartTime;
+        // Get current server time by adjusting client time with offset
+        const serverNow = Date.now() + serverTimeOffsetRef.current;
+        const globalElapsedMs = serverNow - competitionStartTime;
         const globalElapsedSeconds = Math.floor(globalElapsedMs / 1000);
 
         // Each question lasts 30 seconds globally
@@ -786,17 +826,17 @@ export default function LeaguePage() {
           questionStartTime.current = questionGlobalStartTime;
 
           const remainingTime = 30 - timeElapsedInCurrentQuestion;
-          console.log(`⏱️ Timer started for Q${currentQuestionIndex + 1} - Global sync: ${timeElapsedInCurrentQuestion}s elapsed, ${remainingTime}s remaining`);
+          console.log(`⏱️ Timer started for Q${currentQuestionIndex + 1} - Server sync: ${timeElapsedInCurrentQuestion}s elapsed, ${remainingTime}s remaining (offset: ${serverTimeOffsetRef.current}ms)`);
         } else {
           // Fallback: give full 30 seconds (should not happen with proper sync)
-          timerStartTime.current = now;
-          questionStartTime.current = now;
-          console.log(`⏱️ Timer started for Q${currentQuestionIndex + 1} - Full 30s (not synced)`);
+          timerStartTime.current = Date.now() + serverTimeOffsetRef.current;
+          questionStartTime.current = timerStartTime.current;
+          console.log(`⏱️ Timer started for Q${currentQuestionIndex + 1} - Full 30s (not synced, offset: ${serverTimeOffsetRef.current}ms)`);
         }
       } else {
         // No competition start time, give full 30 seconds
-        timerStartTime.current = Date.now();
-        questionStartTime.current = Date.now();
+        timerStartTime.current = Date.now() + serverTimeOffsetRef.current;
+        questionStartTime.current = timerStartTime.current;
         console.log(`⏱️ Timer started for Q${currentQuestionIndex + 1} - Full 30s (no global time)`);
       }
     }
@@ -807,8 +847,9 @@ export default function LeaguePage() {
     const timerInterval = setInterval(() => {
       if (!timerStartTime.current) return;
 
-      // Calculate elapsed time based on actual timestamp difference
-      const elapsed = Date.now() - timerStartTime.current;
+      // Calculate elapsed time using server-synchronized time
+      const serverNow = Date.now() + serverTimeOffsetRef.current;
+      const elapsed = serverNow - timerStartTime.current;
       const remaining = Math.max(0, (questionDuration - elapsed) / 1000);
 
       setTimer(remaining);
@@ -858,9 +899,11 @@ export default function LeaguePage() {
   // The previous useEffect that called handleNextQuestion after 2.5s is deleted.
 
 
-  // Confetti effect on results phase (only when not loading)
+  // Confetti effect on results phase (only when not loading AND countdown finished)
   useEffect(() => {
-    if (phase === 'results' && !resultsLoading && score >= 1) {
+    // Strictly wait until finalization is ready (countdown complete)
+    // This also prevents confetti from firing on historical results (where countdown doesn't run)
+    if (phase === 'results' && !resultsLoading && score >= 1 && isFinalizationReady) {
       // Delay confetti slightly to ensure modal is rendered
       const timer = setTimeout(() => {
         confetti({
@@ -873,7 +916,49 @@ export default function LeaguePage() {
 
       return () => clearTimeout(timer);
     }
-  }, [phase, score, resultsLoading]);
+  }, [phase, score, resultsLoading, isFinalizationReady]);
+
+  // CRITICAL: 10-second finalization countdown
+  // This ensures ALL users have time to save their sessions before finalization
+  const finalizationCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Start countdown when entering results phase
+    if ((phase === 'results' || phase === 'leaderboard') && quizCompleted && !isFinalizationReady) {
+      // Prevent duplicate countdown intervals
+      if (finalizationCountdownRef.current) {
+        return; // Already running
+      }
+
+      console.log('⏳ Starting 10-second finalization countdown...');
+      setFinalizationCountdown(10);
+
+      finalizationCountdownRef.current = setInterval(() => {
+        setFinalizationCountdown(prev => {
+          if (prev <= 1) {
+            // Countdown complete - ready to finalize
+            if (finalizationCountdownRef.current) {
+              clearInterval(finalizationCountdownRef.current);
+              finalizationCountdownRef.current = null;
+            }
+            setIsFinalizationReady(true);
+            setResultsLoading(false); // Show results now
+            console.log('✅ Finalization countdown complete - ready to fetch results');
+            return 0;
+          }
+          console.log(`⏳ Finalization countdown: ${prev - 1} seconds remaining...`);
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        if (finalizationCountdownRef.current) {
+          clearInterval(finalizationCountdownRef.current);
+          finalizationCountdownRef.current = null;
+        }
+      };
+    }
+  }, [phase, quizCompleted, isFinalizationReady]);
 
   // Generate leaderboard when entering results or leaderboard phase
   // Fetch leaderboard periodically in leaderboard phase
@@ -886,18 +971,27 @@ export default function LeaguePage() {
         try {
           console.log('🔍 Fetching leaderboard for competition:', competitionId);
 
-          // Always call finalize API - it will check internally if re-finalization is needed
-          // The API compares completed sessions vs existing results to handle late finishers
-          try {
-            const finalizeRes = await fetch('/api/finalize-competition', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ competitionId })
-            });
-            const finalizeData = await finalizeRes.json();
-            console.log('📊 Finalize API result:', finalizeData);
-          } catch (err) {
-            console.warn('Finalize API failed (non-critical):', err);
+          // ONLY call finalize API after the countdown is complete
+          // This gives all users time to save their sessions
+          if (isFinalizationReady) {
+            try {
+              const finalizeRes = await fetch('/api/finalize-competition', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ competitionId })
+              });
+              const finalizeData = await finalizeRes.json();
+              console.log('📊 Finalize API result:', finalizeData);
+
+              // If grace period is still active, the API will handle it
+              if (finalizeData.message?.includes('grace period')) {
+                console.log(`⏳ Grace period still active on server...`);
+              }
+            } catch (err) {
+              console.warn('Finalize API failed (non-critical):', err);
+            }
+          } else {
+            console.log('⏳ Waiting for finalization countdown to complete...');
           }
 
           // Fetch results after finalization attempt
@@ -1307,11 +1401,13 @@ export default function LeaguePage() {
 
   // NEW: Global Synchronization System
   // Calculate which question should be globally shown based on competition start time
+  // Uses server-synchronized time for accurate sync across all devices
   const calculateGlobalQuestionIndex = (): number => {
     if (!competitionStartTime || questions.length === 0) return 0;
 
-    const now = Date.now();
-    const elapsedMs = now - competitionStartTime;
+    // Use server-synchronized time
+    const serverNow = Date.now() + serverTimeOffsetRef.current;
+    const elapsedMs = serverNow - competitionStartTime;
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
     // Each question lasts exactly 30 seconds for ALL users
@@ -1342,7 +1438,9 @@ export default function LeaguePage() {
       if (globalIndex > currentQuestionIndex && globalIndex < questions.length) {
         // Only force sync if user's local 30-second timer has actually expired
         // This ensures every user gets exactly 30 seconds per question
-        const userTimerExpired = questionStartTime.current && (Date.now() - questionStartTime.current) >= 30000;
+        // Use server-synchronized time for accurate check
+        const serverNow = Date.now() + serverTimeOffsetRef.current;
+        const userTimerExpired = questionStartTime.current && (serverNow - questionStartTime.current) >= 30000;
 
         if (!userTimerExpired) {
           // User's timer hasn't expired yet - don't force sync
@@ -1909,13 +2007,39 @@ export default function LeaguePage() {
 
       const scorePercentage = (correctAnswers / questions.length) * 100;
 
-      await supabase.from('competition_sessions').update({
-        correct_answers: correctAnswers,
-        score_percentage: scorePercentage,
-        end_time: new Date().toISOString(),
-      }).eq('id', sessionId);
+      // CRITICAL: Update session with end_time - retry up to 3 times if it fails
+      let updateSuccess = false;
+      let updateAttempts = 0;
+      const maxAttempts = 3;
 
-      console.log('✅ Session updated with end_time and score');
+      while (!updateSuccess && updateAttempts < maxAttempts) {
+        updateAttempts++;
+        console.log(`💾 Session update attempt ${updateAttempts}/${maxAttempts}...`);
+
+        const { error: updateError } = await supabase.from('competition_sessions').update({
+          correct_answers: correctAnswers,
+          score_percentage: scorePercentage,
+          end_time: new Date().toISOString(),
+        }).eq('id', sessionId);
+
+        if (updateError) {
+          console.error(`❌ Session update attempt ${updateAttempts} failed:`, updateError);
+          if (updateAttempts < maxAttempts) {
+            // Wait 500ms before retry
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } else {
+          updateSuccess = true;
+          console.log(`✅ Session updated successfully on attempt ${updateAttempts}`);
+        }
+      }
+
+      if (!updateSuccess) {
+        console.error('❌ CRITICAL: Failed to update session after', maxAttempts, 'attempts!');
+        console.error('❌ This user session may NOT be included in finalization!');
+      }
+
+      console.log('✅ Session updated with end_time and score for session:', sessionId);
 
       // Log suspicious activity if detected
       if (patternAnalysis.isSuspicious) {
@@ -2092,27 +2216,47 @@ export default function LeaguePage() {
 
     console.log('⏰ Checking competition end time:', competitionDetails);
 
+    // Use server-synchronized time for accurate end-time check
+    const serverNow = Date.now() + serverTimeOffsetRef.current;
+
     // Check if end_time exists and has passed
     if (competitionDetails.end_time) {
       const endTime = new Date(competitionDetails.end_time).getTime();
-      const now = new Date().getTime();
-      const hasEnded = now >= endTime;
-      console.log('📅 End time check:', { endTime: new Date(endTime), now: new Date(now), hasEnded });
+      const hasEnded = serverNow >= endTime;
+      console.log('📅 End time check (server-synced):', { endTime: new Date(endTime), serverNow: new Date(serverNow), hasEnded });
       return hasEnded;
     }
 
-    // Fallback: Calculate end time from start_time + duration
+    // CRITICAL: Use questions-based duration (questions × 30 seconds) for accurate sync
+    // This matches the timer calculation exactly
+    if (competitionDetails.start_time && questions.length > 0) {
+      const startTime = new Date(competitionDetails.start_time).getTime();
+      // Each question has 30 seconds
+      const quizDurationMs = questions.length * 30 * 1000;
+      const calculatedEndTime = startTime + quizDurationMs;
+      const hasEnded = serverNow >= calculatedEndTime;
+      console.log('⏳ Questions-based end time check (server-synced):', {
+        startTime: new Date(startTime),
+        questionCount: questions.length,
+        quizDurationSeconds: questions.length * 30,
+        calculatedEndTime: new Date(calculatedEndTime),
+        serverNow: new Date(serverNow),
+        hasEnded
+      });
+      return hasEnded;
+    }
+
+    // Fallback: Calculate end time from start_time + duration_minutes
     if (competitionDetails.start_time && competitionDetails.duration_minutes) {
       const startTime = new Date(competitionDetails.start_time).getTime();
       const durationMs = competitionDetails.duration_minutes * 60 * 1000;
       const calculatedEndTime = startTime + durationMs;
-      const now = new Date().getTime();
-      const hasEnded = now >= calculatedEndTime;
-      console.log('⏳ Duration-based end time check:', {
+      const hasEnded = serverNow >= calculatedEndTime;
+      console.log('⏳ Duration-based end time check (server-synced):', {
         startTime: new Date(startTime),
         durationMinutes: competitionDetails.duration_minutes,
         calculatedEndTime: new Date(calculatedEndTime),
-        now: new Date(now),
+        serverNow: new Date(serverNow),
         hasEnded
       });
       return hasEnded;
@@ -2131,6 +2275,11 @@ export default function LeaguePage() {
 
     if (competitionDetails.end_time) {
       endTime = new Date(competitionDetails.end_time);
+    } else if (competitionDetails.start_time && questions.length > 0) {
+      // Use questions-based duration for consistency
+      const startTime = new Date(competitionDetails.start_time).getTime();
+      const quizDurationMs = questions.length * 30 * 1000;
+      endTime = new Date(startTime + quizDurationMs);
     } else if (competitionDetails.start_time && competitionDetails.duration_minutes) {
       const startTime = new Date(competitionDetails.start_time).getTime();
       const durationMs = competitionDetails.duration_minutes * 60 * 1000;
@@ -2811,12 +2960,13 @@ export default function LeaguePage() {
             transition={{ duration: 0.3 }}
             className="text-center py-8 sm:py-12 px-4 sm:px-8"
           >
-            {/* Loading State */}
-            {resultsLoading ? (
+            {/* Loading State - Show countdown before finalization */}
+            {(resultsLoading || finalizationCountdown > 0) ? (
               <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-lime-600"></div>
                 <p className="text-xl font-semibold text-gray-700">Calculating your results...</p>
-                <p className="text-sm text-gray-500">Please wait while we process your score</p>
+
+                <p className="text-sm text-gray-500">Please wait while we gather all scores</p>
               </div>
             ) : (
               <>
