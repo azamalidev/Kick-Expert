@@ -100,6 +100,7 @@ export default function LeaguePage() {
   const nextCalled = useRef(false);
   const hasLoadedLeaderboardRef = useRef(false); // NEW: Track if leaderboard has loaded once to avoid skeleton on refresh
   const resultsFinalized = useRef(false); // NEW: Track if competition results are finalized (stops auto-refresh)
+  const resultsFetchCount = useRef(0); // NEW: Count how many times we've fetched finalized results
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
   const responseLatencies = useRef<number[]>([]); // Track all response times
@@ -113,6 +114,7 @@ export default function LeaguePage() {
   useEffect(() => {
     hasLoadedLeaderboardRef.current = false;
     resultsFinalized.current = false;
+    resultsFetchCount.current = 0;
     setLeaderboardLoading(false);
   }, [competitionId]);
 
@@ -972,12 +974,23 @@ export default function LeaguePage() {
 
   // Generate leaderboard when entering results or leaderboard phase
   // Fetch leaderboard periodically in leaderboard phase
+  // CRITICAL: Only start fetching AFTER finalization countdown is complete
+  // This ensures the skeleton shows when the leaderboard is actually visible
   useEffect(() => {
+    // Wait for finalization to be ready before fetching
+    // Otherwise the skeleton shows during the countdown overlay and is invisible
+    if (!isFinalizationReady && phase === 'results') {
+      console.log('⏳ Waiting for finalization countdown before fetching leaderboard...');
+      return; // Don't fetch yet
+    }
+
     if (phase === 'leaderboard' || phase === 'results' || (phase !== 'quiz' && hasCompetitionEnded())) {
       const fetchLeaderboard = async () => {
-        // Show loading state only on first load
+        // Show loading state only on first load - set ref immediately to prevent repeat loaders
         if (!hasLoadedLeaderboardRef.current) {
+          console.log('⏳ First time loading leaderboard - showing skeleton');
           setLeaderboardLoading(true);
+          hasLoadedLeaderboardRef.current = true; // Mark immediately so subsequent fetches skip the loader
         }
 
         const authData = await supabase.auth.getUser();
@@ -1056,10 +1069,18 @@ export default function LeaguePage() {
             setLeaderboardLastUpdated(new Date());
             console.log('✅ Leaderboard updated from competition_results with', leaderboardFromResults.length, 'entries');
 
-            // CRITICAL: Mark results as finalized to stop auto-refresh
-            // Once we have competition_results, data won't change anymore
-            resultsFinalized.current = true;
-            console.log('🏁 Results finalized - stopping auto-refresh');
+            // Track how many times we've successfully fetched results
+            resultsFetchCount.current += 1;
+            console.log(`📊 Results fetch count: ${resultsFetchCount.current}`);
+
+            // Only mark as finalized after 3 successful fetches
+            // This ensures all devices have had time to save their sessions
+            if (resultsFetchCount.current >= 3) {
+              resultsFinalized.current = true;
+              console.log('🏁 Results confirmed stable after 3 fetches - stopping auto-refresh');
+            } else {
+              console.log(`⏳ Will refresh ${3 - resultsFetchCount.current} more time(s) to ensure data consistency`);
+            }
 
             return; // Done - no need to fall back
           }
@@ -1182,9 +1203,6 @@ export default function LeaguePage() {
           // Update last updated timestamp
           setLeaderboardLastUpdated(new Date());
           console.log('✅ Leaderboard updated from sessions with', leaderboardData.length, 'entries');
-
-          // Mark as loaded successfully
-          hasLoadedLeaderboardRef.current = true;
 
         } catch (error) {
           console.error('Failed to fetch leaderboard:', error);
@@ -3457,8 +3475,8 @@ export default function LeaguePage() {
                             <div className="flex items-center gap-2">
                               {/* Circle for Trophy/Rank */}
                               <div className={`h-8 w-8 rounded-full animate-pulse ${i === 0 ? 'bg-yellow-100' :
-                                  i === 1 ? 'bg-gray-100' :
-                                    i === 2 ? 'bg-orange-100' : 'bg-gray-100'
+                                i === 1 ? 'bg-gray-100' :
+                                  i === 2 ? 'bg-orange-100' : 'bg-gray-100'
                                 }`}></div>
                             </div>
                           </td>

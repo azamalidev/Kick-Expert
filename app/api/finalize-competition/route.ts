@@ -222,44 +222,50 @@ export async function POST(req: Request) {
                 console.error(`❌ Failed to upsert result for user ${session.user_id}:`, upsertError);
             }
 
-            // 9. Handle prize distribution for winners
-            if (prizeAmount > 0) {
-                // Check if transaction already exists for this session
-                const { data: existingTx } = await supabase
-                    .from('transactions')
-                    .select('id')
-                    .eq('session_id', session.id)
-                    .eq('type', 'reward')
-                    .maybeSingle();
+            // 9. Handle transaction records for ALL participants (winners AND non-winners)
+            // Check if transaction already exists for this session
+            const { data: existingTx } = await supabase
+                .from('transactions')
+                .select('id')
+                .eq('session_id', session.id)
+                .in('type', ['reward', 'participation'])
+                .maybeSingle();
 
-                if (!existingTx) {
-                    // Insert transaction record
-                    const rankSuffix = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : `${rank}th`;
+            if (!existingTx) {
+                // Insert transaction record for this participant
+                const rankSuffix = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : `${rank}th`;
+                const isWinner = prizeAmount > 0;
 
-                    const { error: txError } = await supabase.from('transactions').insert({
-                        user_id: session.user_id,
-                        type: 'reward',
-                        amount: prizeAmount,
-                        status: 'completed',
-                        metadata: {
-                            rank: rank,
-                            score: correctAnswers,
-                            prize_amount: prizeAmount,
-                            competition_id: competitionId,
-                            competition_name: competitionName,
-                            finalized_at: new Date().toISOString()
-                        },
-                        description: `Competition Reward (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`,
-                        session_id: session.id,
-                        source: 'league_competition_finalized'
-                    });
+                const { error: txError } = await supabase.from('transactions').insert({
+                    user_id: session.user_id,
+                    type: isWinner ? 'reward' : 'participation', // Different type for non-winners
+                    amount: prizeAmount, // 0 for non-winners
+                    status: 'completed',
+                    metadata: {
+                        rank: rank,
+                        score: correctAnswers,
+                        prize_amount: prizeAmount,
+                        competition_id: competitionId,
+                        competition_name: competitionName,
+                        is_winner: isWinner,
+                        total_players: completedPlayerCount,
+                        registered_players: registeredPlayerCount,
+                        finalized_at: new Date().toISOString()
+                    },
+                    description: isWinner
+                        ? `Competition Reward (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`
+                        : `Competition Participation (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`,
+                    session_id: session.id,
+                    source: 'league_competition_finalized'
+                });
 
-                    if (txError) {
-                        console.error(`❌ Failed to insert transaction for user ${session.user_id}:`, txError);
-                    } else {
-                        console.log(`✅ Transaction inserted for user ${session.user_id}: +${prizeAmount} credits`);
+                if (txError) {
+                    console.error(`❌ Failed to insert transaction for user ${session.user_id}:`, txError);
+                } else {
+                    console.log(`✅ Transaction inserted for user ${session.user_id}: ${isWinner ? `+${prizeAmount} credits (winner)` : 'participation recorded'}`);
 
-                        // Update user_credits - use upsert to handle missing records
+                    // Update user_credits ONLY for winners
+                    if (prizeAmount > 0) {
                         const { data: currentCredits, error: creditsFetchError } = await supabase
                             .from('user_credits')
                             .select('winnings_credits')
@@ -289,9 +295,9 @@ export async function POST(req: Request) {
                             console.log(`✅ Credits successfully updated for user ${session.user_id}: +${prizeAmount}`);
                         }
                     }
-                } else {
-                    console.log(`⏭️ Transaction already exists for session ${session.id}, skipping`);
                 }
+            } else {
+                console.log(`⏭️ Transaction already exists for session ${session.id}, skipping`);
             }
 
             // 10. Award trophy for winners

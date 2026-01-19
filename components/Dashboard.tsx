@@ -387,12 +387,12 @@ export default React.memo(function Dashboard({
   };
 
   return (
-    <div className="min-h-fit mt-15 bg-gray-50 text-gray-800 flex items-center justify-center p-6">
+    <div className="min-h-fit mt-15 bg-gray-50 text-gray-800 flex items-center justify-center p-3 sm:p-4 md:p-6">
       {loading ? (
         <div className="flex items-center justify-center min-h-[400px] w-full">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-lg text-gray-700">Loading your dashboard...</p>
+            <p className="text-base sm:text-lg text-gray-700">Loading your dashboard...</p>
           </div>
         </div>
       ) : (
@@ -414,11 +414,11 @@ export default React.memo(function Dashboard({
 
           <div className="rounded-2xl border-gray-100 w-full">
             {/* Enhanced Profile Section with Rank Progression */}
-            <div className="bg-gradient-to-r from-lime-50 to-green-50 border-2 border-lime-200 p-6 rounded-2xl mb-8 shadow-lg">
+            <div className="bg-gradient-to-r from-lime-50 to-green-50 border-2 border-lime-200 p-4 sm:p-5 md:p-6 rounded-2xl mb-6 sm:mb-8 shadow-lg">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 {/* Profile Info */}
                 <div className="flex items-center mb-4 md:mb-0">
-                  <div className="w-20 h-20 bg-lime-100 rounded-full mr-6 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-lime-100 rounded-full mr-4 sm:mr-6 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg flex-shrink-0">
                     {profileData?.avatar_url ? (
                       <img
                         src={profileData.avatar_url}
@@ -427,7 +427,7 @@ export default React.memo(function Dashboard({
                       />
                     ) : (
                       <svg
-                        className="w-10 h-10 text-lime-600"
+                        className="w-8 h-8 sm:w-10 sm:h-10 text-lime-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -442,31 +442,31 @@ export default React.memo(function Dashboard({
                       </svg>
                     )}
                   </div>
-                  <div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-1">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-1 truncate">
                       {username}
                     </h2>
-                    <p className="text-gray-600 mb-2">{userEmail}</p>
+                    <p className="text-sm sm:text-base text-gray-600 mb-2 truncate">{userEmail}</p>
 
                     {/* Current Rank Display */}
                     {mounted && profileData?.xp !== undefined && (
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 sm:space-x-3">
                         {(() => {
                           const currentRank = getRankFromXP(profileData.xp);
                           return (
                             <div
-                              className={`flex items-center px-3 py-1 rounded-full ${currentRank.bgColor} ${currentRank.color} font-semibold`}
+                              className={`flex items-center px-2 sm:px-3 py-1 rounded-full ${currentRank.bgColor} ${currentRank.color} font-semibold`}
                             >
-                              <span className="text-lg mr-2">
+                              <span className="text-base sm:text-lg mr-1 sm:mr-2">
                                 {currentRank.icon}
                               </span>
-                              <span className="text-sm font-bold">
+                              <span className="text-xs sm:text-sm font-bold">
                                 {currentRank.label}
                               </span>
                             </div>
                           );
                         })()}
-                        <div className="text-sm text-gray-600">
+                        <div className="text-xs sm:text-sm text-gray-600">
                           <span className="font-bold">
                             {profileData.xp.toLocaleString()}
                           </span>{" "}
@@ -479,7 +479,7 @@ export default React.memo(function Dashboard({
 
                 {/* Rank Progress Section */}
                 {mounted && profileData?.xp !== undefined && (
-                  <div className="bg-white rounded-xl p-4 shadow-md border border-lime-100 min-w-0 md:w-80">
+                  <div className="bg-white rounded-xl p-3 sm:p-4 shadow-md border border-lime-100 min-w-0 w-full md:w-80">
                     {(() => {
                       const nextRankInfo = getNextRank(profileData.xp);
                       const progress = getProgressToNextRank(profileData.xp);
@@ -488,12 +488,12 @@ export default React.memo(function Dashboard({
                         return (
                           <div className="text-center">
                             <div className="flex items-center justify-center mb-2">
-                              <span className="text-2xl mr-2">👑</span>
-                              <span className="text-lg font-bold text-yellow-600">
+                              <span className="text-xl sm:text-2xl mr-2">👑</span>
+                              <span className="text-base sm:text-lg font-bold text-yellow-600">
                                 Max Rank Achieved!
                               </span>
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-xs sm:text-sm text-gray-600">
                               You've reached the highest rank!
                             </p>
                           </div>
@@ -503,23 +503,23 @@ export default React.memo(function Dashboard({
                       return (
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-gray-600">
+                            <span className="text-xs sm:text-sm font-semibold text-gray-600">
                               Next Rank
                             </span>
                             <div className="flex items-center">
-                              <span className="text-lg mr-1">
+                              <span className="text-base sm:text-lg mr-1">
                                 {nextRankInfo.nextRank.icon}
                               </span>
-                              <span className="text-sm font-bold text-gray-700">
+                              <span className="text-xs sm:text-sm font-bold text-gray-700">
                                 {nextRankInfo.nextRank.label}
                               </span>
                             </div>
                           </div>
 
                           {/* Progress Bar */}
-                          <div className="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
+                          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2 overflow-hidden">
                             <div
-                              className="bg-gradient-to-r from-lime-400 to-lime-500 h-3 rounded-full transition-all duration-500 ease-out"
+                              className="bg-gradient-to-r from-lime-400 to-lime-500 h-2 sm:h-3 rounded-full transition-all duration-500 ease-out"
                               style={{ width: `${progress}%` }}
                             ></div>
                           </div>
@@ -539,15 +539,15 @@ export default React.memo(function Dashboard({
             </div>
 
             {/* Enhanced Stats Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 md:gap-6 mb-6 sm:mb-8">
               {/* Credits card (replacing Wallet Balance) - kept above */}
 
               {/* Total Credits card (excludes referral) */}
-              <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-5 py-8 rounded-xl border-2 border-lime-200 hover:border-lime-400 transition duration-200 shadow-md hover:shadow-lg">
+              <div className="bg-gradient-to-br from-lime-50 to-lime-100 p-4 sm:p-5 py-6 sm:py-8 rounded-xl border-2 border-lime-200 hover:border-lime-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-lime-100 rounded-lg mr-3">
+                  <div className="p-2 bg-lime-100 rounded-lg mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-lime-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-lime-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -560,11 +560,11 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Total Credits
                     </p>
-                    <p className="text-xl font-bold text-lime-700">
+                    <p className="text-lg sm:text-xl font-bold text-lime-700 truncate">
                       {totalCredits % 1 === 0 ? totalCredits : totalCredits.toFixed(2)}
                     </p>
                   </div>
@@ -573,11 +573,11 @@ export default React.memo(function Dashboard({
               </div>
 
               {/* Winnings-only card */}
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 sm:p-5 py-6 sm:py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-emerald-100 rounded-lg mr-3">
+                  <div className="p-2 bg-emerald-100 rounded-lg mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-emerald-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -590,11 +590,11 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Winnings Credits
                     </p>
-                    <p className="text-xl font-bold text-emerald-700">
+                    <p className="text-lg sm:text-xl font-bold text-emerald-700 truncate">
                       {winningsCredits % 1 === 0 ? winningsCredits : winningsCredits.toFixed(2)}
                     </p>
                   </div>
@@ -603,11 +603,11 @@ export default React.memo(function Dashboard({
               </div>
 
               {/* XP Points */}
-              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-5 py-8 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 transition duration-200 shadow-md hover:shadow-lg">
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 sm:p-5 py-6 sm:py-8 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                  <div className="p-2 bg-yellow-100 rounded-lg mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-yellow-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -620,11 +620,11 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       XP Points
                     </p>
-                    <p className="text-xl font-bold text-yellow-700">
+                    <p className="text-lg sm:text-xl font-bold text-yellow-700 truncate">
                       {profileData?.xp || 0}
                     </p>
                   </div>
@@ -632,11 +632,11 @@ export default React.memo(function Dashboard({
               </div>
 
               {/* Competitions Played */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 py-8 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition duration-200 shadow-md hover:shadow-lg">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-5 py-6 sm:py-8 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                  <div className="p-2 bg-blue-100 rounded-lg mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-blue-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -649,11 +649,11 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Competitions
                     </p>
-                    <p className="text-xl font-bold text-blue-700">
+                    <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
                       {competitionsPlayed}
                     </p>
                   </div>
@@ -661,11 +661,11 @@ export default React.memo(function Dashboard({
               </div>
 
               {/* Win Percentage */}
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 sm:p-5 py-6 sm:py-8 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 transition duration-200 shadow-md hover:shadow-lg">
                 <div className="flex items-center">
-                  <div className="p-2 bg-emerald-100 rounded-lg mr-3">
+                  <div className="p-2 bg-emerald-100 rounded-lg mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-emerald-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -678,11 +678,11 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Win Rate
                     </p>
-                    <p className="text-xl font-bold text-emerald-700">
+                    <p className="text-lg sm:text-xl font-bold text-emerald-700 truncate">
                       {winPercentage}%
                     </p>
                   </div>
@@ -693,12 +693,12 @@ export default React.memo(function Dashboard({
             </div>
 
             {/* Trophy Achievements Section */}
-            <div className="bg-white rounded-2xl p-6 mb-8 shadow-md border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 shadow-md border border-gray-100">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 flex items-center">
+                  <div className="p-1.5 sm:p-2 bg-yellow-100 rounded-lg mr-2 sm:mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-yellow-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -711,15 +711,15 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  Trophy Achievements
-                  <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
+                  <span className="truncate">Trophy Achievements</span>
+                  <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0">
                     {userTrophies.length}
                   </span>
                 </h3>
                 <button
                   onClick={handleRefresh}
                   disabled={loading}
-                  className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 sm:px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50 text-xs sm:text-sm flex-shrink-0"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
@@ -736,32 +736,32 @@ export default React.memo(function Dashboard({
                 </div>
               ) : userTrophies.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="text-6xl mb-4">🏆</div>
-                  <p className="text-gray-500 text-sm">No trophies earned yet.</p>
+                  <div className="text-4xl sm:text-5xl md:text-6xl mb-4">🏆</div>
+                  <p className="text-gray-500 text-xs sm:text-sm">No trophies earned yet.</p>
                   <p className="text-gray-400 text-xs mt-1">Complete competitions to earn your first trophy!</p>
                 </div>
               ) : (
                 <>
                   {/* Trophy Statistics Summary */}
-                  <div className="grid grid-cols-3 gap-3 mb-6">
-                    <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-3 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-amber-700">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
+                    <div className="bg-gradient-to-br from-amber-50 to-yellow-100 p-2 sm:p-3 rounded-lg text-center">
+                      <div className="text-xl sm:text-2xl font-bold text-amber-700">
                         {userTrophies.filter(t => t.trophy_type === 'bronze').length}
                       </div>
                       <div className="text-xs text-amber-600 font-medium flex items-center justify-center">
                         🥉 Starter
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-3 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-700">
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-2 sm:p-3 rounded-lg text-center">
+                      <div className="text-xl sm:text-2xl font-bold text-gray-700">
                         {userTrophies.filter(t => t.trophy_type === 'silver').length}
                       </div>
                       <div className="text-xs text-gray-600 font-medium flex items-center justify-center">
                         🥈 Pro
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-yellow-50 to-amber-100 p-3 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-yellow-700">
+                    <div className="bg-gradient-to-br from-yellow-50 to-amber-100 p-2 sm:p-3 rounded-lg text-center">
+                      <div className="text-xl sm:text-2xl font-bold text-yellow-700">
                         {userTrophies.filter(t => t.trophy_type === 'gold').length}
                       </div>
                       <div className="text-xs text-yellow-600 font-medium flex items-center justify-center">
@@ -777,32 +777,32 @@ export default React.memo(function Dashboard({
                       return (
                         <div
                           key={trophy.id}
-                          className={`${colors.bg} ${colors.border} border rounded-lg p-4 transition-all hover:shadow-md`}
+                          className={`${colors.bg} ${colors.border} border rounded-lg p-3 sm:p-4 transition-all hover:shadow-md`}
                         >
-                          <div className="flex items-start space-x-3">
-                            <div className="text-3xl flex-shrink-0">
+                          <div className="flex items-start space-x-2 sm:space-x-3">
+                            <div className="text-2xl sm:text-3xl flex-shrink-0">
                               {TrophyService.getTrophyIcon(trophy.trophy_type)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <h4 className={`font-semibold ${colors.text} text-lg leading-tight`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <h4 className={`font-semibold ${colors.text} text-base sm:text-lg leading-tight truncate`}>
                                     {trophy.title}
                                   </h4>
-                                  <p className={`${colors.text} opacity-80 text-sm mt-1`}>
+                                  <p className={`${colors.text} opacity-80 text-xs sm:text-sm mt-1 line-clamp-2`}>
                                     {trophy.description}
                                   </p>
                                 </div>
-                                <div className="text-right flex-shrink-0 ml-2">
-                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors.accent} text-white`}>
+                                <div className="text-right flex-shrink-0">
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${colors.accent} text-white whitespace-nowrap`}>
                                     {trophy.trophy_type === 'bronze' ? 'Starter' : trophy.trophy_type === 'silver' ? 'Pro' : trophy.trophy_type === 'gold' ? 'Elite' : trophy.trophy_type.charAt(0).toUpperCase() + trophy.trophy_type.slice(1)}
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between mt-3">
+                              <div className="flex items-center justify-between mt-2 sm:mt-3">
                                 <div className="flex items-center text-xs text-gray-500">
                                   <svg
-                                    className="w-3 h-3 mr-1"
+                                    className="w-3 h-3 mr-1 flex-shrink-0"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -815,7 +815,7 @@ export default React.memo(function Dashboard({
                                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                     />
                                   </svg>
-                                  Earned {TrophyService.formatTrophyDate(trophy.earned_at)}
+                                  <span className="truncate">Earned {TrophyService.formatTrophyDate(trophy.earned_at)}</span>
                                 </div>
                               </div>
                             </div>
@@ -831,12 +831,12 @@ export default React.memo(function Dashboard({
             </div>
 
             {/* Rank Ladder & XP Progression Section */}
-            <div className="bg-white rounded-2xl p-6 mb-8 shadow-md border border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg mr-3">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 shadow-md border border-gray-100">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 flex items-center">
+                  <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg mr-2 sm:mr-3 flex-shrink-0">
                     <svg
-                      className="w-6 h-6 text-blue-600"
+                      className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -849,31 +849,31 @@ export default React.memo(function Dashboard({
                       />
                     </svg>
                   </div>
-                  Rank Ladder & XP Progression
+                  <span className="truncate">Rank Ladder & XP Progression</span>
                 </h3>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
                 Progress through ranks by earning XP from games, wins, and referrals. Each rank requires a specific XP threshold.
               </p>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {ranks.map((rank, index) => (
                   <div
                     key={rank.label}
-                    className={`flex items-center justify-between p-4 rounded-lg border ${rankLabel === rank.label ? 'border-lime-500 bg-lime-50' : 'border-gray-200 bg-white'}`}
+                    className={`flex items-center justify-between p-3 sm:p-4 rounded-lg border ${rankLabel === rank.label ? 'border-lime-500 bg-lime-50' : 'border-gray-200 bg-white'}`}
                   >
-                    <div className="flex items-center">
-                      <div className={`p-2 ${rank.bgColor} rounded-full mr-3`}>
-                        <span className="text-xl">{rank.icon}</span>
+                    <div className="flex items-center min-w-0 flex-1">
+                      <div className={`p-1.5 sm:p-2 ${rank.bgColor} rounded-full mr-2 sm:mr-3 flex-shrink-0`}>
+                        <span className="text-base sm:text-xl">{rank.icon}</span>
                       </div>
-                      <div>
-                        <p className={`font-semibold ${rank.color}`}>{rank.label}</p>
-                        <p className="text-xs text-gray-500">
+                      <div className="min-w-0 flex-1">
+                        <p className={`font-semibold ${rank.color} text-sm sm:text-base truncate`}>{rank.label}</p>
+                        <p className="text-xs text-gray-500 truncate">
                           {rank.minXP} - {rank.maxXP === Infinity ? '∞' : rank.maxXP} XP
                         </p>
                       </div>
                     </div>
                     {rankLabel === rank.label && (
-                      <span className="text-xs font-medium text-lime-600 bg-lime-100 px-2 py-1 rounded-full">
+                      <span className="text-xs font-medium text-lime-600 bg-lime-100 px-2 py-1 rounded-full flex-shrink-0 ml-2">
                         Current
                       </span>
                     )}
@@ -1051,8 +1051,8 @@ export default React.memo(function Dashboard({
             </div> */}
 
             {/* Recent Transactions Section */}
-            <div className="bg-white rounded-2xl p-6 mt-8 shadow-xl border border-gray-100">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 md:p-6 mt-6 sm:mt-8 shadow-xl border border-gray-100">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <div className="w-full grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-2 md:justify-center">
                   {/* Wallet Button */}
                   {/* <button
@@ -1255,13 +1255,13 @@ export default React.memo(function Dashboard({
               {activeTab === "history" && (
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-800">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                       History
                     </h3>
                     <button
                       onClick={handleRefresh}
                       disabled={loading}
-                      className="px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50"
+                      className="px-3 sm:px-4 py-2 bg-lime-100 hover:bg-lime-200 text-lime-700 rounded-lg transition-colors disabled:opacity-50 text-xs sm:text-sm flex-shrink-0"
                     >
                       {loading ? (
                         <div className="w-4 h-4 border-2 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
@@ -1549,21 +1549,21 @@ export default React.memo(function Dashboard({
               {/* Support Tab Content */}
               {activeTab === "support" && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
                     Support Center
                   </h3>
-                  <div className="space-y-6">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-bold mb-3">Open a Support Ticket</h4>
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-bold mb-3 text-sm sm:text-base">Open a Support Ticket</h4>
                       <form onSubmit={handleSupportSubmit}>
                         <div className="mb-4">
-                          <label className="block text-sm font-bold text-gray-700 mb-1">
+                          <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1">
                             Topic
                           </label>
                           <select
                             value={supportTopic}
                             onChange={(e) => setSupportTopic(e.target.value)}
-                            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+                            className="w-full px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent text-sm sm:text-base"
                           >
                             <option value="">Select a topic</option>
                             <option value="Account Issue">Account Issue</option>
@@ -1576,7 +1576,7 @@ export default React.memo(function Dashboard({
                           </select>
                         </div>
                         <div className="mb-4">
-                          <label className="block text-sm font-bold text-gray-700 mb-1">
+                          <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1">
                             Description
                           </label>
                           <textarea
@@ -1584,7 +1584,7 @@ export default React.memo(function Dashboard({
                             onChange={(e) =>
                               setSupportDescription(e.target.value)
                             }
-                            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+                            className="w-full px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent text-sm sm:text-base"
                             placeholder="Describe your issue or question..."
                             rows={4}
                           />
@@ -1592,7 +1592,7 @@ export default React.memo(function Dashboard({
                         <button
                           type="submit"
                           disabled={isSubmitting}
-                          className={`w-full max-w-sm py-3 px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                          className={`w-full py-2.5 sm:py-3 px-4 sm:px-6 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all duration-300 text-sm sm:text-base ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
                           {isSubmitting
                             ? "Submitting..."
@@ -1600,21 +1600,21 @@ export default React.memo(function Dashboard({
                         </button>
                       </form>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-bold mb-3">Your Support Tickets</h4>
+                    <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-bold mb-3 text-sm sm:text-base">Your Support Tickets</h4>
                       {supportTickets.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                           {supportTickets.map((ticket) => (
                             <div
                               key={ticket.id}
                               className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
                             >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium text-gray-800">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-gray-800 text-sm sm:text-base truncate">
                                     {ticket.topic}
                                   </p>
-                                  <p className="text-sm text-gray-500 mt-1">
+                                  <p className="text-xs sm:text-sm text-gray-500 mt-1 line-clamp-2">
                                     {ticket.description}
                                   </p>
                                   <p className="text-xs text-gray-400 mt-1">
@@ -1622,16 +1622,16 @@ export default React.memo(function Dashboard({
                                     {formatDate(ticket.created_at)}
                                   </p>
                                 </div>
-                                <div className="flex flex-col items-end space-y-2">
+                                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2">
                                   <span
-                                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)}`}
+                                    className={`inline-block px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(ticket.status)} flex-shrink-0`}
                                   >
                                     {ticket.status.charAt(0).toUpperCase() +
                                       ticket.status.slice(1)}
                                   </span>
                                   <button
                                     onClick={() => handleViewResponse(ticket)}
-                                    className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold rounded-full transition-colors"
+                                    className="px-2 sm:px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold rounded-full transition-colors whitespace-nowrap"
                                   >
                                     View Response
                                   </button>
@@ -1641,7 +1641,7 @@ export default React.memo(function Dashboard({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500">
+                        <p className="text-gray-500 text-xs sm:text-sm">
                           No support tickets found.
                         </p>
                       )}
@@ -1656,39 +1656,39 @@ export default React.memo(function Dashboard({
 
       {/* Response Modal */}
       {showResponseModal && selectedTicket && (
-        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white border border-gray-300 rounded-lg p-6 w-full max-w-2xl h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4 flex-shrink-0">
-              <h3 className="text-xl font-bold text-gray-800">
+        <div className="fixed inset-0 bg-transparent backdrop-blur-xs bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white border border-gray-300 rounded-lg p-4 sm:p-6 w-full max-w-2xl h-[85vh] sm:h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-3 sm:mb-4 flex-shrink-0">
+              <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 truncate pr-2">
                 Support Conversation - "{selectedTicket.topic}"
               </h3>
               <button
                 onClick={() => setShowResponseModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 flex-shrink-0"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <div className="mb-2 flex-shrink-0">
 
-              <p className="text-xs text-gray-400 ">
+              <p className="text-xs text-gray-400">
                 Submitted: {formatDate(selectedTicket.created_at)}
               </p>
             </div>
-            <div className="flex-1 overflow-y-auto mb-4">
+            <div className="flex-1 overflow-y-auto mb-3 sm:mb-4">
               {ticketResponses.length > 0 ? (
-                <div className="flex flex-col space-y-4">
+                <div className="flex flex-col space-y-3 sm:space-y-4">
                   {ticketResponses.map((response) => (
                     <div
                       key={response.id}
-                      className={`p-3 rounded-lg max-w-[80%] ${response.sender === 'user'
+                      className={`p-2.5 sm:p-3 rounded-lg max-w-[85%] sm:max-w-[80%] ${response.sender === 'user'
                         ? 'bg-gray-100 border border-gray-200 self-start'
                         : 'bg-indigo-500 text-white self-end ml-auto'
                         }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap break-words">{response.message}</p>
+                      <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{response.message}</p>
                       <span className="block text-xs mt-1 opacity-70">
                         {formatDateTime(response.created_at)}
                       </span>
@@ -1697,27 +1697,27 @@ export default React.memo(function Dashboard({
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-4">📝</div>
-                  <p className="text-gray-500">No messages yet.</p>
-                  <p className="text-sm text-gray-400 mt-1">Start the conversation by sending a message below.</p>
+                  <div className="text-3xl sm:text-4xl mb-4">📝</div>
+                  <p className="text-gray-500 text-sm sm:text-base">No messages yet.</p>
+                  <p className="text-xs sm:text-sm text-gray-400 mt-1">Start the conversation by sending a message below.</p>
                 </div>
               )}
             </div>
             {selectedTicket.status !== 'closed' && (
-              <div className="flex-shrink-0 border-t pt-4">
+              <div className="flex-shrink-0 border-t pt-3 sm:pt-4">
                 <form onSubmit={handleSendMessage} className="flex space-x-2">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type your message here..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent"
+                    className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-transparent text-sm sm:text-base"
                     disabled={sendingMessage}
                   />
                   <button
                     type="submit"
                     disabled={sendingMessage || !newMessage.trim()}
-                    className="px-6 py-2 bg-lime-500 hover:bg-lime-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    className="px-4 sm:px-6 py-2 bg-lime-500 hover:bg-lime-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm sm:text-base flex-shrink-0"
                   >
                     {sendingMessage ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -1731,15 +1731,15 @@ export default React.memo(function Dashboard({
 
             {/* Ticket Closed Message */}
             {selectedTicket.status === 'closed' && (
-              <div className="flex-shrink-0 border-t pt-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <div className="flex-shrink-0 border-t pt-3 sm:pt-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 text-center">
                   <div className="flex items-center justify-center mb-2">
-                    <svg className="text-green-600 mr-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="text-green-600 mr-2" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-green-800 font-semibold">Ticket Closed</span>
+                    <span className="text-green-800 font-semibold text-sm sm:text-base">Ticket Closed</span>
                   </div>
-                  <p className="text-sm text-green-700">This support ticket has been resolved. No further messages can be sent.</p>
+                  <p className="text-xs sm:text-sm text-green-700">This support ticket has been resolved. No further messages can be sent.</p>
                 </div>
               </div>
             )}
