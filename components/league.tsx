@@ -99,6 +99,7 @@ export default function LeaguePage() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false); // NEW: Loading state for leaderboard
   const nextCalled = useRef(false);
   const hasLoadedLeaderboardRef = useRef(false); // NEW: Track if leaderboard has loaded once to avoid skeleton on refresh
+  const resultsFinalized = useRef(false); // NEW: Track if competition results are finalized (stops auto-refresh)
   const timerStartTime = useRef<number | null>(null); // Timestamp when timer started
   const questionStartTime = useRef<number | null>(null); // Server timestamp when question was displayed
   const responseLatencies = useRef<number[]>([]); // Track all response times
@@ -107,6 +108,13 @@ export default function LeaguePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const competitionId = searchParams ? searchParams.get('competitionId') || '' : '';
+
+  // Reset leaderboard state when competition changes
+  useEffect(() => {
+    hasLoadedLeaderboardRef.current = false;
+    resultsFinalized.current = false;
+    setLeaderboardLoading(false);
+  }, [competitionId]);
 
   // Fetch competition detail
   useEffect(() => {
@@ -1047,6 +1055,12 @@ export default function LeaguePage() {
             }
             setLeaderboardLastUpdated(new Date());
             console.log('✅ Leaderboard updated from competition_results with', leaderboardFromResults.length, 'entries');
+
+            // CRITICAL: Mark results as finalized to stop auto-refresh
+            // Once we have competition_results, data won't change anymore
+            resultsFinalized.current = true;
+            console.log('🏁 Results finalized - stopping auto-refresh');
+
             return; // Done - no need to fall back
           }
 
@@ -1186,11 +1200,22 @@ export default function LeaguePage() {
       // Fetch immediately
       fetchLeaderboard();
 
-      // Auto-refresh leaderboard every 10 seconds in leaderboard phase
+      // Auto-refresh leaderboard every 10 seconds ONLY if not yet finalized
+      // Once results are in competition_results table, no need to refresh
       let refreshInterval: NodeJS.Timeout | null = null;
-      if (phase === 'leaderboard') {
-        refreshInterval = setInterval(fetchLeaderboard, 10000); // Refresh every 10 seconds
-        console.log('🔄 Started leaderboard auto-refresh (10s intervals)');
+      if (phase === 'leaderboard' && !resultsFinalized.current) {
+        refreshInterval = setInterval(() => {
+          // Check if results are now finalized before each fetch
+          if (resultsFinalized.current) {
+            if (refreshInterval) {
+              clearInterval(refreshInterval);
+              console.log('🛑 Auto-refresh stopped - results are finalized');
+            }
+            return;
+          }
+          fetchLeaderboard();
+        }, 10000);
+        console.log('🔄 Started leaderboard auto-refresh (10s intervals, will stop when finalized)');
       }
 
       return () => {
@@ -3417,26 +3442,46 @@ export default function LeaguePage() {
                 <tbody className="divide-y divide-gray-200">
                   <AnimatePresence>
                     {leaderboardLoading ? (
-                      // Skeleton Loading State
-                      [...Array(5)].map((_, i) => (
+                      // Premium Skeleton Loading State
+                      [...Array(6)].map((_, i) => (
                         <motion.tr
                           key={`skeleton-${i}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0 }}
-                          className="bg-white"
+                          transition={{ delay: i * 0.05 }}
+                          className={`bg-white border-b border-gray-100 ${i < 3 ? 'bg-opacity-50' : ''}`}
                         >
+                          {/* Rank Column Skeleton */}
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+                            <div className="flex items-center gap-2">
+                              {/* Circle for Trophy/Rank */}
+                              <div className={`h-8 w-8 rounded-full animate-pulse ${i === 0 ? 'bg-yellow-100' :
+                                  i === 1 ? 'bg-gray-100' :
+                                    i === 2 ? 'bg-orange-100' : 'bg-gray-100'
+                                }`}></div>
+                            </div>
                           </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+
+                          {/* Player Column Skeleton */}
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap w-full">
+                            <div className="flex items-center gap-3">
+                              {/* Avatar Circle */}
+                              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+                              {/* Name Bar */}
+                              <div className="h-4 bg-gray-200 rounded animate-pulse w-32 sm:w-48"></div>
+                            </div>
                           </td>
+
+                          {/* Score Column Skeleton */}
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div>
+                            <div className="h-5 bg-gray-200 rounded animate-pulse w-16"></div>
                           </td>
+
+                          {/* Prize Column Skeleton */}
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="h-4 bg-gray-200 rounded w-12 animate-pulse"></div>
+                            <div className={`h-5 rounded animate-pulse w-20 ${i < 3 ? 'bg-lime-100' : 'bg-gray-100'
+                              }`}></div>
                           </td>
                         </motion.tr>
                       ))

@@ -203,7 +203,84 @@ function LeaderboardPage() {
         'KOREA': 'KR',
         'INDIA': 'IN',
         'CANADA': 'CA',
-        'AUSTRALIA': 'AU'
+        'AUSTRALIA': 'AU',
+        'CROATIA': 'HR',
+        'POLAND': 'PL',
+        'PORTUGAL': 'PT',
+        'NETHERLANDS': 'NL',
+        'BELGIUM': 'BE',
+        'SWEDEN': 'SE',
+        'NORWAY': 'NO',
+        'DENMARK': 'DK',
+        'FINLAND': 'FI',
+        'GREECE': 'GR',
+        'TURKEY': 'TR',
+        'RUSSIA': 'RU',
+        'UKRAINE': 'UA',
+        'ARGENTINA': 'AR',
+        'MEXICO': 'MX',
+        'CHILE': 'CL',
+        'COLOMBIA': 'CO',
+        'PERU': 'PE',
+        'VENEZUELA': 'VE',
+        'EGYPT': 'EG',
+        'SOUTH AFRICA': 'ZA',
+        'NIGERIA': 'NG',
+        'KENYA': 'KE',
+        'MOROCCO': 'MA',
+        'ALGERIA': 'DZ',
+        'TUNISIA': 'TN',
+        'CHINA': 'CN',
+        'THAILAND': 'TH',
+        'VIETNAM': 'VN',
+        'PHILIPPINES': 'PH',
+        'INDONESIA': 'ID',
+        'MALAYSIA': 'MY',
+        'SINGAPORE': 'SG',
+        'NEW ZEALAND': 'NZ',
+        'PAKISTAN': 'PK',
+        'BANGLADESH': 'BD',
+        'SRI LANKA': 'LK',
+        'NEPAL': 'NP',
+        'AFGHANISTAN': 'AF',
+        'IRAN': 'IR',
+        'IRAQ': 'IQ',
+        'SAUDI ARABIA': 'SA',
+        'UAE': 'AE',
+        'UNITED ARAB EMIRATES': 'AE',
+        'QATAR': 'QA',
+        'KUWAIT': 'KW',
+        'OMAN': 'OM',
+        'BAHRAIN': 'BH',
+        'JORDAN': 'JO',
+        'LEBANON': 'LB',
+        'SYRIA': 'SY',
+        'ISRAEL': 'IL',
+        'PALESTINE': 'PS',
+        'AUSTRIA': 'AT',
+        'SWITZERLAND': 'CH',
+        'CZECH REPUBLIC': 'CZ',
+        'CZECHIA': 'CZ',
+        'SLOVAKIA': 'SK',
+        'HUNGARY': 'HU',
+        'ROMANIA': 'RO',
+        'BULGARIA': 'BG',
+        'SERBIA': 'RS',
+        'BOSNIA': 'BA',
+        'BOSNIA AND HERZEGOVINA': 'BA',
+        'MONTENEGRO': 'ME',
+        'ALBANIA': 'AL',
+        'NORTH MACEDONIA': 'MK',
+        'MACEDONIA': 'MK',
+        'SLOVENIA': 'SI',
+        'LITHUANIA': 'LT',
+        'LATVIA': 'LV',
+        'ESTONIA': 'EE',
+        'ICELAND': 'IS',
+        'IRELAND': 'IE',
+        'LUXEMBOURG': 'LU',
+        'MALTA': 'MT',
+        'CYPRUS': 'CY'
     };
 
     const getFlagEmoji = (countryInput?: string) => {
@@ -213,7 +290,7 @@ function LeaderboardPage() {
         // If input already looks like an emoji, return as-is
         if (isProbablyEmoji(raw)) return raw;
 
-        const upper = raw.toUpperCase();
+        const upper = raw.toUpperCase().trim();
 
         // If it's a 2-letter code like 'GB' or 'US', create flag
         const alpha2 = upper.replace(/[^A-Z]/g, '');
@@ -229,6 +306,14 @@ function LeaderboardPage() {
             return String.fromCodePoint(...cps);
         }
 
+        // Try partial matching (e.g., "United Kingdom" contains "KINGDOM")
+        for (const [name, code] of Object.entries(countryNameToCode)) {
+            if (upper.includes(name) || name.includes(upper)) {
+                const cps = [...code].map(c => 127397 + c.charCodeAt(0));
+                return String.fromCodePoint(...cps);
+            }
+        }
+
         // If the name contains multiple words, try to derive code from initials
         const words = upper.split(/\s+/).filter(Boolean);
         if (words.length >= 2) {
@@ -239,84 +324,83 @@ function LeaderboardPage() {
             }
         }
 
-        // Final fallback: return cleaned string (readable short name)
-        // This avoids producing an empty-box flag by not trying to map arbitrary text
-        return raw.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        // Final fallback: return white flag emoji instead of text
+        return '🏳️';
     };
 
     return (
         <>
             <Navbar />
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-lime-50 py-8 px-4">
-                <div className="max-w-6xl mx-auto mt-16">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-lime-50 py-4 sm:py-8 px-2 sm:px-4">
+                <div className="max-w-6xl mx-auto mt-12 sm:mt-16">
                     {/* Header Section */}
-                    <div className="text-center mb-8">
-                        <div className="relative inline-block mb-6">
-                            <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-lime-600 via-green-600 to-teal-600 bg-clip-text text-transparent drop-shadow-sm">
+                    <div className="text-center mb-6 sm:mb-8">
+                        <div className="relative inline-block mb-4 sm:mb-6">
+                            <h1 className="text-3xl sm:text-4xl md:text-6xl font-black bg-gradient-to-r from-lime-600 via-green-600 to-teal-600 bg-clip-text text-transparent drop-shadow-sm px-2">
                                 Global Leaderboard
                             </h1>
-                            <div className="absolute -top-2 -right-2 text-2xl md:text-3xl animate-bounce">
+                            <div className="absolute -top-1 sm:-top-2 -right-1 sm:-right-2 text-xl sm:text-2xl md:text-3xl animate-bounce">
                                 🏆
                             </div>
                         </div>
-                        <p className="text-lg md:text-xl text-gray-600 font-medium mb-6">
+                        <p className="text-base sm:text-lg md:text-xl text-gray-600 font-medium mb-4 sm:mb-6 px-2">
                             Compete with the world's best players
                         </p>
 
                         {/* Timeframe selector + League filters */}
-                        <div className="flex flex-col lg:flex-row items-center justify-center space-y-4 lg:space-y-0 lg:space-x-6">
+                        <div className="flex flex-col space-y-3 sm:space-y-4 items-center px-2">
                             {/* Timeframe Selector */}
-                            <div className="inline-flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="inline-flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden w-full sm:w-auto">
                                 <button
                                     onClick={() => setTimeframe('weekly')}
                                     aria-pressed={timeframe === 'weekly'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'weekly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-l-full`}
+                                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'weekly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-l-full`}
                                 >
                                     Weekly
                                 </button>
                                 <button
                                     onClick={() => setTimeframe('monthly')}
                                     aria-pressed={timeframe === 'monthly'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'monthly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
+                                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'monthly' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
                                 >
                                     Monthly
                                 </button>
                                 <button
                                     onClick={() => setTimeframe('all_time')}
                                     aria-pressed={timeframe === 'all_time'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'all_time' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-r-full`}
+                                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${timeframe === 'all_time' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-r-full`}
                                 >
                                     All-time
                                 </button>
                             </div>
 
                             {/* League Filter */}
-                            <div className="inline-flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="inline-flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden w-full sm:w-auto">
                                 <button
                                     onClick={() => setLeagueFilter('all')}
                                     aria-pressed={leagueFilter === 'all'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'all' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-l-full`}
+                                    className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'all' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-l-full`}
                                 >
-                                    All Leagues
+                                    All
                                 </button>
                                 <button
                                     onClick={() => setLeagueFilter('starter')}
                                     aria-pressed={leagueFilter === 'starter'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'starter' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
+                                    className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'starter' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
                                 >
                                     Starter
                                 </button>
                                 <button
                                     onClick={() => setLeagueFilter('pro')}
                                     aria-pressed={leagueFilter === 'pro'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'pro' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
+                                    className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'pro' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' }`}
                                 >
                                     Pro
                                 </button>
                                 <button
                                     onClick={() => setLeagueFilter('elite')}
                                     aria-pressed={leagueFilter === 'elite'}
-                                    className={`px-6 py-3 text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'elite' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-r-full`}
+                                    className={`flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-lime-300 ${leagueFilter === 'elite' ? 'bg-lime-600 text-white' : 'text-gray-700 hover:bg-lime-50' } rounded-r-full`}
                                 >
                                     Elite
                                 </button>
@@ -364,11 +448,19 @@ function LeaderboardPage() {
                                                             {user.avatar_url ? (
                                                                 <Image
                                                                     src={user.avatar_url}
-                                                                    alt={user.username}
+                                                                    alt={`${user.username}'s avatar`}
                                                                     width={80}
                                                                     height={80}
                                                                     className="object-cover w-full h-full"
                                                                     loading="lazy"
+                                                                    unoptimized
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                        if (target.parentElement) {
+                                                                            target.parentElement.innerHTML = `<div class="w-full h-full bg-gradient-to-br from-lime-100 to-lime-200 flex items-center justify-center"><svg class="w-10 h-10 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>`;
+                                                                        }
+                                                                    }}
                                                                 />
                                                             ) : (
                                                                 <div className="w-full h-full bg-gradient-to-br from-lime-100 to-lime-200 flex items-center justify-center">
@@ -405,12 +497,6 @@ function LeaderboardPage() {
                                                             <span className="text-sm text-gray-600">Win Rate:</span>
                                                             <span className="font-bold text-emerald-600">{user.win_rate ?? 0}%</span>
                                                         </div>
-                                                        {user.total_trophies > 0 && (
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-sm text-gray-600">Trophies:</span>
-                                                                <span className="font-bold text-purple-600">🏆 {user.total_trophies}</span>
-                                                            </div>
-                                                        )}
                                                         {user.nationality && (
                                                             <div className="flex justify-between items-center">
                                                                 <span className="text-sm text-gray-600">Country:</span>
@@ -447,7 +533,22 @@ function LeaderboardPage() {
                                                 <div className="relative">
                                                     <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white shadow-lg flex-shrink-0">
                                                         {user.avatar_url ? (
-                                                            <Image src={user.avatar_url} alt={user.username} width={64} height={64} className="object-cover w-full h-full" loading="lazy" />
+                                                            <Image 
+                                                                src={user.avatar_url} 
+                                                                alt={`${user.username}'s avatar`} 
+                                                                width={64} 
+                                                                height={64} 
+                                                                className="object-cover w-full h-full" 
+                                                                loading="lazy"
+                                                                unoptimized
+                                                                onError={(e) => {
+                                                                    const target = e.target as HTMLImageElement;
+                                                                    target.style.display = 'none';
+                                                                    if (target.parentElement) {
+                                                                        target.parentElement.innerHTML = `<div class="w-full h-full bg-gradient-to-br from-lime-100 to-lime-200 flex items-center justify-center"><svg class="w-8 h-8 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>`;
+                                                                    }
+                                                                }}
+                                                            />
                                                         ) : (
                                                             <div className="w-full h-full bg-gradient-to-br from-lime-100 to-lime-200 flex items-center justify-center">
                                                                 <svg className="w-8 h-8 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,11 +602,19 @@ function LeaderboardPage() {
                                                             {currentUserRank.avatar_url ? (
                                                                 <Image 
                                                                     src={currentUserRank.avatar_url} 
-                                                                    alt={currentUserRank.username}
+                                                                    alt={`${currentUserRank.username}'s avatar`}
                                                                     width={48}
                                                                     height={48}
                                                                     className="object-cover w-full h-full"
                                                                     loading="lazy"
+                                                                    unoptimized
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                        if (target.parentElement) {
+                                                                            target.parentElement.innerHTML = `<div class="w-full h-full bg-lime-100 flex items-center justify-center"><svg class="w-6 h-6 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>`;
+                                                                        }
+                                                                    }}
                                                                 />
                                                             ) : (
                                                                 <div className="w-full h-full bg-lime-100 flex items-center justify-center">
@@ -536,12 +645,12 @@ function LeaderboardPage() {
                             )}
 
                             {/* Remaining Players (4-50) - Enhanced Table Style */}
-                            <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-100">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                                        <div className="p-2 bg-lime-100 rounded-lg mr-3">
+                            <div className="bg-white rounded-2xl p-3 sm:p-6 shadow-md border border-gray-100">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-2">
+                                    <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center">
+                                        <div className="p-2 bg-lime-100 rounded-lg mr-2 sm:mr-3">
                                             <svg
-                                                className="w-6 h-6 text-lime-600"
+                                                className="w-5 h-5 sm:w-6 sm:h-6 text-lime-600"
                                                 fill="none"
                                                 stroke="currentColor"
                                                 viewBox="0 0 24 24"
@@ -554,26 +663,25 @@ function LeaderboardPage() {
                                                 />
                                             </svg>
                                         </div>
-                                        Complete Rankings
+                                        <span className="text-base sm:text-xl">Complete Rankings</span>
                                     </h3>
-                                    <div className="text-sm text-gray-500">
-                                        Showing: <span className="font-semibold text-gray-700 capitalize">{timeframe.replace('_', ' ')}</span>
+                                    <div className="text-xs sm:text-sm text-gray-500">
+                                        <span className="font-semibold text-gray-700 capitalize">{timeframe.replace('_', ' ')}</span>
                                         {leagueFilter !== 'all' && (
                                             <span className="ml-2">
-                                                • <span className="font-semibold text-gray-700 capitalize">{leagueFilter}</span> League
+                                                • <span className="font-semibold text-gray-700 capitalize">{leagueFilter}</span>
                                             </span>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Table Headers - Desktop */}
-                                <div className="hidden md:grid grid-cols-13 gap-4 px-4 py-3 bg-gray-50 rounded-lg border border-gray-200 mb-3">
+                                <div className="hidden md:grid grid-cols-11 gap-4 px-4 py-3 bg-gray-50 rounded-lg border border-gray-200 mb-3">
                                     <div className="col-span-1 text-sm font-semibold text-gray-700 text-center">Rank</div>
                                     <div className="col-span-3 text-sm font-semibold text-gray-700">Player</div>
                                     <div className="col-span-2 text-sm font-semibold text-gray-700 text-center">League</div>
                                     <div className="col-span-2 text-sm font-semibold text-gray-700 text-center">XP</div>
                                     <div className="col-span-2 text-sm font-semibold text-gray-700 text-center">Win Rate</div>
-                                    <div className="col-span-2 text-sm font-semibold text-gray-700 text-center">Trophies</div>
                                     <div className="col-span-1 text-sm font-semibold text-gray-700 text-center">Country</div>
                                 </div>
 
@@ -586,7 +694,7 @@ function LeaderboardPage() {
                                             }`}
                                         >
                                             {/* Desktop View */}
-                                            <div className="hidden md:grid grid-cols-13 gap-4 items-center">
+                                            <div className="hidden md:grid grid-cols-11 gap-4 items-center">
                                                 <div className="col-span-1 text-center">
                                                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-lime-500 text-white mx-auto">
                                                         {user.rank_position}
@@ -598,11 +706,19 @@ function LeaderboardPage() {
                                                             {user.avatar_url ? (
                                                                 <Image
                                                                     src={user.avatar_url}
-                                                                    alt={user.username}
+                                                                    alt={`${user.username}'s avatar`}
                                                                     width={48}
                                                                     height={48}
                                                                     className="w-full h-full object-cover"
                                                                     loading="lazy"
+                                                                    unoptimized
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                        if (target.parentElement) {
+                                                                            target.parentElement.innerHTML = `<svg class="w-6 h-6 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>`;
+                                                                        }
+                                                                    }}
                                                                 />
                                                             ) : (
                                                                 <svg
@@ -651,25 +767,6 @@ function LeaderboardPage() {
                                                     </div>
                                                     <span className="text-sm text-gray-500">Win Rate</span>
                                                 </div>
-                                                <div className="col-span-2 text-center">
-                                                    {user.total_trophies > 0 ? (
-                                                        <div className="flex items-center justify-center space-x-1">
-                                                            <span className="text-lg">🏆</span>
-                                                            <div className="text-center">
-                                                                <div className="font-bold text-purple-600 text-lg">
-                                                                    {user.total_trophies}
-                                                                </div>
-                                                                <div className="flex items-center justify-center space-x-1 text-xs">
-                                                                    {user.bronze_count > 0 && <span className="text-amber-600">🥉{user.bronze_count}</span>}
-                                                                    {user.silver_count > 0 && <span className="text-gray-600">🥈{user.silver_count}</span>}
-                                                                    {user.gold_count > 0 && <span className="text-yellow-600">🥇{user.gold_count}</span>}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-gray-400 text-sm">-</div>
-                                                    )}
-                                                </div>
                                                 <div className="col-span-1 text-center">
                                                     <span className="text-2xl">
                                                         {getFlagEmoji(user.nationality || '')}
@@ -679,24 +776,32 @@ function LeaderboardPage() {
 
                                             {/* Mobile View */}
                                             <div className="md:hidden">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center">
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-lime-500 text-white mr-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex items-center min-w-0 flex-1">
+                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-lime-500 text-white mr-2 flex-shrink-0">
                                                             {user.rank_position}
                                                         </div>
-                                                        <div className="w-12 h-12 bg-lime-100 rounded-full mr-3 flex items-center justify-center overflow-hidden">
+                                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-lime-100 rounded-full mr-2 sm:mr-3 flex items-center justify-center overflow-hidden flex-shrink-0">
                                                             {user.avatar_url ? (
                                                                 <Image
                                                                     src={user.avatar_url}
-                                                                    alt={user.username}
-                                                                    width={48}
-                                                                    height={48}
+                                                                    alt={`${user.username}'s avatar`}
+                                                                    width={40}
+                                                                    height={40}
                                                                     className="w-full h-full object-cover"
                                                                     loading="lazy"
+                                                                    unoptimized
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        target.style.display = 'none';
+                                                                        if (target.parentElement) {
+                                                                            target.parentElement.innerHTML = `<svg class="w-5 h-5 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>`;
+                                                                        }
+                                                                    }}
                                                                 />
                                                             ) : (
                                                                 <svg
-                                                                    className="w-6 h-6 text-lime-600"
+                                                                    className="w-5 h-5 text-lime-600"
                                                                     fill="none"
                                                                     stroke="currentColor"
                                                                     viewBox="0 0 24 24"
@@ -710,34 +815,30 @@ function LeaderboardPage() {
                                                                 </svg>
                                                             )}
                                                         </div>
-                                                        <div>
+                                                        <div className="min-w-0 flex-1">
                                                             <Link href={`/profile/${user.user_id}`} className="hover:opacity-80 transition-opacity">
-                                                                <h4 className="font-bold text-gray-800">
+                                                                <h4 className="font-bold text-gray-800 text-sm sm:text-base truncate">
                                                                     {user.username}
                                                                 </h4>
                                                             </Link>
-                                                            <div className="flex items-center space-x-2 mt-1">
-                                                                <span className={`inline-block px-2 py-1 ${getLeagueBadgeStyle(user.league_type)} text-xs font-semibold rounded-full`}>
+                                                            <div className="flex items-center space-x-1 sm:space-x-2 mt-1">
+                                                                <span className={`inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 ${getLeagueBadgeStyle(user.league_type)} text-xs font-semibold rounded-full`}>
                                                                     {user.league_type}
                                                                 </span>
-                                                                <span className="text-2xl">
+                                                                <span className="text-lg sm:text-2xl">
                                                                     {getFlagEmoji(user.nationality || '')}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="font-bold text-blue-600">
-                                                            {(user.xp ?? 0).toLocaleString()} XP
+                                                    <div className="text-right flex-shrink-0">
+                                                        <div className="font-bold text-blue-600 text-sm sm:text-base">
+                                                            {(user.xp ?? 0).toLocaleString()}
                                                         </div>
-                                                        <div className="text-sm text-emerald-600 font-semibold">
-                                                            {user.win_rate ?? 0}% win rate
+                                                        <div className="text-xs text-gray-500">XP</div>
+                                                        <div className="text-xs sm:text-sm text-emerald-600 font-semibold mt-1">
+                                                            {user.win_rate ?? 0}%
                                                         </div>
-                                                        {user.total_trophies > 0 && (
-                                                            <div className="text-xs text-purple-600 font-semibold mt-1">
-                                                                🏆 {user.total_trophies} trophies
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

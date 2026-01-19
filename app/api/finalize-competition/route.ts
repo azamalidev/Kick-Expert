@@ -119,7 +119,22 @@ export async function POST(req: Request) {
             });
         }
 
-        // 4. Fetch all completed sessions
+        // 4. Fetch REGISTERED player count (for prize calculation - matches waiting room display)
+        const { data: registrations, error: registrationsError } = await supabase
+            .from('competition_registrations')
+            .select('id, user_id')
+            .eq('competition_id', competitionId)
+            .in('status', ['confirmed', 'registered']);
+
+        if (registrationsError) {
+            console.error('Error fetching registrations:', registrationsError);
+            return NextResponse.json({ success: false, error: registrationsError.message }, { status: 500 });
+        }
+
+        const registeredPlayerCount = registrations?.length || 0;
+        console.log('📋 Registered players:', registeredPlayerCount);
+
+        // 5. Fetch all completed sessions (for ranking and prize distribution)
         const { data: sessions, error: sessionsError } = await supabase
             .from('competition_sessions')
             .select('id, user_id, correct_answers, end_time, start_time')
@@ -136,9 +151,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: true, message: "No completed sessions" });
         }
 
-        console.log('🔄 Finalizing competition with', sessions.length, 'players...');
+        const completedPlayerCount = sessions.length;
+        console.log('🔄 Finalizing competition with', completedPlayerCount, 'completed players (from', registeredPlayerCount, 'registered)...');
 
-        // 5. Sort sessions by score (desc) and end_time (asc for tie-breaker)
+        // 6. Sort sessions by score (desc) and end_time (asc for tie-breaker)
         const sortedSessions = sessions.sort((a, b) => {
             const scoreA = a.correct_answers ?? 0;
             const scoreB = b.correct_answers ?? 0;
@@ -146,19 +162,26 @@ export async function POST(req: Request) {
             return new Date(a.end_time).getTime() - new Date(b.end_time).getTime();
         });
 
-        // 6. Calculate prize configuration
+        // 7. Calculate prize configuration based on REGISTERED players (matches waiting room)
+        // This ensures prizes are exactly what users saw when they registered
         const competitionName = competition.name || '';
         const creditCost = competition.credit_cost || competition.entry_fee || getCreditCost(competitionName);
-        const actualPlayerCount = sortedSessions.length;
-        const prizeConfig = getPrizePoolConfig(actualPlayerCount);
-        const totalRevenue = actualPlayerCount * creditCost;
 
-        console.log('💰 Prize pool calculation:', {
-            playerCount: actualPlayerCount,
+        // CRITICAL: Use registeredPlayerCount for prize calculation, NOT completedPlayerCount
+        // This ensures the prize amounts match what was displayed in the waiting room
+        const prizeConfig = getPrizePoolConfig(registeredPlayerCount);
+        const totalRevenue = registeredPlayerCount * creditCost;
+
+        console.log('💰 Prize pool calculation (based on REGISTERED players):', {
+            registeredPlayers: registeredPlayerCount,
+            completedPlayers: completedPlayerCount,
             creditCost,
             totalRevenue,
             prizePoolPercentage: prizeConfig.percentage,
-            winnerCount: prizeConfig.winnerCount
+            winnerCount: prizeConfig.winnerCount,
+            first: Math.ceil(totalRevenue * prizeConfig.distribution[0]),
+            second: Math.ceil(totalRevenue * prizeConfig.distribution[1]),
+            third: Math.ceil(totalRevenue * prizeConfig.distribution[2])
         });
 
         // 7. Process each user with correct rank
@@ -363,7 +386,8 @@ export async function POST(req: Request) {
             success: true,
             message: "Competition finalized",
             results: results.slice(0, 10), // Return top 10 for debugging
-            totalPlayers: actualPlayerCount,
+            totalPlayers: completedPlayerCount,
+            registeredPlayers: registeredPlayerCount,
             prizePool: Math.floor(totalRevenue * prizeConfig.percentage)
         });
 
