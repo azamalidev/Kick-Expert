@@ -104,21 +104,6 @@ export async function POST(req: Request) {
 
         console.log(`✅ Competition ended and grace period passed. Proceeding with finalization.`);
 
-        // 3. Check if already finalized - if ANY results exist, skip
-        const { data: existingResults } = await supabase
-            .from('competition_results')
-            .select('id')
-            .eq('competition_id', competitionId);
-
-        if (existingResults && existingResults.length > 0) {
-            console.log('✅ Competition already finalized with', existingResults.length, 'players');
-            return NextResponse.json({
-                success: true,
-                message: "Already finalized",
-                resultCount: existingResults.length
-            });
-        }
-
         // 4. Fetch REGISTERED player count (for prize calculation - matches waiting room display)
         const { data: registrations, error: registrationsError } = await supabase
             .from('competition_registrations')
@@ -152,7 +137,30 @@ export async function POST(req: Request) {
         }
 
         const completedPlayerCount = sessions.length;
-        console.log('🔄 Finalizing competition with', completedPlayerCount, 'completed players (from', registeredPlayerCount, 'registered)...');
+        console.log('🔄 Found', completedPlayerCount, 'completed sessions (from', registeredPlayerCount, 'registered)...');
+
+        // 3. Check if already FULLY finalized - compare results count with sessions count
+        const { data: existingResults } = await supabase
+            .from('competition_results')
+            .select('id, user_id')
+            .eq('competition_id', competitionId);
+
+        const existingResultsCount = existingResults?.length || 0;
+
+        // Only skip if ALL sessions have been processed
+        if (existingResultsCount >= completedPlayerCount && existingResultsCount > 0) {
+            console.log('✅ Competition already FULLY finalized with', existingResultsCount, 'players (matches', completedPlayerCount, 'sessions)');
+            return NextResponse.json({
+                success: true,
+                message: "Already finalized",
+                resultCount: existingResultsCount
+            });
+        }
+
+        // If partial finalization, log and continue to process missing players
+        if (existingResultsCount > 0 && existingResultsCount < completedPlayerCount) {
+            console.log('⚠️ Partial finalization detected:', existingResultsCount, 'results vs', completedPlayerCount, 'sessions. Processing remaining...');
+        }
 
         // 6. Sort sessions by score (desc) and end_time (asc for tie-breaker)
         const sortedSessions = sessions.sort((a, b) => {
@@ -228,17 +236,18 @@ export async function POST(req: Request) {
                 .from('transactions')
                 .select('id')
                 .eq('session_id', session.id)
-                .in('type', ['reward', 'participation'])
+                .eq('type', 'reward')
                 .maybeSingle();
 
             if (!existingTx) {
                 // Insert transaction record for this participant
+                // Use 'reward' type for ALL participants - non-winners get 0 credits
                 const rankSuffix = rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : `${rank}th`;
                 const isWinner = prizeAmount > 0;
 
                 const { error: txError } = await supabase.from('transactions').insert({
                     user_id: session.user_id,
-                    type: isWinner ? 'reward' : 'participation', // Different type for non-winners
+                    type: 'reward', // Use 'reward' for ALL participants (winners and non-winners)
                     amount: prizeAmount, // 0 for non-winners
                     status: 'completed',
                     metadata: {
@@ -254,7 +263,7 @@ export async function POST(req: Request) {
                     },
                     description: isWinner
                         ? `Competition Reward (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`
-                        : `Competition Participation (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`,
+                        : `Competition Played (${competitionName}) - Rank: ${rankSuffix} - Score: ${correctAnswers}`,
                     session_id: session.id,
                     source: 'league_competition_finalized'
                 });

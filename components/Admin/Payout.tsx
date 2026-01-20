@@ -29,6 +29,8 @@ const Payout = () => {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [withdrawalsPerPage] = useState(20);
 
   useEffect(() => {
     fetchWithdrawals();
@@ -38,22 +40,29 @@ const Payout = () => {
   const fetchWithdrawals = async () => {
     try {
       setIsLoading(true);
+      
+      // Try to get session, but don't fail if it's not available
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Please sign in as admin to view withdrawals');
-        setIsLoading(false);
-        return;
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add auth header if session exists
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
-      const res = await fetch('/api/admin/withdrawals', {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch withdrawals');
+      const res = await fetch('/api/admin/withdrawals', { headers });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch withdrawals');
+      }
+      
       const body = await res.json();
       const rows: Withdrawal[] = (body.withdrawals || []).map((r: any) => {
-        // provider_response may come from user_payment_accounts.metadata or provider_payouts.response
         const provResp = r.provider_response || r.metadata || {};
-        // If provider_account missing, try to infer from the provider_response (stripe account id in `id`)
         const provAcct = r.provider_account || provResp?.id || null;
         return {
           id: r.id,
@@ -69,9 +78,9 @@ const Payout = () => {
         } as Withdrawal;
       });
       setWithdrawals(rows);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fetch withdrawals error', err);
-      toast.error('Failed to load withdrawals');
+      toast.error(err.message || 'Failed to load withdrawals');
     } finally {
       setIsLoading(false);
     }
@@ -80,17 +89,27 @@ const Payout = () => {
   const approve = async (id: string) => {
     try {
       setActionLoadingId(id);
+      
+      // Try to get session, but proceed without it if not available
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return toast.error('Admin session missing');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
       const res = await fetch(`/api/admin/withdrawals/${id}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }
+        headers
       });
+      
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Approve failed');
 
-      // update local state
+      // Update local state
       setWithdrawals((prev) => prev.map(w => w.id === id ? { ...w, status: body.paid ? 'Paid' : 'Approved', provider_payout_id: body.payout_id ?? w.provider_payout_id } : w));
       toast.success(body.paid ? 'Payout sent' : 'Withdrawal approved');
     } catch (err: any) {
@@ -115,14 +134,24 @@ const Payout = () => {
     if (!rejectingId) return;
     try {
       setActionLoadingId(rejectingId);
+      
+      // Try to get session, but proceed without it if not available
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return toast.error('Admin session missing');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
       const res = await fetch(`/api/admin/withdrawals/${rejectingId}/reject`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        headers,
         body: JSON.stringify({ note: rejectNote || null })
       });
+      
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Reject failed');
 
@@ -139,18 +168,29 @@ const Payout = () => {
 
   const refreshKyc = async (providerAccountId?: string) => {
     try {
+      // Try to get session, but proceed without it if not available
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return toast.error('Admin session missing');
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
-      // allow admin to pass providerAccountId or rely on provider_response.id if available
       const payload: any = {};
       if (providerAccountId) payload.provider_account_id = providerAccountId;
 
-      const res = await fetch('/api/admin/payments/stripe/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(payload) });
+      const res = await fetch('/api/admin/payments/stripe/refresh', { 
+        method: 'POST', 
+        headers, 
+        body: JSON.stringify(payload) 
+      });
+      
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || 'Failed to refresh');
       toast.success(`KYC status: ${body.kyc_status}`);
-      // refresh withdrawals (to pick up updated metadata if backend maps it)
       fetchWithdrawals();
     } catch (err: any) {
       console.error('Refresh KYC error', err);
@@ -163,6 +203,14 @@ const Payout = () => {
   const pendingAmount = withdrawals.filter(w => w.status === 'pending').reduce((s, w) => s + w.amount, 0);
   const approvedAmount = withdrawals.filter(w => w.status === 'approved' || w.status === 'Paid' || w.status === 'paid').reduce((s, w) => s + w.amount, 0);
   const rejectedAmount = withdrawals.filter(w => w.status === 'rejected' || w.status === 'Rejected').reduce((s, w) => s + w.amount, 0);
+
+  // Pagination calculations
+  const indexOfLastWithdrawal = currentPage * withdrawalsPerPage;
+  const indexOfFirstWithdrawal = indexOfLastWithdrawal - withdrawalsPerPage;
+  const currentWithdrawals = withdrawals.slice(indexOfFirstWithdrawal, indexOfLastWithdrawal);
+  const totalPages = Math.ceil(withdrawals.length / withdrawalsPerPage);
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -220,7 +268,9 @@ const Payout = () => {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-6 border-b flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-800">Withdrawal Requests</h2>
-            <div className="text-sm text-gray-500">{isLoading ? 'Loading...' : `${withdrawals.length} total`}</div>
+            <div className="text-sm text-gray-500">
+              {isLoading ? 'Loading...' : `Showing ${indexOfFirstWithdrawal + 1}-${Math.min(indexOfLastWithdrawal, withdrawals.length)} of ${withdrawals.length}`}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -235,7 +285,7 @@ const Payout = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {withdrawals.map(w => (
+                {currentWithdrawals.map(w => (
                   <React.Fragment key={w.id}>
                     <tr className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{w.user_id ?? '—'}</td>
@@ -305,6 +355,62 @@ const Payout = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-6 border-t flex justify-center items-center space-x-2">
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Previous
+              </button>
+              
+              <div className="flex space-x-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => paginate(page)}
+                        className={`px-4 py-2 border rounded-lg text-sm font-medium transition ${
+                          currentPage === page
+                            ? 'bg-lime-600 text-white border-lime-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (
+                    page === currentPage - 2 ||
+                    page === currentPage + 2
+                  ) {
+                    return (
+                      <span key={page} className="px-2 py-2 text-gray-500">
+                        ...
+                      </span>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Reject modal */}

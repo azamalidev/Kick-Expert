@@ -33,14 +33,33 @@ export default function AdminRefunds() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'completed'>('pending');
   const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [refundsPerPage] = useState(20);
 
   useEffect(() => {
     fetchRefunds();
+    setCurrentPage(1); // Reset to first page when filter changes
   }, [filter]);
 
   const fetchRefunds = async () => {
     try {
       setIsLoading(true);
+      
+      // Try API route first (with service role key)
+      try {
+        const response = await fetch(`/api/admin/refunds/list?filter=${filter}`);
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          setRefunds(result.refunds || []);
+          setIsLoading(false);
+          return;
+        }
+      } catch (apiError) {
+        console.warn('API route failed, falling back to direct query:', apiError);
+      }
+
+      // Fallback to direct Supabase query
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -72,14 +91,20 @@ export default function AdminRefunds() {
   const handleApprove = async (refund: RefundRequest) => {
     try {
       setIsProcessing(true);
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add auth header if we have a valid session
       const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
       const response = await fetch('/api/admin/refunds/approve', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
+        headers,
         body: JSON.stringify({ refund_id: refund.id })
       });
 
@@ -102,14 +127,20 @@ export default function AdminRefunds() {
   const handleReject = async (refund: RefundRequest, reason: string) => {
     try {
       setIsProcessing(true);
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add auth header if we have a valid session
       const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
       const response = await fetch('/api/admin/refunds/reject', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
+        headers,
         body: JSON.stringify({ refund_id: refund.id, reason })
       });
 
@@ -158,6 +189,14 @@ export default function AdminRefunds() {
         return null;
     }
   };
+
+  // Pagination calculations
+  const indexOfLastRefund = currentPage * refundsPerPage;
+  const indexOfFirstRefund = indexOfLastRefund - refundsPerPage;
+  const currentRefunds = refunds.slice(indexOfFirstRefund, indexOfLastRefund);
+  const totalPages = Math.ceil(refunds.length / refundsPerPage);
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   return (
     <div className="space-y-6">
@@ -254,7 +293,7 @@ export default function AdminRefunds() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {refunds.map((refund) => (
+                {currentRefunds.map((refund) => (
                   <tr key={refund.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-900">{refund.user_email || refund.user_id}</td>
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900">{refund.amount} credits</td>
@@ -303,6 +342,62 @@ export default function AdminRefunds() {
             </table>
           )}
         </div>
+
+        {/* Pagination */}
+        {!isLoading && totalPages > 1 && (
+          <div className="p-6 border-t flex justify-center items-center space-x-2">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Previous
+            </button>
+            
+            <div className="flex space-x-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                // Show first page, last page, current page, and pages around current
+                if (
+                  page === 1 ||
+                  page === totalPages ||
+                  (page >= currentPage - 1 && page <= currentPage + 1)
+                ) {
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => paginate(page)}
+                      className={`px-4 py-2 border rounded-lg text-sm font-medium transition ${
+                        currentPage === page
+                          ? 'bg-lime-600 text-white border-lime-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                } else if (
+                  page === currentPage - 2 ||
+                  page === currentPage + 2
+                ) {
+                  return (
+                    <span key={page} className="px-2 py-2 text-gray-500">
+                      ...
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Review Modal */}

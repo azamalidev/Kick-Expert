@@ -36,6 +36,8 @@ export default function AdminContacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [responseText, setResponseText] = useState('');
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [contactsPerPage] = useState(20);
 
   useEffect(() => {
     fetchContacts();
@@ -198,6 +200,19 @@ export default function AdminContacts() {
     return matchesStatus && matchesPriority && matchesSearch;
   });
 
+  // Pagination calculations
+  const indexOfLastContact = currentPage * contactsPerPage;
+  const indexOfFirstContact = indexOfLastContact - contactsPerPage;
+  const currentContacts = filteredContacts.slice(indexOfFirstContact, indexOfLastContact);
+  const totalPages = Math.ceil(filteredContacts.length / contactsPerPage);
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, filterPriority, searchTerm]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new':
@@ -337,7 +352,7 @@ export default function AdminContacts() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredContacts.map((contact) => (
+                  {currentContacts.map((contact) => (
                     <tr
                       key={contact.id}
                       onClick={() => setSelectedContact(contact)}
@@ -367,6 +382,62 @@ export default function AdminContacts() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {!loading && totalPages > 1 && (
+              <div className="p-6 border-t flex justify-center items-center space-x-2">
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => paginate(page)}
+                          className={`px-4 py-2 border rounded-lg text-sm font-medium transition ${
+                            currentPage === page
+                              ? 'bg-lime-600 text-white border-lime-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (
+                      page === currentPage - 2 ||
+                      page === currentPage + 2
+                    ) {
+                      return (
+                        <span key={page} className="px-2 py-2 text-gray-500">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Contact Details */}

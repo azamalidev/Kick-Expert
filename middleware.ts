@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-    // Skip middleware for RSC requests to prevent hanging
+    // Skip middleware for RSC requests to prevent issues
     const url = request.nextUrl;
     if (url.searchParams.has('_rsc')) {
         return NextResponse.next();
@@ -33,24 +33,12 @@ export async function middleware(request: NextRequest) {
         }
     );
 
-    // Add timeout to prevent hanging on slow Supabase calls
+    // Refresh session if needed
     try {
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Auth timeout')), 3000)
-        );
-        
-        const authPromise = supabase.auth.getUser();
-        
-        await Promise.race([authPromise, timeoutPromise]);
+        await supabase.auth.getUser();
     } catch (error) {
         console.error('Middleware auth error:', error);
-        // Continue without blocking the request
     }
-
-    // Optionally protect routes (uncomment if needed)
-    // if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    //   return NextResponse.redirect(new URL('/login', request.url));
-    // }
 
     return supabaseResponse;
 }
